@@ -23,7 +23,9 @@ dependencies = [
   "matplotlib>=3.5",
   "scikit-learn>=1.0",
 ]
+dynamic = ["version"]
 
 [project.urls]
 "Homepage" = "https://github.com/lorentzenchr/model-diagnostics"
 "Bug Tracker" = "https://github.com/lorentzenchr/model-diagnostics/issues"
+[tool]
