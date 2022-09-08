@@ -4,7 +4,6 @@ build-backend = "hatchling.build"
 
 [project]
 name = "model-diagnostics"
-version = "0.0.1"
 authors = [
   { name="Christian Lorentzen", email="lorentzen.ch@gmail.com" },
 ]
@@ -17,15 +16,32 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Development Status :: 1 - Planning",
+    "Framework :: Hatch",
     "Topic :: Scientific/Engineering",
 ]
+keywords = ["machine learning", "model diagnostics", "calibration"]
 dependencies = [
-  "matplotlib>=3.5",
-  "scikit-learn>=1.0",
+  "matplotlib >= 3.5",
+  "scikit-learn >= 1.0",
 ]
 dynamic = ["version"]
+
+[project.optional-dependencies]
+tests = [
+  "pytest >= 7.1",
+  "jupyterlab >= 3.4",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/lorentzenchr/model-diagnostics"
 "Bug Tracker" = "https://github.com/lorentzenchr/model-diagnostics/issues"
+
 [tool]
+
+[tool.hatch.envs.test]
+features = [
+  "tests",
+]
+
+[tool.hatch.version]
+path = "src/model_diagnostics/__init__.py"
