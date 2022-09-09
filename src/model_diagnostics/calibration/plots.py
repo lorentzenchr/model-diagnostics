@@ -7,12 +7,12 @@ from sklearn.isotonic import IsotonicRegression
 
 
 def plot_reliability_diagram(
-    y_obs : npt.ArrayLike,
-    y_pred : npt.ArrayLike,
-    y_min : typing.Optional[float] = 0,
-    y_max : typing.Optional[float] = 1,
+    y_obs: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    y_min: typing.Optional[float] = 0,
+    y_max: typing.Optional[float] = 1,
     *,
-    ax = None,
+    ax=None,
 ):
     """Plot a reliability diagram.
 
@@ -34,7 +34,7 @@ def plot_reliability_diagram(
     """
     if ax is None:
         ax = plt.gca()
-    
+
     y_obs_min, y_obs_max = np.min(y_obs), np.max(y_obs)
     y_pred_min, y_pred_max = np.min(y_pred), np.max(y_pred)
     iso = IsotonicRegression(y_min=y_obs_min, y_max=y_obs_max).fit(y_pred, y_obs)
