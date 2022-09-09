@@ -74,11 +74,17 @@ exclude = [
 dependencies = [
   "pytest",
   "pytest-cov",
+  "pytest-xdist",
 ]
 
 [tool.hatch.envs.default.scripts]
-cov = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=src/model_diagnostics --cov=tests"
+cov = "pytest  -n auto --cov-report=term-missing --cov-config=pyproject.toml --cov=src/model_diagnostics"
 no-cov = "cov --no-cov"
+
+[tool.hatch.envs.jupyter]
+dependencies = [
+  "jupyterlab >=3.4"
+]
 
 [[tool.hatch.envs.test.matrix]]
 python = ["38", "39", "310", "311"]
