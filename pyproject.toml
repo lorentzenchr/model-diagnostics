@@ -37,7 +37,6 @@ line-length = 88
 target-version = ["py38"]
 
 [tool.isort]
-default_section = "THIRDPARTY"
 known_first_party = ["model_diagnostics"]
 profile = "black"
 
