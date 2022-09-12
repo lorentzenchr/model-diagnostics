@@ -1,0 +1,87 @@
+site_name: Model Diagnostics
+site_description: Tools for diagnostics and assessment of (machine learning) models
+site_author: Christian Lorentzen
+# site_url: https://lorentzenchr.model-diagnostics.github.io
+repo_name: lorentzenchr/model-diagnostics
+repo_url: https://github.com/lorentzenchr/model-diagnostics
+# edit_uri: blob/master/docs
+copyright: 'Copyright &copy; Christian Lorentzen 202-present'
+
+theme:
+  name: material
+
+nav:
+  - Home:
+    - About: index.md
+  - Code Reference: reference/  # defer to gen-files + literate-nav
+
+watch:
+  - src/model_diagnostics/
+
+plugins:
+  # Built-in
+  - search:
+  # Extra
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            docstring_style: "numpy"
+            # Headings
+            show_root_heading: true
+            show_root_full_path: false
+            # Docstrings
+            # show_if_no_docstring: true
+            # Signatures/annotations
+            show_signature_annotations: true
+            # Other
+            show_bases: false
+            show_source: true
+
+markdown_extensions:
+
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js

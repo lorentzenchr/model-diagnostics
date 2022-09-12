@@ -16,14 +16,16 @@ def plot_reliability_diagram(
 ):
     """Plot a reliability diagram.
 
-    A reliability diagram calibration curve plots the E(y_obs|y_pred) vs y_pred.
+    A reliability diagram or calibration curve assess tauto-calibration. It plots the
+    conditional expectation $E(Y|y_{pred})$ vs $y_{pred}$, where $E(Y|y_{pred})$ is
+    estimated via isotonic regression (PAV algorithm) of `y_obs` on `y_pred`.
 
     Parameters
     ----------
-    y_obs : array-like, shape (n_obs)
+    y_obs : array-like of shape (n_obs)
         Observed values of the response variable.
         For binary classification, y_obs is expected to be in the interval [0, 1].
-    y_pred : array-like, shape (n_obs)
+    y_pred : array-like of shape (n_obs)
         Predicted values of the conditional expectation of Y, :math:`E(Y|X)`.
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.

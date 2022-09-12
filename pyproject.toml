@@ -81,6 +81,20 @@ dependencies = [
 cov = "pytest  -n auto --cov-report=term-missing --cov-config=pyproject.toml --cov=src/model_diagnostics"
 no-cov = "cov --no-cov"
 
+[tool.hatch.envs.docs]
+dependencies = [
+  "mkdocs-material~=8.4.3",
+  "mkdocstrings[python]>=0.18",
+  "mkdocs-gen-files>=0.4.0",
+  "mkdocs-literate-nav>=0.4.1",
+  "mkdocs-section-index>=0.3.4",
+  ]
+
+[tool.hatch.envs.docs.scripts]
+build = "mkdocs build --clean --strict {args}"
+serve = "mkdocs serve --dev-addr localhost:8000 {args}"
+ci-build = "mike deploy --update-aliases {args}"
+
 [tool.hatch.envs.jupyter]
 dependencies = [
   "jupyterlab >=3.4"
