@@ -1,11 +1,11 @@
 site_name: Model Diagnostics
 site_description: Tools for diagnostics and assessment of (machine learning) models
 site_author: Christian Lorentzen
-# site_url: https://lorentzenchr.model-diagnostics.github.io
+site_url: https://lorentzenchr.github.io/model-diagnostics
 repo_name: lorentzenchr/model-diagnostics
 repo_url: https://github.com/lorentzenchr/model-diagnostics
-# edit_uri: blob/master/docs
-copyright: 'Copyright &copy; Christian Lorentzen 202-present'
+edit_uri: blob/master/docs
+copyright: 'Copyright &copy; Christian Lorentzen 2022-present'
 
 theme:
   name: material

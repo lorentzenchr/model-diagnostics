@@ -93,7 +93,7 @@ dependencies = [
 [tool.hatch.envs.docs.scripts]
 build = "mkdocs build --clean --strict {args}"
 serve = "mkdocs serve --dev-addr localhost:8000 {args}"
-ci-build = "mike deploy --update-aliases {args}"
+ci-build = "mkdocs gh-deploy --force {args}"
 
 [tool.hatch.envs.jupyter]
 dependencies = [
