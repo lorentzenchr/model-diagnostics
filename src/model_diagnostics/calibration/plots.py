@@ -41,7 +41,8 @@ def plot_reliability_diagram(
     y_pred_min, y_pred_max = np.min(y_pred), np.max(y_pred)
     iso = IsotonicRegression(y_min=y_obs_min, y_max=y_obs_max).fit(y_pred, y_obs)
     ax.plot([y_pred_min, y_pred_max], [y_pred_min, y_pred_max], "k:")
-    ax.plot(iso.X_thresholds_, iso.y_thresholds_, "s-")
+    ax.plot(iso.X_thresholds_, iso.y_thresholds_)
     ax.set(xlabel="prediction for E(Y|X)", ylabel="estimated E(Y|prediction)")
+    ax.set_title("Reliability Diagram")
 
     return ax
