@@ -10,7 +10,7 @@ authors = [
 description = "Tools for diagnostics and assessment of (machine learning) models"
 readme = "README.md"
 license = { file="LICENSE" }
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -34,7 +34,7 @@ dynamic = ["version"]
 
 [tool.black]
 line-length = 88
-target-version = ["py38"]
+target-version = ["py39"]
 
 [tool.isort]
 known_first_party = ["model_diagnostics"]
@@ -100,7 +100,7 @@ dependencies = [
 ]
 
 [[tool.hatch.envs.test.matrix]]
-python = ["38", "39", "310", "311"]
+python = ["39", "310", "311"]
 
 [tool.hatch.envs.lint]
 detached = true

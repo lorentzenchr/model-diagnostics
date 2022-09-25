@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8']
+        python-version: ['3.9']
 
     steps:
     - uses: actions/checkout@v3
@@ -37,7 +37,7 @@ jobs:
       run: |
         pip install hatch
 
-    - if: matrix.python-version == '3.8' && runner.os == 'Linux'
+    - if: matrix.python-version == '3.9' && runner.os == 'Linux'
       name: Lint
       run: hatch run lint:all
 
