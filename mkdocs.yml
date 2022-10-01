@@ -56,7 +56,7 @@ plugins:
             # Docstrings
             # show_if_no_docstring: true
             # Signatures/annotations
-            show_signature_annotations: true
+            show_signature_annotations: false  # type annotations
             # Other
             show_bases: false
             show_source: true
