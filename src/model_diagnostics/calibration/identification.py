@@ -37,7 +37,7 @@ def identification_function(
 
     Returns
     -------
-    V : array-like of shape (n_obs)
+    V : ndarray of shape (n_obs)
         Values of the identification function.
 
     Notes
