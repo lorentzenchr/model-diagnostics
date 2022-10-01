@@ -71,6 +71,8 @@ exclude = [
 
 [tool.hatch.envs.default]
 dependencies = [
+  "pandas>=1.5.0",
+  "pyarrow>=9.0.0",
   "pytest",
   "pytest-cov",
   "pytest-xdist",
