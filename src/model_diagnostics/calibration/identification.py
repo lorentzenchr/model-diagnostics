@@ -9,7 +9,7 @@ def identification_function(
     y_pred: npt.ArrayLike,
     functional: str = "mean",
     level: float = 0.5,
-) -> npt.ArrayLike:
+) -> np.ndarray:
     r"""Canonical identification function.
 
     Identification functions act as generalised residuals. See Notes for further
@@ -68,19 +68,21 @@ def identification_function(
     --------
 
     """
-    y_obs, y_pred = validate_2_arrays(y_obs, y_pred)
+    y_o: np.ndarray
+    y_p: np.ndarray
+    y_o, y_p = validate_2_arrays(y_obs, y_pred)
 
     if functional in ("expectile", "quantile") and (level < 0 or level > 1):
         raise ValueError(f"Argument level must fulfil 0 <= level <= 1, got {level}.")
 
     if functional == "mean":
-        return y_pred - y_obs
+        return y_p - y_o
     elif functional == "median":
-        return np.greater_equal(y_pred, y_obs) - 0.5
+        return np.greater_equal(y_p, y_o) - 0.5
     elif functional == "expectile":
-        return 2 * np.abs(np.greater_equal(y_pred, y_obs) - level) * (y_pred - y_obs)
+        return 2 * np.abs(np.greater_equal(y_p, y_o) - level) * (y_p - y_o)
     elif functional == "quantile":
-        return np.greater_equal(y_pred, y_obs) - level
+        return np.greater_equal(y_p, y_o) - level
     else:
         allowed_functionals = ("mean", "median", "expectile", "quantile")
         raise ValueError(

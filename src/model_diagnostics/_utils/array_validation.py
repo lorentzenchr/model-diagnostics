@@ -4,7 +4,7 @@ import numpy.typing as npt
 
 def validate_2_arrays(
     a: npt.ArrayLike, b: npt.ArrayLike
-) -> tuple[npt.ArrayLike, npt.ArrayLike]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Validate 2 arrays."""
     # Note: If the input is an pyarrow array, np.asarray produces a read-only ndarray.
     a = np.asarray(a)
