@@ -7,7 +7,9 @@ import mkdocs_gen_files
 nav = mkdocs_gen_files.Nav()
 
 for path in sorted(
-    set(Path("src").rglob("*.py")) - set(Path("src").rglob("*test*.py"))
+    set(Path("src").rglob("*.py"))
+    - set(Path("src").rglob("*test*.py"))
+    - set(Path("src").rglob("_*/*.py"))
 ):
     # print(f"Generate path {path}")
     module_path = path.relative_to("src").with_suffix("")
