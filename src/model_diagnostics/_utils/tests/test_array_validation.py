@@ -1,14 +1,14 @@
-import pytest
-
 import numpy as np
-from numpy.testing import assert_array_equal
 import pandas as pd
 import pyarrow as pa
+import pytest
+from numpy.testing import assert_array_equal
 
 from model_diagnostics._utils.array_validation import validate_2_arrays
 
 
-@pytest.mark.parametrize("a",
+@pytest.mark.parametrize(
+    "a",
     [
         list(range(5)),
         pd.Series(range(5), dtype=float),
