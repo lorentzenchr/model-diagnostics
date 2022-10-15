@@ -14,11 +14,13 @@ def plot_reliability_diagram(
     *,
     ax=None,
 ):
-    """Plot a reliability diagram.
+    r"""Plot a reliability diagram.
 
-    A reliability diagram or calibration curve assess tauto-calibration. It plots the
-    conditional expectation $E(Y|y_{pred})$ vs $y_{pred}$, where $E(Y|y_{pred})$ is
-    estimated via isotonic regression (PAV algorithm) of `y_obs` on `y_pred`.
+    A reliability diagram or calibration curve assess auto-calibration. It plots the
+    conditional expectation given the predictions (y-axis) vs the predictions (x-axis).
+    The conditional expectation is estimated via isotonic regression (PAV algorithm)
+    of `y_obs` on `y_pred`.
+    See Notes for further details.
 
     Parameters
     ----------
@@ -26,13 +28,35 @@ def plot_reliability_diagram(
         Observed values of the response variable.
         For binary classification, y_obs is expected to be in the interval [0, 1].
     y_pred : array-like of shape (n_obs)
-        Predicted values of the conditional expectation of Y, :math:`E(Y|X)`.
+        Predicted values of the conditional expectation of Y, \(E(Y|X)\).
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.
 
     Returns
     -------
     ax
+
+    Notes
+    -----
+    The expectation conditional on the predictions is \(E(Y|y_{pred})\). This object is
+    estimated by the pool-adjacent violator (PAV) algorithm, which has very desirable
+    properties:
+
+        - It is non-parametric without any tuning parameter. Thus, the results are
+          easily reproducible.
+        - Optimal selection of bins
+        - Statistical consistent estimator
+
+    For details, refer to [Dimitriadis2021].
+
+    References
+    ----------
+    `[Dimitriadis2021]`
+
+    :   T. Dimitriadis, T. Gneiting, and A. I. Jordan.
+        "Stable reliability diagrams for probabilistic classifiers".
+        In: Proceedings of the National Academy of Sciences 118.8 (2021), e2016191118.
+        [doi:10.1073/pnas.2016191118](https://doi.org/10.1073/pnas.2016191118).
     """
     if ax is None:
         ax = plt.gca()
