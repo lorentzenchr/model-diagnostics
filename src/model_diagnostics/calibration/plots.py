@@ -9,9 +9,9 @@ from sklearn.isotonic import IsotonicRegression
 def plot_reliability_diagram(
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
+    *,
     y_min: typing.Optional[float] = 0,
     y_max: typing.Optional[float] = 1,
-    *,
     ax=None,
 ):
     r"""Plot a reliability diagram.
