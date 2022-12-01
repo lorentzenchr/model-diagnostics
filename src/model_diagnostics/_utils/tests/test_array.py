@@ -4,7 +4,7 @@ import pyarrow as pa
 import pytest
 from numpy.testing import assert_array_equal
 
-from model_diagnostics._utils.array_validation import validate_2_arrays
+from model_diagnostics._utils.array import array_name, validate_2_arrays
 
 
 @pytest.mark.parametrize(
@@ -32,3 +32,16 @@ def test_validate_2_arrays_raises():
     b = np.arange(4)
     with pytest.raises(ValueError, match="Arrays must have the same shape"):
         validate_2_arrays(a, b)
+
+
+pytest.mark.parametrize("a, name",
+    [
+        (np.array([1]), None),
+        (pd.Series([1], name="Numbers"), "Numbers"),
+        # pa.array gives no control to set arra._name
+        (pa.table({"t": [1.]}).column("t"), "t"),
+    ]
+)
+def test_array_name(a, name):
+    """Test that array_name gives correct name."""
+    assert array_name(a) == name

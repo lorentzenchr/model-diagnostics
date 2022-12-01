@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.typing as npt
 
-from .._utils.array_validation import validate_2_arrays
+from .._utils.array import array_name, validate_2_arrays
 
 
 def identification_function(

@@ -19,3 +19,17 @@ def validate_2_arrays(
                 f"Arrays must have the same shape, got {a.shape=} and {b.shape=}."
             )
     return a, b
+
+
+def array_name(a: npt.ArrayLike, default: str = None) -> str:
+    """Extract name from array if it exists."""
+    if hasattr(a, "name"):
+        # pandas and polars Series
+        name = a.name
+    elif hasattr(a, "_name"):
+        # pyarrow Array / ChunkedArray
+        name = a._name
+    else:
+        name = default
+
+    return name
