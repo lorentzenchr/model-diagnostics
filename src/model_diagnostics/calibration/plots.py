@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 from sklearn.isotonic import IsotonicRegression
 
-from .identification import compute_bias, identification_function
+from .identification import compute_bias
 
 
 def plot_reliability_diagram(
