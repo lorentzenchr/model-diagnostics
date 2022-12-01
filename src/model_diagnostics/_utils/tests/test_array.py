@@ -34,7 +34,7 @@ def test_validate_2_arrays_raises():
         validate_2_arrays(a, b)
 
 
-pytest.mark.parametrize("a, name",
+@pytest.mark.parametrize("a, name",
     [
         (np.array([1]), None),
         (pd.Series([1], name="Numbers"), "Numbers"),
