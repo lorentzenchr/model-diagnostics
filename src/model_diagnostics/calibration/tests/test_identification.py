@@ -1,10 +1,12 @@
 from functools import partial
 
 import numpy as np
+import pyarrow as pa
 import pytest
 from scipy.optimize import root_scalar
+from scipy.stats import ttest_1samp
 
-from model_diagnostics.calibration import identification_function
+from model_diagnostics.calibration import compute_bias, identification_function
 
 
 # Note: expectile might arrive with scipy 1.10.
@@ -80,3 +82,44 @@ def test_identification_function_raises(functional, level, msg):
     y_obs, y_pred = np.arange(5), np.arange(5)
     with pytest.raises(ValueError, match=msg):
         identification_function(y_obs, y_pred, functional=functional, level=level)
+
+
+@pytest.mark.parametrize(
+    "feature, f_result",
+    [
+        (
+            pa.DictionaryArray.from_arrays([0, 0, 1, 1], ["b", "a"]),
+            pa.DictionaryArray.from_arrays([0, 1], ["b", "a"]),
+        ),
+        (
+            pa.array([0.1, 0.1, 0.9, 0.9]),
+            pa.array([0.1, 0.9]),
+        ),
+    ],
+)
+def test_compute_bias(feature, f_result):
+    """Test compute_bias on simple data."""
+    df = pa.table(
+        {
+            "y_obs": [0, 1, 2, 4],
+            "y_pred": [1, 1, 2, 2],
+            "feature": feature,
+        }
+    )
+    df_bias = compute_bias(
+        y_obs=df.column("y_obs"),
+        y_pred=df.column("y_pred"),
+        feature=df.column("feature"),
+    )
+    df_expected = pa.table(
+        {
+            "feature": f_result,
+            "bias_mean": [0.5, -1],
+            "bias_count": [2, 2],
+            "bias_stddev": np.sqrt([0.25 + 0.25, 1 + 1]),
+            "p_value": [ttest_1samp([1, 0], 0).pvalue, ttest_1samp([0, -2], 0).pvalue],
+        }
+    )
+    print(f"{df_bias=}")
+    print(f"{df_expected=}")
+    assert df_bias.equals(df_expected)
