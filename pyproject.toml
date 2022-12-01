@@ -21,7 +21,9 @@ classifiers = [
 ]
 keywords = ["machine learning", "model diagnostics", "calibration"]
 dependencies = [
-  "matplotlib >= 3.5",
+  "pandas >= 1.5",
+  "pyarrow >= 9.0.0",
+  "matplotlib >= 3.6.1",
   "scikit-learn >= 1.0",
 ]
 dynamic = ["version"]
@@ -71,8 +73,6 @@ exclude = [
 
 [tool.hatch.envs.default]
 dependencies = [
-  "pandas>=1.5.0",
-  "pyarrow>=9.0.0",
   "pytest",
   "pytest-cov",
   "pytest-xdist",
@@ -89,7 +89,7 @@ dependencies = [
   "mkdocs-gen-files>=0.4.0",
   "mkdocs-literate-nav>=0.4.1",
   "mkdocs-section-index>=0.3.4",
-  ]
+]
 
 [tool.hatch.envs.docs.scripts]
 build = "mkdocs build --clean --strict {args}"
@@ -97,8 +97,8 @@ serve = "mkdocs serve --dev-addr localhost:8000 {args}"
 ci-build = "mkdocs gh-deploy --force {args}"
 
 [tool.hatch.envs.jupyter]
-dependencies = [
-  "jupyterlab >=3.4"
+extra-dependencies = [
+  "jupyterlab >=3.4",
 ]
 
 [[tool.hatch.envs.test.matrix]]
