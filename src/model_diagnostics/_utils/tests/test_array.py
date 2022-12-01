@@ -34,13 +34,14 @@ def test_validate_2_arrays_raises():
         validate_2_arrays(a, b)
 
 
-@pytest.mark.parametrize("a, name",
+@pytest.mark.parametrize(
+    "a, name",
     [
-        (np.array([1]), None),
+        (np.array([1]), ""),
         (pd.Series([1], name="Numbers"), "Numbers"),
         # pa.array gives no control to set arra._name
-        (pa.table({"t": [1.]}).column("t"), "t"),
-    ]
+        (pa.table({"t": [1.0]}).column("t"), "t"),
+    ],
 )
 def test_array_name(a, name):
     """Test that array_name gives correct name."""

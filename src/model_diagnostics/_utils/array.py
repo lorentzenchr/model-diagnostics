@@ -21,7 +21,7 @@ def validate_2_arrays(
     return a, b
 
 
-def array_name(a: npt.ArrayLike, default: str = None) -> str:
+def array_name(a: npt.ArrayLike, default: str = "") -> str:
     """Extract name from array if it exists."""
     if hasattr(a, "name"):
         # pandas and polars Series
