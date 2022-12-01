@@ -197,9 +197,10 @@ def compute_bias(
             feature,
             q=np.linspace(0 + 1 / n_bins, 1 - 1 / n_bins, n_bins - 1),
             method="lower",  # "linear" would not reduce with np.unique below
-        )
+        )  # type: ignore
         q = np.unique(q)
-        f_binned = np.digitize(feature, bins=q, right=True)  # bins[i-1] < x <= bins[i]
+        # bins[i-1] < x <= bins[i]
+        f_binned = np.digitize(feature, bins=q, right=True)  # type: ignore
         df = df.append_column("bin", pa.array(f_binned))
         df = (
             df.group_by(["bin"])
