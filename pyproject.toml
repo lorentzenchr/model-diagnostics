@@ -29,8 +29,9 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-"Homepage" = "https://github.com/lorentzenchr/model-diagnostics"
-"Bug Tracker" = "https://github.com/lorentzenchr/model-diagnostics/issues"
+"Homepage" = "https://lorentzenchr.github.io/model-diagnostics/"
+"Source" = "https://github.com/lorentzenchr/model-diagnostics"
+"Tracker" = "https://github.com/lorentzenchr/model-diagnostics/issues"
 
 [tool]
 
