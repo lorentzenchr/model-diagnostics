@@ -85,24 +85,28 @@ def test_identification_function_raises(functional, level, msg):
 
 
 @pytest.mark.parametrize(
-    "feature, f_result",
+    "feature, f_grouped",
     [
         (
-            pa.DictionaryArray.from_arrays([0, 0, 1, 1], ["b", "a"]),
-            pa.DictionaryArray.from_arrays([0, 1], ["b", "a"]),
+            pa.DictionaryArray.from_arrays([0, 0, 1, 1, 1], ["b", "a"]),
+            pa.DictionaryArray.from_arrays(np.array([0, 1], dtype=np.int8), ["b", "a"]),
         ),
         (
-            pa.array([0.1, 0.1, 0.9, 0.9]),
+            pa.array(["a", "a", "b", "b", "b"]),
+            pa.array(["a", "b"]),
+        ),
+        (
+            pa.array([0.1, 0.1, 0.9, 0.9, 0.9]),
             pa.array([0.1, 0.9]),
         ),
     ],
 )
-def test_compute_bias(feature, f_result):
+def test_compute_bias(feature, f_grouped):
     """Test compute_bias on simple data."""
     df = pa.table(
         {
-            "y_obs": [0, 1, 2, 4],
-            "y_pred": [1, 1, 2, 2],
+            "y_obs": [0, 1, 2, 4, 3],
+            "y_pred": [1, 1, 2, 2, 2],
             "feature": feature,
         }
     )
@@ -113,13 +117,14 @@ def test_compute_bias(feature, f_result):
     )
     df_expected = pa.table(
         {
-            "feature": f_result,
+            "feature": f_grouped,
             "bias_mean": [0.5, -1],
-            "bias_count": [2, 2],
-            "bias_stddev": np.sqrt([0.25 + 0.25, 1 + 1]),
-            "p_value": [ttest_1samp([1, 0], 0).pvalue, ttest_1samp([0, -2], 0).pvalue],
+            "bias_count": [2, 3],
+            "bias_stddev": np.sqrt([0.25 + 0.25, (1 + 1 + 0) / 2]),
+            "p_value": [
+                ttest_1samp([1, 0], 0).pvalue,
+                ttest_1samp([0, -2, -1], 0).pvalue,
+            ],
         }
     )
-    print(f"{df_bias=}")
-    print(f"{df_expected=}")
     assert df_bias.equals(df_expected)

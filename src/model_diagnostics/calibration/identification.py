@@ -173,24 +173,34 @@ def compute_bias(
         }
     )
 
-    # Is feature categorical?
+    is_categorical = False
+    # is_numeric = False
+    is_string = False
     if pa.types.is_dictionary(df.column(feature_name).type):
         is_categorical = True
     elif pa.types.is_string(df.column(feature_name).type):
         # We could convert strings to categoricals.
-        is_categorical = True
-    else:
-        is_categorical = False
+        is_string = True
+    # else:
+    #     is_numeric = True
 
     agg = (
         ("bias", "mean"),
         ("bias", "count"),
         ("bias", "stddev", pc.VarianceOptions(ddof=1)),
     )
-    if is_categorical:
+    if is_categorical or is_string:
         df = df.group_by([feature_name]).aggregate([*agg])
         n_bins = min(n_bins, df.num_rows)
-        df.sort_by("bias_count").take(np.arange(n_bins))
+        df = df.sort_by("bias_count").take(np.arange(n_bins))
+        if is_categorical:
+            # Pyarrow does not yet support sorting dictionary type arrays, see
+            # https://issues.apache.org/jira/browse/ARROW-14314
+            # We resort to pandas instead.
+            df = df.to_pandas().sort_values(feature_name)
+            df = pa.Table.from_pandas(df)
+        else:
+            df = df.sort_by(feature_name)
     else:
         # binning
         q = np.quantile(
@@ -210,6 +220,7 @@ def compute_bias(
                     (feature_name, "mean"),
                 ]
             )
+            .sort_by("bin")
             .drop(["bin"])
         )
         cnames = df.column_names
