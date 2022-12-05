@@ -32,4 +32,7 @@ def array_name(a: npt.ArrayLike, default: str = "") -> str:
     else:
         name = default
 
+    if name is None:
+        name = default
+
     return name
