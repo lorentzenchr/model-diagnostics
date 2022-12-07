@@ -123,3 +123,4 @@ def test_array_name_none():
     """Test that array_name gives default if name is None."""
     a = pd.Series([1, 2])  # We dont set name is Series => it is None.
     assert array_name(a, default="default") == "default"
+    assert array_name(None, default="default")
