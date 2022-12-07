@@ -4,7 +4,78 @@ import pyarrow as pa
 import pytest
 from numpy.testing import assert_array_equal
 
-from model_diagnostics._utils.array import array_name, validate_2_arrays
+from model_diagnostics._utils.array import (
+    array_name,
+    validate_2_arrays,
+    validate_same_first_dimension,
+)
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (list(range(5)), np.zeros(5)),
+        (np.zeros(5), np.zeros((5, 15))),
+        (pd.Series(range(5)), np.zeros(5)),
+        (pa.array(range(5)), np.zeros(5)),
+        (pd.DataFrame({"a": [0, 1], "b": 0.5})["b"], np.zeros(2)),
+        (pa.table({"a": [0, 1], "b": ["A", "B"]}).column("b"), np.zeros(2)),
+    ],
+)
+def test_validate_same_first_dimension_passes(a, b):
+    """Test that validate_same_first_dimension succeeds."""
+    assert validate_same_first_dimension(a, b)
+
+
+@pytest.mark.parametrize(
+    "a, b, msg",
+    [
+        (
+            list(range(5)),
+            np.zeros(3),
+            "The two array-like objects don't have the same length",
+        ),
+        (
+            np.zeros(5),
+            np.zeros((3, 15)),
+            "The two array-like objects don't have the same length",
+        ),
+        (
+            pd.Series(range(5)),
+            np.zeros(3),
+            "The two array-like objects don't have the same length",
+        ),
+        (
+            pa.array(range(5)),
+            np.zeros(3),
+            "The two array-like objects don't have the same length",
+        ),
+        (
+            pd.DataFrame({"a": [0, 1], "b": 0.5})["b"],
+            np.zeros(3),
+            "The two array-like objects don't have the same length",
+        ),
+        (
+            pa.table({"a": [0, 1], "b": ["A", "B"]}).column("b"),
+            np.zeros(3),
+            "The two array-like objects don't have the same length",
+        ),
+        (
+            5,
+            np.zeros(3),
+            "Unable to determine array-like object's length of first dimension.",
+        ),
+        (
+            np.array(5),
+            np.zeros(3),
+            "Array-like object has zero length first dimension.",
+        ),
+    ],
+)
+def test_validate_same_first_dimension_raises(a, b, msg):
+    """Test that validate_same_first_dimension succeeds."""
+    with pytest.raises(ValueError, match=msg):
+        validate_same_first_dimension(a, b)
 
 
 @pytest.mark.parametrize(
