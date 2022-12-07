@@ -1,6 +1,7 @@
 from functools import partial
 
 import numpy as np
+import pandas as pd
 import pyarrow as pa
 import pytest
 from scipy.optimize import root_scalar
@@ -128,3 +129,65 @@ def test_compute_bias(feature, f_grouped):
         }
     )
     assert df_bias.equals(df_expected)
+
+
+def test_compute_bias_feature_none():
+    """Test compute_bias for feature = None."""
+    df = pa.table(
+        {
+            "y_obs": [0, 1, 2, 4, 3],
+            "y_pred": [1, 1, 2, 2, 2],
+        }
+    )
+    df_bias = compute_bias(
+        y_obs=df.column("y_obs"),
+        y_pred=df.column("y_pred"),
+        feature=None,
+    )
+    df_expected = pa.table(
+        {
+            "bias_mean": [-0.4],  # (1 + 0 + 0 - 2 - 1)/5
+            "bias_count": [5],
+            "bias_stddev": [np.std([1, 0, 0, -2, -1], ddof=1)],
+            "p_value": [
+                ttest_1samp([1, 0, 0, -2, -1], 0).pvalue,
+            ],
+        }
+    )
+    pd.testing.assert_frame_equal(df_bias.to_pandas(), df_expected.to_pandas())
+
+
+def test_compute_bias_numerical_feature():
+    """Test compute_bias for feature = None."""
+    n_obs = 100
+    n_bins = 10
+    n_steps = n_obs // n_bins
+    df = pa.table(
+        {
+            "y_obs": 2 * np.linspace(-0.5, 0.5, num=n_obs, endpoint=False),
+            "y_pred": np.linspace(0, 1, num=n_obs, endpoint=False),
+            "feature": np.linspace(0, 1, num=n_obs, endpoint=False),
+        }
+    )
+    df_bias = compute_bias(
+        y_obs=df.column("y_obs"),
+        y_pred=df.column("y_pred"),
+        feature=df.column("feature"),
+        n_bins=n_bins,
+    )
+    bias = df.column("y_pred").to_numpy() - df.column("y_obs").to_numpy()
+    df_expected = pa.table(
+        {
+            "feature": 0.045 + 0.1 * np.arange(10),
+            "bias_mean": 0.955 - 0.1 * np.arange(10),
+            "bias_count": n_steps * np.ones(n_bins, dtype=np.int64),
+            "bias_stddev": [
+                np.std(bias[n : n + n_steps], ddof=1) for n in range(0, n_obs, n_steps)
+            ],
+            "p_value": [
+                ttest_1samp(bias[n : n + n_steps], 0).pvalue
+                for n in range(0, n_obs, n_steps)
+            ],
+        }
+    )
+    pd.testing.assert_frame_equal(df_bias.to_pandas(), df_expected.to_pandas())
