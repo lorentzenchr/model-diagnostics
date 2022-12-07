@@ -161,21 +161,24 @@ def plot_bias(
     elif pa.types.is_string(df.column(feature_name).type):
         is_string = True
 
-    # diagonal line
+    # horizontal line at y=0
     if is_categorical or is_string:
         min_max = {"min": 0, "max": df.shape[0]}
     else:
         min_max = pc.min_max(df[feature_name]).as_py()
     ax.hlines(0, min_max["min"], min_max["max"], color="k", linestyles="dotted")
     # bias plot
-    # ax.plot(df[feature_name], df["bias_mean"], "o-")
-    ax.errorbar(
-        df[feature_name],
-        df["bias_mean"],
-        yerr=df["bias_stddev"],
-        fmt="o-",
-        capsize=4,
-    )
+    if df["bias_stddev"].null_count > 0:
+
+        ax.plot(df[feature_name], df["bias_mean"], "o-")
+    else:
+        ax.errorbar(
+            df[feature_name],
+            df["bias_mean"],
+            yerr=df["bias_stddev"],
+            fmt="o-",
+            capsize=4,
+        )
     if is_categorical or is_string:
         ax.set(xlabel=feature_name, ylabel="bias")
     else:

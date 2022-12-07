@@ -29,7 +29,11 @@ def test_plot_reliability_diagram(ax):
 @pytest.mark.parametrize("categorical_type", ["cat", "string"])
 def test_plot_bias(ax, categorical_type):
     """Test that plot_bias works."""
-    X, y = make_classification(random_state=42)
+    X, y = make_classification(
+        n_samples=100,
+        n_features=10,
+        random_state=42,
+    )
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
     clf = LogisticRegression(solver="lbfgs")
     clf.fit(X_train, y_train)
