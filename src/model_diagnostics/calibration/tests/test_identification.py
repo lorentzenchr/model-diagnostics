@@ -191,3 +191,30 @@ def test_compute_bias_numerical_feature():
         }
     )
     pd.testing.assert_frame_equal(df_bias.to_pandas(), df_expected.to_pandas())
+
+
+def test_compute_bias_multiple_predictions():
+    """test compute_bias for multiple predictions."""
+    n_obs = 10
+    y_obs = np.ones(n_obs)
+    y_obs[: 10 // 2] = 2
+    y_pred = pd.DataFrame({"model_1": np.ones(n_obs), "model_2": 3 * np.ones(n_obs)})
+    feature = pd.Series(y_obs, name="nice_feature")
+    df_bias = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+    )
+    df_expected = pd.DataFrame(
+        {
+            "model": ["model_1", "model_1", "model_2", "model_2"],
+            "nice_feature": [1.0, 2, 1, 2],
+            "bias_mean": [0.0, -1, 2, 1],
+            "bias_count": [5] * 4,
+            "bias_stddev": [0.0] * 4,
+            "p_value": [0.0] * 4,
+        }
+    )
+    print(df_bias.to_pandas())
+    print(df_expected)
+    pd.testing.assert_frame_equal(df_bias.to_pandas(), df_expected)
