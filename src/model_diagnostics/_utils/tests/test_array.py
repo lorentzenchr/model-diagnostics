@@ -6,9 +6,84 @@ from numpy.testing import assert_array_equal
 
 from model_diagnostics._utils.array import (
     array_name,
+    get_second_dimension,
+    length_of_first_dimension,
+    length_of_second_dimension,
     validate_2_arrays,
     validate_same_first_dimension,
 )
+
+
+@pytest.mark.parametrize(
+    "a, n",
+    [
+        (list(range(5)), 5),
+        (np.arange(5), 5),
+        (np.ones((5, 3)), 5),
+        (pd.Series(range(5)), 5),
+        (pa.array(range(5)), 5),
+        (pd.DataFrame({"a": [0, 1], "b": 0.5}), 2),
+        (pa.table({"a": [0, 1], "b": ["A", "B"]}), 2),
+    ],
+)
+def test_length_of_first_dimension(a, n):
+    """Test length of first dimenion."""
+    assert length_of_first_dimension(a) == n
+
+
+@pytest.mark.parametrize(
+    "a, msg",
+    [
+        (np.array(2), "Array-like object has zero length first dimension."),
+        (2, "Unable to determine array-like object's length of first dimension."),
+    ],
+)
+def test_length_of_first_dimension_raises(a, msg):
+    """Test that test_length_of_first_dimension raises error."""
+    with pytest.raises(ValueError, match=msg):
+        length_of_first_dimension(a)
+
+
+@pytest.mark.parametrize(
+    "a, n",
+    [
+        (list(range(5)), 0),
+        (([2, 3, 4], [1, 2, 3]), 3),
+        (np.arange(5), 0),
+        (np.ones((5, 3)), 3),
+        (pd.DataFrame({"a": [0, 1], "b": 0.5}), 2),
+        (pa.table({"a": [0, 1], "b": ["A", "B"]}), 2),
+    ],
+)
+def test_length_of_second_dimension(a, n):
+    """Test length of second dimension."""
+    assert length_of_second_dimension(a) == n
+
+
+@pytest.mark.parametrize(
+    "a, msg",
+    [
+        (np.ones((2, 2, 2)), "Array-like has more than 2 dimensions."),
+        ([[[0], [1]], [[0], [1]]], "Array-like has more than 2 dimensions."),
+    ],
+)
+def test_length_of_second_dimension_raises(a, msg):
+    """Test that test_length_of_second_dimension raises error."""
+    with pytest.raises(ValueError, match=msg):
+        length_of_second_dimension(a)
+
+
+@pytest.mark.parametrize(
+    "a, i, result",
+    [
+        (np.ones((5, 3)), 2, np.ones(5)),
+        (pd.DataFrame({"a": [0, 1], "b": 0.5}), 0, pd.Series([0, 1], name="a")),
+        (pa.table({"a": [0, 1], "b": ["A", "B"]}), 1, pa.array(["A", "B"])),
+    ],
+)
+def test_get_second_dimension(a, i, result):
+    """Test that get_second_dimension works correctly."""
+    np.testing.assert_array_equal(get_second_dimension(a, i), result)
 
 
 @pytest.mark.parametrize(

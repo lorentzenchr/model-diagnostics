@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 
 
-def _length_of_first_dimension(a: npt.ArrayLike) -> int:
+def length_of_first_dimension(a: npt.ArrayLike) -> int:
     """Return length of first dimension."""
     if hasattr(a, "shape"):
         if len(a.shape) < 1:
@@ -23,13 +23,40 @@ def _length_of_first_dimension(a: npt.ArrayLike) -> int:
 
 def validate_same_first_dimension(a: npt.ArrayLike, b: npt.ArrayLike) -> bool:
     """Validate that 2 array-like have the same length of the first dimension."""
-    if _length_of_first_dimension(a) != _length_of_first_dimension(b):
+    if length_of_first_dimension(a) != length_of_first_dimension(b):
         raise ValueError(
             "The two array-like objects don't have the same length of their first "
             "dimension."
         )
     else:
         return True
+
+
+def length_of_second_dimension(a: npt.ArrayLike) -> int:
+    """Return length of first dimension."""
+    if not hasattr(a, "shape"):
+        a = np.asarray(a)
+
+    dim = len(a.shape)
+    if dim < 2:
+        return 0
+    elif dim == 2:
+        return a.shape[1]
+    else:
+        raise ValueError("Array-like has more than 2 dimensions.")
+
+
+def get_second_dimension(a: npt.ArrayLike, i: int) -> npt.ArrayLike:
+    """Get i-th column of a, e.g. a[:, i]."""
+    if hasattr(a, "iloc"):
+        # pandas
+        return a.iloc[:, i]
+    elif hasattr(a, "column"):
+        # pyarrow
+        return a.column(i)  # a[i] would also work
+    else:
+        # numpy
+        return a[:, i]  # type: ignore
 
 
 def validate_2_arrays(
