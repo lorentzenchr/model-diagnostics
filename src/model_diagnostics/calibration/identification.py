@@ -247,17 +247,15 @@ def compute_bias(
     x = df.column("bias_mean").to_numpy()
     n = df.column("bias_count").to_numpy()
     s = df.column("bias_stddev").to_numpy()
-    df = df.append_column(
-        "p_value",
-        pa.array(
-            # t-statistic t (-|t| and factor of 2 because of 2-sided test)
-            2
-            * special.stdtr(
-                n - 1,  # degrees of freedom
-                -np.abs(x / s * np.sqrt(n)),
-            ),
-        ),
+    # t-statistic t (-|t| and factor of 2 because of 2-sided test)
+    p_value = np.zeros_like(x)
+    mask = s > 0
+    x, n, s = x[mask], n[mask], s[mask]
+    p_value[mask] = 2 * special.stdtr(
+        n - 1,  # degrees of freedom
+        -np.abs(x / s * np.sqrt(n)),
     )
+    df = df.append_column("p_value", pa.array(p_value))
 
     if feature_name in df.column_names:
         df = df.select(
