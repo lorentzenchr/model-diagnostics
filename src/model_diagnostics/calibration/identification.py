@@ -281,29 +281,23 @@ def compute_bias(
         )
         df = df.append_column("p_value", pa.array(p_value))
 
-        if feature_name in df.column_names:
-            if n_pred > 0:
-                if feature_name == "model":
-                    model_col_name = "model_"
-                else:
-                    model_col_name = "model"
-                model_name = pa.array([pred_names[i]] * df.num_rows)
-                df = df.append_column(model_col_name, model_name)
-                df = df.select(
-                    [
-                        model_col_name,
-                        feature_name,
-                        "bias_mean",
-                        "bias_count",
-                        "bias_stddev",
-                        "p_value",
-                    ]
-                )
+        # Add column "model".
+        if n_pred > 0:
+            if feature_name == "model":
+                model_col_name = "model_"
             else:
-                df = df.select(
-                    [feature_name, "bias_mean", "bias_count", "bias_stddev", "p_value"]
-                )
+                model_col_name = "model"
+            df = df.append_column(
+                model_col_name, pa.array([pred_names[i]] * df.num_rows)
+            )
 
-        df_list.append(df)
+        # Select the columns in the correct order.
+        col_selection = []
+        if n_pred > 0:
+            col_selection.append(model_col_name)
+        if feature_name is not None and feature_name in df.column_names:
+            col_selection.append(feature_name)
+        col_selection += ["bias_mean", "bias_count", "bias_stddev", "p_value"]
+        df_list.append(df.select(col_selection))
 
     return pa.concat_tables(df_list)

@@ -215,6 +215,14 @@ def test_compute_bias_multiple_predictions():
             "p_value": [0.0] * 4,
         }
     )
-    print(df_bias.to_pandas())
-    print(df_expected)
+    pd.testing.assert_frame_equal(df_bias.to_pandas(), df_expected)
+
+    # Same for pure numpy input.
+    df_bias = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred.to_numpy(),
+        feature=feature.to_numpy(),
+    )
+    df_expected["model"] = ["0", "0", "1", "1"]
+    df_expected = df_expected.rename(columns={"nice_feature": "feature"})
     pd.testing.assert_frame_equal(df_bias.to_pandas(), df_expected)
