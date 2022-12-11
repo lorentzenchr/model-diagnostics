@@ -226,3 +226,14 @@ def test_compute_bias_multiple_predictions():
     df_expected["model"] = ["0", "0", "1", "1"]
     df_expected = df_expected.rename(columns={"nice_feature": "feature"})
     pd.testing.assert_frame_equal(df_bias.to_pandas(), df_expected)
+
+    # Model and feature name clash.
+    feature = pd.Series(y_obs, name="model")
+    df_bias = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+    )
+    df_expected = df_expected.rename(columns={"model": "model_", "feature": "model"})
+    df_expected["model_"] = ["model_1", "model_1", "model_2", "model_2"]
+    pd.testing.assert_frame_equal(df_bias.to_pandas(), df_expected)
