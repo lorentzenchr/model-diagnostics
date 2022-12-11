@@ -212,7 +212,7 @@ def test_compute_bias_multiple_predictions():
             "bias_mean": [0.0, -1, 2, 1],
             "bias_count": [5] * 4,
             "bias_stddev": [0.0] * 4,
-            "p_value": [0.0] * 4,
+            "p_value": [np.nan] * 4,
         }
     )
     pd.testing.assert_frame_equal(df_bias.to_pandas(), df_expected)

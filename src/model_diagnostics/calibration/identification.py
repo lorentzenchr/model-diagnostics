@@ -269,7 +269,7 @@ def compute_bias(
 
         # Add p-value of 2-sided t-test.
         s_ = df.column("bias_stddev").to_numpy()
-        p_value = np.zeros_like(s_)
+        p_value = np.full_like(s_, fill_value=np.nan)
         mask: npt.ArrayLike = s_ > 0
         x = df.column("bias_mean").to_numpy()[mask]
         n = df.column("bias_count").to_numpy()[mask]
