@@ -74,8 +74,11 @@ def plot_reliability_diagram(
     # reliability curve
     ax.plot(iso.X_thresholds_, iso.y_thresholds_)
     ax.set(xlabel="prediction for E(Y|X)", ylabel="estimated E(Y|prediction)")
-    ax.set_title("Reliability Diagram")
-
+    model_name = array_name(y_pred, default="")
+    if model_name == "":
+        ax.set_title("Reliability Diagram")
+    else:
+        ax.set_title("Reliability Diagram " + model_name)
     return ax
 
 
@@ -183,6 +186,10 @@ def plot_bias(
         ax.set(xlabel=feature_name, ylabel="bias")
     else:
         ax.set(xlabel="binned " + feature_name, ylabel="bias")
-    ax.set_title("Bias Plot")
+    model_name = array_name(y_pred, default="")
+    if model_name == "":
+        ax.set_title("Bias Plot")
+    else:
+        ax.set_title("Bias Plot " + model_name)
 
     return ax

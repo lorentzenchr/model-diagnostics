@@ -24,10 +24,17 @@ def test_plot_reliability_diagram(ax):
     assert plt_ax.get_ylabel() == "estimated E(Y|prediction)"
     assert plt_ax.get_title() == "Reliability Diagram"
 
+    plt_ax = plot_reliability_diagram(
+        y_obs=y_test,
+        y_pred=pd.Series(y_pred, name="simple"),
+        ax=ax,
+    )
+    assert plt_ax.get_title() == "Reliability Diagram simple"
+
 
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
-@pytest.mark.parametrize("categorical_type", ["cat", "string"])
-def test_plot_bias(ax, categorical_type):
+@pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
+def test_plot_bias(ax, feature_type):
     """Test that plot_bias works."""
     X, y = make_classification(
         n_samples=100,
@@ -37,12 +44,12 @@ def test_plot_bias(ax, categorical_type):
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
     clf = LogisticRegression(solver="lbfgs")
     clf.fit(X_train, y_train)
-    if categorical_type == "cat":
-        feature = pd.Series(X_test[:, 0].astype("=U8"), dtype="category")
-    elif categorical_type == "string":
-        feature = X_test[:, 0].astype("=U8")
-    else:
-        feature = X_test[:, 0]
+    feature = X_test[:, 0]
+    if feature_type == "cat":
+        feature = pd.Series(feature.astype("=U8"), dtype="category")
+    elif feature_type == "string":
+        feature = feature.astype("=U8")
+
     plt_ax = plot_bias(
         y_obs=y_test,
         y_pred=clf.predict_proba(X_test)[:, 1],
@@ -52,9 +59,17 @@ def test_plot_bias(ax, categorical_type):
 
     if ax is not None:
         assert ax is plt_ax
-    if categorical_type:
-        assert plt_ax.get_xlabel() == "feature"
-    else:
+    if feature_type == "num":
         assert plt_ax.get_xlabel() == "binned feature"
+    else:
+        assert plt_ax.get_xlabel() == "feature"
     assert plt_ax.get_ylabel() == "bias"
     assert plt_ax.get_title() == "Bias Plot"
+
+    plt_ax = plot_bias(
+        y_obs=y_test,
+        y_pred=pd.Series(clf.predict_proba(X_test)[:, 1], name="simple"),
+        feature=feature,
+        ax=ax,
+    )
+    assert plt_ax.get_title() == "Bias Plot simple"
