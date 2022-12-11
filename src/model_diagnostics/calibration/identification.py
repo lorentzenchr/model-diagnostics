@@ -106,7 +106,7 @@ def identification_function(
 def compute_bias(
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
-    feature: Optional[npt.ArrayLike],
+    feature: Optional[npt.ArrayLike] = None,
     *,
     functional: str = "mean",
     level: float = 0.5,
