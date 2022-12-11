@@ -99,8 +99,12 @@ ci-build = "mkdocs gh-deploy --force {args}"
 
 [tool.hatch.envs.jupyter]
 extra-dependencies = [
-  "jupyterlab >=3.4",
+  "jupyterlab>=3.4",
+  "scikit-learn>=1.2.0",
 ]
+
+[tool.hatch.envs.jupyter.scripts]
+lab = "jupyter lab"
 
 [[tool.hatch.envs.test.matrix]]
 python = ["39", "310", "311"]
