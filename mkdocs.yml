@@ -65,6 +65,7 @@ plugins:
             # Other
             show_bases: false
             show_source: true
+  - mkdocs-jupyter
 
 markdown_extensions:
 

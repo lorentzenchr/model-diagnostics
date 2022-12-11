@@ -90,6 +90,7 @@ dependencies = [
   "mkdocs-gen-files>=0.4.0",
   "mkdocs-literate-nav>=0.5.0",
   "mkdocs-section-index>=0.3.4",
+  "mkdocs-jupyter>=0.22",
 ]
 
 [tool.hatch.envs.docs.scripts]
