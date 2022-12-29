@@ -70,6 +70,8 @@ exclude_lines = [
 [tool.hatch.build.targets.sdist]
 exclude = [
   "/.github",
+  "/.hatch",
+  "/.vscode",
 ]
 
 [tool.hatch.envs.default]
