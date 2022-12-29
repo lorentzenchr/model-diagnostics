@@ -32,6 +32,8 @@ theme:
 nav:
   - Home:
     - About: index.md
+  - Examples:
+    - Regression on Workers' Compensation: examples/regression_on_workers_compensation.ipynb
   - Code Reference: reference/  # defer to gen-files + literate-nav
 
 watch:
