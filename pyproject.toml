@@ -82,7 +82,8 @@ dependencies = [
 ]
 
 [tool.hatch.envs.default.scripts]
-cov = "pytest  -n auto --cov-report=term-missing --cov-config=pyproject.toml --cov=src/model_diagnostics {args}"
+# Adding "-n auto" (pytest-xdist) allows parallel execution but swallows output.
+cov = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=src/model_diagnostics {args}"
 no-cov = "cov --no-cov"
 
 [tool.hatch.envs.docs]
