@@ -13,7 +13,7 @@ env:
   FORCE_COLOR: "1"
 
 jobs:
-  run:
+  run-test-suite:
     name: Python ${{ matrix.python-version }} on ${{ startsWith(matrix.os, 'macos-') && 'macOS' || startsWith(matrix.os, 'windows-') && 'Windows' || 'Linux' }}
     runs-on: ${{ matrix.os }}
     strategy:
