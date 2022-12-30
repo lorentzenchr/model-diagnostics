@@ -48,6 +48,6 @@ jobs:
       inputs:
         testResultsFormat: 'JUnit'
         testResultsFiles: 'pytest.xml'
-        testRunTitle: ${{ format('{0}-{1}-$(Agent.JobName)', matrix.python-version, runner.os) }}
+        # testRunTitle: ${{ format('{0}-{1}-$(Agent.JobName)', matrix.python-version, runner.os) }}
       displayName: 'Publish Test Results'
       condition: succeededOrFailed()
