@@ -42,4 +42,12 @@ jobs:
       run: hatch run lint:all
 
     - name: Run tests
-      run: hatch run cov
+      run: hatch run cov --junitxml=pytest.xml
+
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: 'pytest.xml'
+        testRunTitle: ${{ format('{0}-{1}-$(Agent.JobName)', matrix.python-version, runner.os) }}
+      displayName: 'Publish Test Results'
+      condition: succeededOrFailed()
