@@ -38,10 +38,12 @@ dynamic = ["version"]
 [tool.black]
 line-length = 88
 target-version = ["py39"]
+extend-exclude = ".hatch/*"
 
 [tool.isort]
 known_first_party = ["model_diagnostics"]
 profile = "black"
+skip = ".hatch"
 
 [tool.mypy]
 # disallow_untyped_defs = false
@@ -131,7 +133,7 @@ dependencies = [
 typing = "mypy --install-types --non-interactive {args:src/model_diagnostics}"
 security = "bandit --quiet --recursive --skip B101,B102,B105,B110,B112,B301,B307,B324,B403,B404,B603,B604,B606,B607 {args:.}"
 style = [
-  "flake8 {args:.}",
+  "flake8 --exclude .hatch {args:.}",
   "black --check --diff {args:.}",
   "isort --check-only --diff {args:.}",
 ]
