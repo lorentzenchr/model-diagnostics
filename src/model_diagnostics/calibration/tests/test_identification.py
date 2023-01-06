@@ -121,7 +121,7 @@ def test_compute_bias(feature, f_grouped):
             "feature": f_grouped,
             "bias_mean": [0.5, -1],
             "bias_count": [2, 3],
-            "bias_stddev": np.sqrt([0.25 + 0.25, (1 + 1 + 0) / 2]),
+            "bias_stderr": np.sqrt([(0.25 + 0.25), (1 + 1 + 0) / 2]) / np.sqrt([2, 3]),
             "p_value": [
                 ttest_1samp([1, 0], 0).pvalue,
                 ttest_1samp([0, -2, -1], 0).pvalue,
@@ -146,9 +146,9 @@ def test_compute_bias_feature_none():
     )
     df_expected = pa.table(
         {
-            "bias_mean": [-0.4],  # (1 + 0 + 0 - 2 - 1)/5
+            "bias_mean": [-0.4],  # (1 + 0 + 0 - 2 - 1) / 5
             "bias_count": [5],
-            "bias_stddev": [np.std([1, 0, 0, -2, -1], ddof=1)],
+            "bias_stderr": [np.std([1, 0, 0, -2, -1], ddof=1) / np.sqrt(5)],
             "p_value": [
                 ttest_1samp([1, 0, 0, -2, -1], 0).pvalue,
             ],
@@ -181,8 +181,9 @@ def test_compute_bias_numerical_feature():
             "feature": 0.045 + 0.1 * np.arange(10),
             "bias_mean": 0.955 - 0.1 * np.arange(10),
             "bias_count": n_steps * np.ones(n_bins, dtype=np.int64),
-            "bias_stddev": [
-                np.std(bias[n : n + n_steps], ddof=1) for n in range(0, n_obs, n_steps)
+            "bias_stderr": [
+                np.std(bias[n : n + n_steps], ddof=1) / np.sqrt(n_steps)
+                for n in range(0, n_obs, n_steps)
             ],
             "p_value": [
                 ttest_1samp(bias[n : n + n_steps], 0).pvalue
@@ -211,7 +212,7 @@ def test_compute_bias_multiple_predictions():
             "nice_feature": [1.0, 2, 1, 2],
             "bias_mean": [0.0, -1, 2, 1],
             "bias_count": [5] * 4,
-            "bias_stddev": [0.0] * 4,
+            "bias_stderr": [0.0] * 4,
             "p_value": [np.nan] * 4,
         }
     )
