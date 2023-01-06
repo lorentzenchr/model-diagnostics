@@ -128,7 +128,7 @@ def compute_bias(
         Observed values of the response variable.
         For binary classification, y_obs is expected to be in the interval [0, 1].
     y_pred : array-like of shape (n_obs) or (n_obs, n_models)
-        Predicted values of the conditional expectation of Y, :math:`E(Y|X)`.
+        Predicted values of the conditional expectation of Y, \(E(Y|X)\).
     feature : array-like of shape (n_obs) or None
         Some feature column.
     functional : str
@@ -149,6 +149,11 @@ def compute_bias(
     Returns
     -------
     df : pyarrow Table
+        The result table contains at least the columns:
+
+        - `bias_mean`: Mean of the bias
+        - `bias_cout`: Number of data rows
+        - `bias_stderr`: Standard error, i.e. standard deviation of `bias_mean`
 
     Notes
     -----
@@ -267,7 +272,13 @@ def compute_bias(
                 cnames[-1] = feature_name
                 df = df.rename_columns(cnames)
 
-        # Add p-value of 2-sided t-test.
+        # Add column standard error.
+        df = df.append_column(
+            "bias_stderr",
+            pc.divide(df.column("bias_stddev"), pc.sqrt(df.column("bias_count"))),
+        )
+
+        # Add column with p-value of 2-sided t-test.
         s_ = df.column("bias_stddev").to_numpy()
         p_value = np.full_like(s_, fill_value=np.nan)
         mask: npt.ArrayLike = s_ > 0
@@ -297,7 +308,7 @@ def compute_bias(
             col_selection.append(model_col_name)
         if feature_name is not None and feature_name in df.column_names:
             col_selection.append(feature_name)
-        col_selection += ["bias_mean", "bias_count", "bias_stddev", "p_value"]
+        col_selection += ["bias_mean", "bias_count", "bias_stderr", "p_value"]
         df_list.append(df.select(col_selection))
 
     return pa.concat_tables(df_list)

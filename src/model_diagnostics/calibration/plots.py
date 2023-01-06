@@ -167,14 +167,14 @@ def plot_bias(
         min_max = pc.min_max(df[feature_name]).as_py()
     ax.hlines(0, min_max["min"], min_max["max"], color="k", linestyles="dotted")
     # bias plot
-    if df["bias_stddev"].null_count > 0:
+    if df["bias_stderr"].null_count > 0:
 
         ax.plot(df[feature_name], df["bias_mean"], "o-")
     else:
         ax.errorbar(
             df[feature_name],
             df["bias_mean"],
-            yerr=df["bias_stddev"],
+            yerr=df["bias_stderr"],
             fmt="o-",
             capsize=4,
         )
