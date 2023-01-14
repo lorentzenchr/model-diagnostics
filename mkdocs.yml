@@ -35,6 +35,7 @@ nav:
   - Examples:
     - Regression on Workers' Compensation: examples/regression_on_workers_compensation.ipynb
   - Code Reference: reference/  # defer to gen-files + literate-nav
+  - Development: development.md
 
 watch:
   - src/model_diagnostics/
