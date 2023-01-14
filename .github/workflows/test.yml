@@ -42,7 +42,7 @@ jobs:
       run: hatch run lint:all
 
     - if: matrix.python-version == '3.9' && runner.os == 'Linux'
-      name: Lint
+      name: Build docs
       run: hatch run docs:build
 
     - name: Run tests
