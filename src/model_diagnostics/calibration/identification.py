@@ -59,10 +59,13 @@ def identification_function(
     induces the functional \(T\) as:
 
     \[
-    E[V(Y, z)] = 0\quad \Rightarrow\quad z=T(F) \quad \forall \text{ distributions } F
+    \operatorname{E}[V(Y, z)] = 0\quad \Rightarrow\quad z=T(F) \quad \forall
+    \text{ distributions } F
+    \in \mathcal{F}
     \]
 
-    Functional \(T\) can be the mean, median, an expectile or a quantile.
+    for some class of distribtions \(\mathcal{F}\). Implemented examples of the
+    functional \(T\) are mean, median, expectiles and quantiles.
 
     | functional | strict identification function \(V(y, z)\)           |
     | ---------- | ---------------------------------------------------- |
@@ -128,7 +131,7 @@ def compute_bias(
         Observed values of the response variable.
         For binary classification, y_obs is expected to be in the interval [0, 1].
     y_pred : array-like of shape (n_obs) or (n_obs, n_models)
-        Predicted values of the conditional expectation of Y, \(E(Y|X)\).
+        Predicted values of the conditional expectation of Y, `E(Y|X)`.
     feature : array-like of shape (n_obs) or None
         Some feature column.
     functional : str
@@ -154,14 +157,27 @@ def compute_bias(
         - `bias_mean`: Mean of the bias
         - `bias_cout`: Number of data rows
         - `bias_stderr`: Standard error, i.e. standard deviation of `bias_mean`
+        - `p_value`: p-value of the 2-sided t-test with null hypothesis:
+          `bias_mean = 0`
 
     Notes
     -----
-    A model \(m(X)\) is conditionally calibrated iff \(E(V(m(X), Y))=0\) a.s. with
-    canonical identification function \(V\). The empirical version, given some data,
-    reads \(\frac{1}{n}\sum_i V(m(x_i), y_i)\).
+    A model \(m(X)\) is conditionally calibrated iff
+    \(\operatorname{E}(V(m(X), Y)|X)=0\) almost surely with canonical identification
+    function \(V\).
+    The empirical version, given some data, reads
+    \(\bar{V} = \frac{1}{n}\sum_i \phi(x_i) V(m(x_i), y_i)\) with a function
+    \(\phi(x_i)\) that projects on the specified feature.
+    For a feature with only two distinct values `"a"` and `"b"`, this becomes
+    \(\bar{V} = \frac{1}{n_a}\sum_{i \text{ with }x_i=a} V(m(a), y_i)\) with
+    \(n_a=\sum_{i \text{ with }x_i=a}\) and the same with `"b"`.
     This generalises the classical residual (up to a minus sign) for target functionals
     other than the mean. See `[FLM2022]`.
+
+    The standard error for \(\bar{V}\) is caluclated in the standard way as
+    \(\mathrm{SE} = \sqrt{\operatorname{Var}(\bar{V})} = \frac{\sigma}{\sqrt{n}}\) and the
+    standard variance estimator for \(\sigma^2 = \operatorname{Var}(\phi(x_i)
+    V(m(x_i), y_i))\) with Bessel correction, i.e. division by \(n-1\) instead of \(n\). 
 
     References
     ----------
