@@ -92,61 +92,61 @@ def plot_bias(
 ):
     r"""Plot model bias conditional on a feature.
 
-     This plots the generalised bias (residuals), i.e. the values of the canonical
-     identification function, versus a feature. This is a good way to assess whether
-     a model is conditionally calibrated or not. Well calibrated models have bias terms
-     around zero.
-     See Notes for further details.
+    This plots the generalised bias (residuals), i.e. the values of the canonical
+    identification function, versus a feature. This is a good way to assess whether
+    a model is conditionally calibrated or not. Well calibrated models have bias terms
+    around zero.
+    See Notes for further details.
 
-     Parameters
-     ----------
-     y_obs : array-like of shape (n_obs)
-         Observed values of the response variable.
-         For binary classification, y_obs is expected to be in the interval [0, 1].
-     y_pred : array-like of shape (n_obs)
-         Predicted values of the conditional expectation of Y, :math:`E(Y|X)`.
-     feature : array-like of shape (n_obs)
-         Some feature column.
+    Parameters
+    ----------
+    y_obs : array-like of shape (n_obs)
+        Observed values of the response variable.
+        For binary classification, y_obs is expected to be in the interval [0, 1].
+    y_pred : array-like of shape (n_obs)
+        Predicted values of the conditional expectation of Y, :math:`E(Y|X)`.
+    feature : array-like of shape (n_obs)
+        Some feature column.
      functional : str
-         The functional that is induced by the identification function `V`. Options are:
-         - `"mean"`. Argument `level` is neglected.
-         - `"median"`. Argument `level` is neglected.
-         - `"expectile"`
-         - `"quantile"`
+        The functional that is induced by the identification function `V`. Options are:
+        - `"mean"`. Argument `level` is neglected.
+        - `"median"`. Argument `level` is neglected.
+        - `"expectile"`
+        - `"quantile"`
     weights : array-like of shape (n_obs) or None
-         Case weights. If given, the bias is calculated as weighted average of the
-         identification function with these weights.
-         Note that the standard errors and p-values in the output are based on the
-         assumption that the variance of the bias is inverse proportional to the
-         weights. See the Notes section for details.
-     level : float
-         The level of the expectile of quantile. (Often called \(\alpha\).)
-         It must be `0 <= level <= 1`.
-         `level=0.5` and `functional="expectile"` gives the mean.
-         `level=0.5` and `functional="quantile"` gives the median.
-     n_bins : int
-         The number of bins for numerical features and the maximal number of (most
-         frequent) categories shown for categorical features.
-     ax : matplotlib.axes.Axes
-         Axes object to draw the plot onto, otherwise uses the current Axes.
+        Case weights. If given, the bias is calculated as weighted average of the
+        identification function with these weights.
+        Note that the standard errors and p-values in the output are based on the
+        assumption that the variance of the bias is inverse proportional to the
+        weights. See the Notes section for details.
+    level : float
+        The level of the expectile of quantile. (Often called \(\alpha\).)
+        It must be `0 <= level <= 1`.
+        `level=0.5` and `functional="expectile"` gives the mean.
+        `level=0.5` and `functional="quantile"` gives the median.
+    n_bins : int
+        The number of bins for numerical features and the maximal number of (most
+        frequent) categories shown for categorical features.
+    ax : matplotlib.axes.Axes
+        Axes object to draw the plot onto, otherwise uses the current Axes.
 
-     Returns
-     -------
-     ax
+    Returns
+    -------
+    ax
 
-     Notes
-     -----
-     A model \(m(X)\) is conditionally calibrated iff \(E(V(m(X), Y))=0\) a.s. The
-     empirical version, given some data, reads \(\frac{1}{n}\sum_i V(m(x_i), y_i)\).
-     This generali. See [FLM2022]`.
+    Notes
+    -----
+    A model \(m(X)\) is conditionally calibrated iff \(E(V(m(X), Y))=0\) a.s. The
+    empirical version, given some data, reads \(\frac{1}{n}\sum_i V(m(x_i), y_i)\).
+    This generali. See [FLM2022]`.
 
-     References
-     ----------
-     `FLM2022`
+    References
+    ----------
+    `FLM2022`
 
-     :   T. Fissler, C. Lorentzen, and M. Mayer.
-         "Model Comparison and Calibration Assessment". (2022)
-         [arxiv:https://arxiv.org/abs/2202.12780](https://arxiv.org/abs/2202.12780).
+    :   T. Fissler, C. Lorentzen, and M. Mayer.
+        "Model Comparison and Calibration Assessment". (2022)
+        [arxiv:https://arxiv.org/abs/2202.12780](https://arxiv.org/abs/2202.12780).
     """
     if ax is None:
         ax = plt.gca()
