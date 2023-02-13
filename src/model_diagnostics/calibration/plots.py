@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-import pyarrow as pa
-import pyarrow.compute as pc
+import polars as pl
 from sklearn.isotonic import IsotonicRegression
 
 from .._utils.array import array_name
@@ -155,20 +154,19 @@ def plot_bias(
 
     is_categorical = False
     is_string = False
-    if pa.types.is_dictionary(df.column(feature_name).type):
+    if df.get_column(feature_name).dtype is pl.Categorical:
         is_categorical = True
-    elif pa.types.is_string(df.column(feature_name).type):
+    elif df.get_column(feature_name).dtype in [pl.Utf8, pl.Object]:
         is_string = True
 
     # horizontal line at y=0
     if is_categorical or is_string:
         min_max = {"min": 0, "max": df.shape[0]}
     else:
-        min_max = pc.min_max(df[feature_name]).as_py()
+        min_max = {"min": df[feature_name].min(), "max": df[feature_name].max()}
     ax.hlines(0, min_max["min"], min_max["max"], color="k", linestyles="dotted")
     # bias plot
-    if df["bias_stderr"].null_count > 0:
-
+    if df["bias_stderr"].null_count() > 0:
         ax.plot(df[feature_name], df["bias_mean"], "o-")
     else:
         ax.errorbar(
