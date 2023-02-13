@@ -132,7 +132,15 @@ dependencies = [
 [tool.hatch.envs.lint.scripts]
 # typing = "mypy --install-types --non-interactive {args:backend/src/hatchling src/hatch tests}"
 typing = "mypy --install-types --non-interactive {args:src/model_diagnostics}"
-security = "bandit --quiet --recursive --skip B101,B102,B105,B110,B112,B301,B307,B324,B403,B404,B603,B604,B606,B607 {args:.}"
+# Note: bandit does not respect the --exclude flag, see
+# https://github.com/PyCQA/bandit/issues/657
+#   --exclude .svn,CVS,.bzr,.hg,.git,*__pycache__,.tox,.eggs,*.egg,.github,.hatch \
+# We instead use the path argument instead of {args:.}.
+security = """\
+  bandit --quiet --recursive \
+  --skip B101,B102,B105,B110,B112,B301,B307,B324,B403,B404,B603,B604,B606,B607 \
+  {args:src}
+"""
 style = [
   "flake8 --exclude .hatch {args:.}",
   "black --check --diff {args:.}",
