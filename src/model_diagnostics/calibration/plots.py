@@ -13,6 +13,7 @@ from .identification import compute_bias
 def plot_reliability_diagram(
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
+    weights: Optional[npt.ArrayLike] = None,
     *,
     ax=None,
 ):
@@ -33,6 +34,8 @@ def plot_reliability_diagram(
         Predicted values of the conditional expectation of Y, \(E(Y|X)\).
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.
+    weights : array-like of shape (n_obs) or None
+        Case weights.
 
     Returns
     -------
@@ -65,7 +68,9 @@ def plot_reliability_diagram(
 
     y_obs_min, y_obs_max = np.min(y_obs), np.max(y_obs)
     y_pred_min, y_pred_max = np.min(y_pred), np.max(y_pred)
-    iso = IsotonicRegression(y_min=y_obs_min, y_max=y_obs_max).fit(y_pred, y_obs)
+    iso = IsotonicRegression(y_min=y_obs_min, y_max=y_obs_max).fit(
+        y_pred, y_obs, sample_weight=weights
+    )
     # diagonal line
     ax.plot([y_pred_min, y_pred_max], [y_pred_min, y_pred_max], "k:")
     # reliability curve
@@ -107,7 +112,7 @@ def plot_bias(
         Predicted values of the conditional expectation of Y, :math:`E(Y|X)`.
     feature : array-like of shape (n_obs)
         Some feature column.
-     functional : str
+    functional : str
         The functional that is induced by the identification function `V`. Options are:
         - `"mean"`. Argument `level` is neglected.
         - `"median"`. Argument `level` is neglected.
