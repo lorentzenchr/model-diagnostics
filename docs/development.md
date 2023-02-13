@@ -28,10 +28,13 @@ See <https://packaging.python.org/en/latest/tutorials/packaging-projects/>,
 <https://hatch.pypa.io/latest/build/> and <https://hatch.pypa.io/latest/publish/>.
 This will require credentials for <https://test.pypi.org> and <https://pypi.org>.
 
-- Set the `version` in `__about__.py`.
-- Create annotated git tag for the current commit (not needed for release candidates):
+- Create a new pull request (PR) and set the new `version` in `__about__.py`.
+- Merge the PR on github and sync locally
+  - `git checkout main`
+  - `git pull origin main` (origin might be upstream)
+- Create annotated git tag on branch main for the current commit (not needed for release candidates):
   `git tag -a v1.4 -m "my version 1.4"`
-- Push the annotated tag: `git push origin <tag_name>`
+- Push the annotated tag: `git push origin <tag_name>`.
   Note that `origin` might be to be replaced by `upstream` depending on your setup.
 - Run `hatch build`.
 - (Optional) Create a github release with the new tag and upload the build artifacts.
