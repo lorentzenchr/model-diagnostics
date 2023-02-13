@@ -1,8 +1,9 @@
+from typing import Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-import pyarrow as pa
-import pyarrow.compute as pc
+import polars as pl
 from sklearn.isotonic import IsotonicRegression
 
 from .._utils.array import array_name
@@ -12,6 +13,7 @@ from .identification import compute_bias
 def plot_reliability_diagram(
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
+    weights: Optional[npt.ArrayLike] = None,
     *,
     ax=None,
 ):
@@ -32,6 +34,8 @@ def plot_reliability_diagram(
         Predicted values of the conditional expectation of Y, \(E(Y|X)\).
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.
+    weights : array-like of shape (n_obs) or None
+        Case weights.
 
     Returns
     -------
@@ -64,7 +68,9 @@ def plot_reliability_diagram(
 
     y_obs_min, y_obs_max = np.min(y_obs), np.max(y_obs)
     y_pred_min, y_pred_max = np.min(y_pred), np.max(y_pred)
-    iso = IsotonicRegression(y_min=y_obs_min, y_max=y_obs_max).fit(y_pred, y_obs)
+    iso = IsotonicRegression(y_min=y_obs_min, y_max=y_obs_max).fit(
+        y_pred, y_obs, sample_weight=weights
+    )
     # diagonal line
     ax.plot([y_pred_min, y_pred_max], [y_pred_min, y_pred_max], "k:")
     # reliability curve
@@ -82,6 +88,7 @@ def plot_bias(
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
     feature: npt.ArrayLike,
+    weights: Optional[npt.ArrayLike] = None,
     *,
     functional: str = "mean",
     level: float = 0.5,
@@ -111,6 +118,12 @@ def plot_bias(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+    weights : array-like of shape (n_obs) or None
+        Case weights. If given, the bias is calculated as weighted average of the
+        identification function with these weights.
+        Note that the standard errors and p-values in the output are based on the
+        assumption that the variance of the bias is inverse proportional to the
+        weights. See the Notes section for details.
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
         It must be `0 <= level <= 1`.
@@ -148,6 +161,7 @@ def plot_bias(
         y_obs=y_obs,
         y_pred=y_pred,
         feature=feature,
+        weights=weights,
         functional=functional,
         level=level,
         n_bins=n_bins,
@@ -155,20 +169,19 @@ def plot_bias(
 
     is_categorical = False
     is_string = False
-    if pa.types.is_dictionary(df.column(feature_name).type):
+    if df.get_column(feature_name).dtype is pl.Categorical:
         is_categorical = True
-    elif pa.types.is_string(df.column(feature_name).type):
+    elif df.get_column(feature_name).dtype in [pl.Utf8, pl.Object]:
         is_string = True
 
     # horizontal line at y=0
     if is_categorical or is_string:
         min_max = {"min": 0, "max": df.shape[0]}
     else:
-        min_max = pc.min_max(df[feature_name]).as_py()
+        min_max = {"min": df[feature_name].min(), "max": df[feature_name].max()}
     ax.hlines(0, min_max["min"], min_max["max"], color="k", linestyles="dotted")
     # bias plot
-    if df["bias_stderr"].null_count > 0:
-
+    if df["bias_stderr"].null_count() > 0:
         ax.plot(df[feature_name], df["bias_mean"], "o-")
     else:
         ax.errorbar(
