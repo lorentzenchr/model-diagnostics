@@ -1,5 +1,7 @@
 window.MathJax = {
+    loader: {load: ['[tex]/ams']},
     tex: {
+      packages: {'[+]': ['ams']},
       inlineMath: [["\\(", "\\)"]],
       displayMath: [["\\[", "\\]"]],
       processEscapes: true,
@@ -8,9 +10,7 @@ window.MathJax = {
     options: {
       ignoreHtmlClass: ".*|",
       processHtmlClass: "arithmatex"
-    },
-    loader: {load: ['[tex]/ams']},
-    tex: {packages: {'[+]': ['ams']}}
+    }
   };
   
   document$.subscribe(() => {
