@@ -238,8 +238,7 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
     The homogeneous score of degree \(h\) is given by
 
     \[
-    S_\alpha^h(y, z) = (\mathbf{1}\{z \ge y\} - \alpha) \frac{1}{h}
-    \left(z^h - y^h)\right)
+    S_\alpha^h(y, z) = (\mathbf{1}\{z \ge y\} - \alpha) \frac{z^h - y^h}{h}
     \]
 
     There are important domain restrictions and limits:
@@ -247,7 +246,7 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
     - \(h\) positive odd integer: All real numbers \(y\) and \(z\) are allowed.
 
         - Special case \(h=1\) equals the pinball loss,
-          \(S(y, z) = |\mathbf{1}\{z \ge y\} - \alpha| \frac{1}{h}\left(z - y)\).
+          \(S(y, z) = (\mathbf{1}\{z \ge y\} - \alpha) (z - y)\).
         - Special case \(h=1, \alpha=\frac{1}{2}\) equals half the absolute error
           \(S(y, z) = \frac{1}{2}|z - y|\).
 
