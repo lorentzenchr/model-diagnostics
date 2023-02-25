@@ -318,5 +318,5 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
 class PinballLoss(HomogeneousQuantileScore):
     """Pinball loss."""
 
-    def __init__(self, level: float=0.5) -> None:
+    def __init__(self, level: float = 0.5) -> None:
         super().__init__(degree=1, level=level)

@@ -109,7 +109,7 @@ def test_scoring_function_raises(sf, level, msg):
         (HQS(degree=1.1), 1, 0, "Valid domain .* y_obs > 0 and y_pred > 0"),
         (HQS(degree=0), 0, 1, "Valid domain .* y_obs > 0 and y_pred > 0"),
         (HQS(degree=0), 1, 0, "Valid domain .* y_obs > 0 and y_pred > 0"),
-    ]
+    ],
 )
 def test_scoring_function_domain(sf, y_obs, y_pred, msg):
     """Test the valid domains of scoring functions."""
@@ -196,7 +196,7 @@ def test_homogeneous_scoring_function_against_precomputed_values():
     assert pl(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
 
     sf = HomogeneousQuantileScore(degree=2, level=1 / 4)
-    precomputed = (3/4 * 15 / 2 + 1/4 * 3 / 2) / 2
+    precomputed = (3 / 4 * 15 / 2 + 1 / 4 * 3 / 2) / 2
     assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
 
 
