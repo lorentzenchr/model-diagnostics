@@ -77,6 +77,12 @@ def identification_function(
 
     References
     ----------
+    `[Gneiting2011]`
+
+    :   T. Gneiting.
+        "Making and Evaluating Point Forecasts”. (2011)
+        [doi:10.1198/jasa.2011.r10138](https://doi.org/10.1198/jasa.2011.r10138)
+        [arxiv:0912.0902](https://arxiv.org/abs/0912.0902)
 
     Examples
     --------
@@ -202,7 +208,7 @@ def compute_bias(
 
     :   T. Fissler, C. Lorentzen, and M. Mayer.
         "Model Comparison and Calibration Assessment". (2022)
-        [arxiv:https://arxiv.org/abs/2202.12780](https://arxiv.org/abs/2202.12780).
+        [arxiv:2202.12780](https://arxiv.org/abs/2202.12780).
     """
     validate_same_first_dimension(y_obs, y_pred)
     if feature is not None:
