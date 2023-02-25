@@ -151,7 +151,7 @@ def plot_bias(
 
     :   T. Fissler, C. Lorentzen, and M. Mayer.
         "Model Comparison and Calibration Assessment". (2022)
-        [arxiv:https://arxiv.org/abs/2202.12780](https://arxiv.org/abs/2202.12780).
+        [arxiv:2202.12780](https://arxiv.org/abs/2202.12780).
     """
     if ax is None:
         ax = plt.gca()
