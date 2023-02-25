@@ -188,7 +188,7 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
 
 class SquaredError(HomogeneousExpectileScore):
     r"""Squared error.
-    
+
     The squared error is strictly consistent for the mean.
     It has a degree of homogeneity of 2.
 
@@ -205,11 +205,11 @@ class SquaredError(HomogeneousExpectileScore):
 
     def __init__(self) -> None:
         super().__init__(degree=2, level=0.5)
-    
+
 
 class PoissonDeviance(HomogeneousExpectileScore):
     r"""Poisson deviance.
-    
+
     The Poisson deviance is strictly consistent for the mean.
     It has a degree of homogeneity of 1.
 
@@ -229,7 +229,7 @@ class PoissonDeviance(HomogeneousExpectileScore):
 
 class GammaDeviance(HomogeneousExpectileScore):
     r"""Gamma deviance.
-    
+
     The Gamma deviance is strictly consistent for the mean.
     It has a degree of homogeneity of 0 and is therefore insensitive to a change of
     units or multiplication of `y_obs` and `y_pred` by the same positive constant.
@@ -357,7 +357,7 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
 
 class PinballLoss(HomogeneousQuantileScore):
     r"""Pinball loss.
-    
+
      Parameters
     ----------
     level : float

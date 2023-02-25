@@ -346,9 +346,9 @@ def compute_bias(
                             .alias("bias_stderr"),
                         ]
                     )
-                    .sort("bias_count", reverse=True)
+                    .sort("bias_count", descending=True)
                     .head(n_bins)
-                    .sort(feature_name)
+                    .sort(feature_name, descending=False)
                 )
                 if is_numeric:
                     df = df.drop("bin")
