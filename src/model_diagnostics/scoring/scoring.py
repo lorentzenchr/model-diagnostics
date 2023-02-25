@@ -53,8 +53,8 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
         Degree of homogeneity.
     level : float
         The level of the expectile. (Often called \(\alpha\).)
-        It must be `0 <= level <= 1`.
-        `level=0.5` and `functional="expectile"` gives the mean.
+        It must be `0 < level < 1`.
+        `level=0.5` gives the mean.
 
     Attributes
     ----------
@@ -106,10 +106,8 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
 
     def __init__(self, degree: float = 2, level: float = 0.5) -> None:
         self.degree = degree
-        if level < 0 or level > 1:
-            raise ValueError(
-                f"Argument level must fulfil 0 <= level <= 1, got {level}."
-            )
+        if level <= 0 or level >= 1:
+            raise ValueError(f"Argument level must fulfil 0 < level < 1, got {level}.")
         self.level = level
 
     @property
@@ -143,18 +141,43 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
                 * (y - z)
             )
         elif self.degree == 1:
-            # Should error when y<0 or x<=0.
+            # Domain: y >= 0 and z > 0
+            if not np.all((y >= 0) & (z > 0)):
+                raise ValueError(
+                    f"Valid domain for degree={self.degree} is "
+                    "y_obs >= 0 and y_pred > 0."
+                )
             score = 2 * (special.xlogy(y, y / z) - y + z)
         elif self.degree == 0:
-            # Should error when y<0 or x<0.
+            # Domain: y > 0 and z > 0.
+            if not np.all((y > 0) & (z > 0)):
+                raise ValueError(
+                    f"Valid domain for degree={self.degree} is "
+                    "y_obs > 0 and y_pred > 0."
+                )
             y_z = y / z
             score = 2 * (y_z - np.log(y_z) - 1)
         else:  # self.degree < 1
-            # Should error when y<0 or x<0.
+            # Domain: y >= 0 and z > 0 for 0 < self.degree < 1
+            # Domain: y > 0  and z > 0 else
+            if self.degree > 0:
+                if not np.all((y >= 0) & (z > 0)):
+                    raise ValueError(
+                        f"Valid domain for degree={self.degree} is "
+                        "y_obs >= 0 and y_pred > 0."
+                    )
+            else:
+                if not np.all((y > 0) & (z > 0)):
+                    raise ValueError(
+                        f"Valid domain for degree={self.degree} is "
+                        "y_obs > 0 and y_pred > 0."
+                    )
+            # Note: We add 0.0 to be sure we have floating points. Integers are not
+            # allowerd to be raised to a negative power.
             score = 2 * (
-                (np.power(y, self.degree) - np.power(z, self.degree))
+                (np.power(y + 0.0, self.degree) - np.power(z + 0.0, self.degree))
                 / (self.degree * (self.degree - 1))
-                - 1 / (self.degree - 1) * np.power(z, self.degree - 1) * (y - z)
+                - 1 / (self.degree - 1) * np.power(z + 0.0, self.degree - 1) * (y - z)
             )
 
         if self.level == 0.5:
@@ -182,3 +205,118 @@ class GammaDeviance(HomogeneousExpectileScore):
 
     def __init__(self) -> None:
         super().__init__(degree=0, level=0.5)
+
+
+class HomogeneousQuantileScore(_BaseScoringFunction):
+    r"""Homogeneous scoring function of degree h for quantiles.
+
+    The smaller the better.
+
+    Up to a multiplicative constant, these are the only scoring funtions that are
+    strictly consistent for quantiles at level ɑ and homogeneous functions.
+    The possible additive constant is chosen such that the minimal function value
+    equals zero.
+
+    Note that the 1/2-quantile (level ɑ=0.5) equals the median.
+
+    Parameters
+    ----------
+    degree : float
+        Degree of homogeneity.
+    level : float
+        The level of the quantile. (Often called \(\alpha\).)
+        It must be `0 < level < 1`.
+        `level=0.5` gives the median.
+
+    Attributes
+    ----------
+    functional: str
+        "quantile"
+
+    Notes
+    -----
+    The homogeneous score of degree \(h\) is given by
+
+    \[
+    S_\alpha^h(y, z) = (\mathbf{1}\{z \ge y\} - \alpha) \frac{1}{h}
+    \left(z^h - y^h)\right)
+    \]
+
+    There are important domain restrictions and limits:
+
+    - \(h\) positive odd integer: All real numbers \(y\) and \(z\) are allowed.
+
+        - Special case \(h=1\) equals the pinball loss,
+          \(S(y, z) = |\mathbf{1}\{z \ge y\} - \alpha| \frac{1}{h}\left(z - y)\).
+        - Special case \(h=1, \alpha=\frac{1}{2}\) equals half the absolute error
+          \(S(y, z) = \frac{1}{2}|z - y|\).
+
+    - \(h\) real valued: Only \(y>0\), \(z>0\) are allowed.
+
+        Special case \(h=0\) (by taking the limit) equals
+        \(S(y, z) = |\mathbf{1}\{z \ge y\} - \alpha| \log\frac{z}{y}\).
+
+    References
+    ----------
+    `[Gneiting2011]`
+
+    :   T. Gneiting.
+        "Making and Evaluating Point Forecasts”. (2011)
+        [doi:10.1198/jasa.2011.r10138](https://doi.org/10.1198/jasa.2011.r10138)
+        [arxiv:0912.0902](https://arxiv.org/abs/0912.0902)
+    """
+
+    def __init__(self, degree: float = 2, level: float = 0.5) -> None:
+        self.degree = degree
+        if level <= 0 or level >= 1:
+            raise ValueError(f"Argument level must fulfil 0 < level < 1, got {level}.")
+        self.level = level
+
+    @property
+    def functional(self):
+        return "quantile"
+
+    def score_per_obs(
+        self,
+        y_obs: npt.ArrayLike,
+        y_pred: npt.ArrayLike,
+    ) -> np.ndarray:
+        """Score per observation."""
+        y: np.ndarray
+        z: np.ndarray
+        y, z = validate_2_arrays(y_obs, y_pred)
+
+        if self.degree == 1:
+            # Fast path
+            score = z - y
+        elif self.degree > 1 and self.degree % 2 == 1:
+            # Odd positive degree
+            score = (np.power(z, self.degree) - np.power(y, self.degree)) / self.degree
+        elif self.degree == 0:
+            # Domain: y > 0 and z > 0.
+            if not np.all((y > 0) & (z > 0)):
+                raise ValueError(
+                    f"Valid domain for degree={self.degree} is "
+                    "y_obs > 0 and y_pred > 0."
+                )
+            score = np.log(z / y)
+        else:
+            # Domain: y > 0 and z > 0.
+            if not np.all((y > 0) & (z > 0)):
+                raise ValueError(
+                    f"Valid domain for degree={self.degree} is "
+                    "y_obs > 0 and y_pred > 0."
+                )
+            score = (np.power(z, self.degree) - np.power(y, self.degree)) / self.degree
+
+        if self.level == 0.5:
+            return 0.5 * np.abs(score)
+        else:
+            return (np.greater_equal(z, y) - self.level) * score
+
+
+class PinballLoss(HomogeneousQuantileScore):
+    """Pinball loss."""
+
+    def __init__(self, level: float = 0.5) -> None:
+        super().__init__(degree=1, level=level)

@@ -42,7 +42,7 @@ def identification_function(
         - `"quantile"`
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
-        It must be `0 <= level <= 1`.
+        It must be `0 < level < 1`.
         `level=0.5` and `functional="expectile"` gives the mean.
         `level=0.5` and `functional="quantile"` gives the median.
 
@@ -92,8 +92,8 @@ def identification_function(
     y_p: np.ndarray
     y_o, y_p = validate_2_arrays(y_obs, y_pred)
 
-    if functional in ("expectile", "quantile") and (level < 0 or level > 1):
-        raise ValueError(f"Argument level must fulfil 0 <= level <= 1, got {level}.")
+    if functional in ("expectile", "quantile") and (level <= 0 or level >= 1):
+        raise ValueError(f"Argument level must fulfil 0 < level < 1, got {level}.")
 
     if functional == "mean":
         return y_p - y_o
@@ -154,7 +154,7 @@ def compute_bias(
         - `"quantile"`
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
-        It must be `0 <= level <= 1`.
+        It must be `0 < level < 1`.
         `level=0.5` and `functional="expectile"` gives the mean.
         `level=0.5` and `functional="quantile"` gives the median.
     n_bins : int

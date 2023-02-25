@@ -78,7 +78,9 @@ def test_identification_function_equal_input(functional, est, level):
     "functional, level, msg",
     [
         ("no good functional", 0.5, "Argument functional must be one of"),
-        ("quantile", 1.1, "Argument level must fulfil 0 <= level <= 1"),
+        ("quantile", 0, "Argument level must fulfil 0 < level < 1"),
+        ("quantile", 1, "Argument level must fulfil 0 < level < 1"),
+        ("quantile", 1.1, "Argument level must fulfil 0 < level < 1"),
     ],
 )
 def test_identification_function_raises(functional, level, msg):
