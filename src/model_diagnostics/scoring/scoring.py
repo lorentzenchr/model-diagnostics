@@ -187,21 +187,62 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
 
 
 class SquaredError(HomogeneousExpectileScore):
-    """Squared error."""
+    r"""Squared error.
+
+    The squared error is strictly consistent for the mean.
+    It has a degree of homogeneity of 2.
+
+
+    Attributes
+    ----------
+    functional: str
+        "mean"
+
+    Notes
+    -----
+    \(S(y, z) = (y - z)^2\)
+    """
 
     def __init__(self) -> None:
         super().__init__(degree=2, level=0.5)
 
 
 class PoissonDeviance(HomogeneousExpectileScore):
-    """Squared error."""
+    r"""Poisson deviance.
+
+    The Poisson deviance is strictly consistent for the mean.
+    It has a degree of homogeneity of 1.
+
+    Attributes
+    ----------
+    functional: str
+        "mean"
+
+    Notes
+    -----
+    \(S(y, z) = 2(y\log\frac{y}{z} - y + z)\)
+    """
 
     def __init__(self) -> None:
         super().__init__(degree=1, level=0.5)
 
 
 class GammaDeviance(HomogeneousExpectileScore):
-    """Squared error."""
+    r"""Gamma deviance.
+
+    The Gamma deviance is strictly consistent for the mean.
+    It has a degree of homogeneity of 0 and is therefore insensitive to a change of
+    units or multiplication of `y_obs` and `y_pred` by the same positive constant.
+
+    Attributes
+    ----------
+    functional: str
+        "mean"
+
+    Notes
+    -----
+    \(S(y, z) = 2(\frac{y}{z} -\log\frac{y}{z} - 1)\)
+    """
 
     def __init__(self) -> None:
         super().__init__(degree=0, level=0.5)
@@ -315,7 +356,31 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
 
 
 class PinballLoss(HomogeneousQuantileScore):
-    """Pinball loss."""
+    r"""Pinball loss.
+
+     Parameters
+    ----------
+    level : float
+        The level of the quantile. (Often called \(\alpha\).)
+        It must be `0 < level < 1`.
+        `level=0.5` gives the median.
+
+    Attributes
+    ----------
+    functional: str
+        "quantile"
+
+    Notes
+    -----
+    The pinball loss has degree of homogeneity 1 and is given by
+
+    \[
+    S_\alpha(y, z) = (\mathbf{1}\{z \ge y\} - \alpha) (z - y)
+    \]
+
+    The authors do not know where and when the term *pinball loss* was coined. It is
+    most famously used in quantile regression.
+    """
 
     def __init__(self, level: float = 0.5) -> None:
         super().__init__(degree=1, level=level)
