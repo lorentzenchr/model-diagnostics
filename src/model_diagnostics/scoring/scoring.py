@@ -248,6 +248,55 @@ class GammaDeviance(HomogeneousExpectileScore):
         super().__init__(degree=0, level=0.5)
 
 
+class LogLoss(_BaseScoringFunction):
+    r"""Log loss.
+
+    The log loss is a strictly consistent scoring function for the mean for the
+    observations and predictions in the range 0 to 1.
+    It is also referred to as Bernoulli deviance, Binomial log-likelihood, logistic
+    loss and binary cross-entropy.
+    It's minimal function value is zero.
+
+    Attributes
+    ----------
+    functional: str
+        "mean"
+
+    Notes
+    -----
+    The log loss for \(y,z \in [0,1]\) is given by
+
+    \[
+    S(y, z) = - y \log\frac{z}{y} - (1 - y) \log\frac{1-z}{1-y}
+    \]
+
+    If one restricts to \(y\in \{0, 1\}\), this simplifies to
+
+    \[
+    S(y, z) = - y \log(z) - (1 - y) \log(1-z)
+    \]
+    """
+
+    @property
+    def functional(self):
+        return "mean"
+
+    def score_per_obs(
+        self,
+        y_obs: npt.ArrayLike,
+        y_pred: npt.ArrayLike,
+    ) -> np.ndarray:
+        """Score per observation."""
+        y: np.ndarray
+        z: np.ndarray
+        y, z = validate_2_arrays(y_obs, y_pred)
+
+        score = -special.xlogy(y, z) - special.xlogy(1 - y, 1 - z)
+        if np.any((0 < y) & (y < 1)):
+            score += special.xlogy(y, y) + special.xlogy(1 - y, 1 - y)
+        return score
+
+
 class HomogeneousQuantileScore(_BaseScoringFunction):
     r"""Homogeneous scoring function of degree h for quantiles.
 
