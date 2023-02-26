@@ -603,7 +603,7 @@ def decompose(
         w = np.asarray(weights)  # needed to satisfy mypy
 
     iso = IsotonicRegression(y_min=None, y_max=None).fit(z, y, sample_weight=w)
-    recalibrated = iso.predict(z)
+    recalibrated = np.squeeze(iso.predict(z))
     marginal = np.full(shape=y.shape, fill_value=np.average(y, weights=w))
 
     score = scoring_function(y, z, w)
