@@ -2,6 +2,7 @@ from inspect import isclass
 
 import numpy as np
 import pytest
+import scipy.stats
 from numpy.testing import assert_allclose
 
 from model_diagnostics.scoring import (
@@ -216,6 +217,11 @@ def test_log_loss_against_precomputed_values():
     y_pred = [0, 0.5, 0.5, 0.25, 0.5, 1]
     sf = LogLoss()
     precomputed = [0, -log05, 0, -0.5 * log05 - 0.5 * log15, -log05, 0]
+    assert_allclose(sf.score_per_obs(y_obs=y_obs, y_pred=y_pred), precomputed)
+
+    # bernoulli.logpmf can only handle y_obs in {0, 1}
+    y_obs = [0, 0, 0, 1, 1, 1]
+    precomputed = -scipy.stats.bernoulli.logpmf(y_obs, y_pred)
     assert_allclose(sf.score_per_obs(y_obs=y_obs, y_pred=y_pred), precomputed)
 
 
