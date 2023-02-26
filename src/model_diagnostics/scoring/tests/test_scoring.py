@@ -1,8 +1,8 @@
 from inspect import isclass
 
 import numpy as np
-from numpy.testing import assert_allclose
 import pytest
+from numpy.testing import assert_allclose
 
 from model_diagnostics.scoring import (
     GammaDeviance,
@@ -131,7 +131,7 @@ def test_scoring_function_for_equal_input(sf):
     n = 5
     y = np.abs(rng.normal(loc=-2, scale=2, size=n))  # common domain
     if isinstance(sf, LogLoss):
-       y /= np.amax(y)
+        y /= np.amax(y)
     assert sf(y_obs=y, y_pred=y) == pytest.approx(0)
 
 
@@ -144,8 +144,8 @@ def test_scoring_function_score_per_obs(sf, weights):
     y_obs = np.abs(rng.normal(loc=-2, scale=2, size=n))  # common domain
     y_pred = np.abs(rng.normal(loc=-2, scale=2, size=n))  # common domain
     if isinstance(sf, LogLoss):
-       y_obs /= np.amax(y_obs)
-       y_pred /= np.amax(y_pred)
+        y_obs /= np.amax(y_obs)
+        y_pred /= np.amax(y_pred)
     if weights is not None:
         weights = np.abs(rng.normal(loc=-2, scale=2, size=n))
 

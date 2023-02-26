@@ -269,9 +269,9 @@ class LogLoss(_BaseScoringFunction):
     \[
     S(y, z) = - y \log\frac{z}{y} - (1 - y) \log\frac{1-z}{1-y}
     \]
-    
+
     If one restricts to \(y\in \{0, 1\}\), this simplifies to
-    
+
     \[
     S(y, z) = - y \log(z) - (1 - y) \log(1-z)
     \]
@@ -294,7 +294,7 @@ class LogLoss(_BaseScoringFunction):
         score = -special.xlogy(y, z) - special.xlogy(1 - y, 1 - z)
         if np.any((0 < y) & (y < 1)):
             score += special.xlogy(y, y) + special.xlogy(1 - y, 1 - y)
-        return score    
+        return score
 
 
 class HomogeneousQuantileScore(_BaseScoringFunction):
