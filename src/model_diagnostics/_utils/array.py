@@ -62,7 +62,18 @@ def get_second_dimension(a: npt.ArrayLike, i: int) -> npt.ArrayLike:
 def validate_2_arrays(
     a: npt.ArrayLike, b: npt.ArrayLike
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Validate 2 arrays."""
+    """Validate 2 arrays.
+
+    Both arrays are checked to have same dimensions and shapes and returned as numpy
+    arrays.
+
+    Returns
+    -------
+    a : ndarray
+        Input as an ndarray
+    b : ndarray
+        Input as an ndarray
+    """
     # Note: If the input is a pyarrow array, np.asarray produces a read-only ndarray.
     a = np.asarray(a)
     b = np.asarray(b)
