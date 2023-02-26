@@ -11,6 +11,10 @@
 
 Read more in the [documentation](https://lorentzenchr.github.io/model-diagnostics/).
 
+**Installation**
+
+`pip install model-diagnostics`
+
 **Contributions**
 
 Contributions are warmly welcome!
