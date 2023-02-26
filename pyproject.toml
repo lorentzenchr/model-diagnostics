@@ -82,6 +82,7 @@ dependencies = [
   "pytest",
   "pytest-cov",
   "pytest-xdist",
+  "scipy>=1.10",
 ]
 
 [tool.hatch.envs.default.scripts]
@@ -92,10 +93,10 @@ no-cov = "cov --no-cov"
 [tool.hatch.envs.docs]
 dependencies = [
   "mkdocs-material~=8.5.11",
-  "mkdocstrings[python]>=0.19",
+  "mkdocstrings[python]>=0.20",
   "mkdocs-gen-files>=0.4.0",
-  "mkdocs-literate-nav>=0.5.0",
-  "mkdocs-section-index>=0.3.4",
+  "mkdocs-literate-nav>=0.6.0",
+  "mkdocs-section-index>=0.3.5",
   "mkdocs-jupyter>=0.22",
 ]
 
@@ -106,7 +107,7 @@ ci-build = "mkdocs gh-deploy --force {args}"
 
 [tool.hatch.envs.jupyter]
 extra-dependencies = [
-  "jupyterlab>=3.4",
+  "jupyterlab>=3.6",
   "scikit-learn>=1.2.0",
 ]
 
