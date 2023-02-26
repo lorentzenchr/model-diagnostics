@@ -1,12 +1,14 @@
 from inspect import isclass
 
 import numpy as np
+from numpy.testing import assert_allclose
 import pytest
 
 from model_diagnostics.scoring import (
     GammaDeviance,
     HomogeneousExpectileScore,
     HomogeneousQuantileScore,
+    LogLoss,
     PinballLoss,
     PoissonDeviance,
     SquaredError,
@@ -58,6 +60,7 @@ SCORES = [
     HQS(degree=3, level=0.2),
     HQS(degree=3, level=0.5),
     HQS(degree=3, level=0.99),
+    LogLoss(),
 ]
 
 
@@ -127,6 +130,8 @@ def test_scoring_function_for_equal_input(sf):
     rng = np.random.default_rng(112358132134)
     n = 5
     y = np.abs(rng.normal(loc=-2, scale=2, size=n))  # common domain
+    if isinstance(sf, LogLoss):
+       y /= np.amax(y)
     assert sf(y_obs=y, y_pred=y) == pytest.approx(0)
 
 
@@ -138,6 +143,9 @@ def test_scoring_function_score_per_obs(sf, weights):
     n = 5
     y_obs = np.abs(rng.normal(loc=-2, scale=2, size=n))  # common domain
     y_pred = np.abs(rng.normal(loc=-2, scale=2, size=n))  # common domain
+    if isinstance(sf, LogLoss):
+       y_obs /= np.amax(y_obs)
+       y_pred /= np.amax(y_pred)
     if weights is not None:
         weights = np.abs(rng.normal(loc=-2, scale=2, size=n))
 
@@ -198,6 +206,17 @@ def test_homogeneous_scoring_function_against_precomputed_values():
     sf = HomogeneousQuantileScore(degree=2, level=1 / 4)
     precomputed = (3 / 4 * 15 / 2 + 1 / 4 * 3 / 2) / 2
     assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
+
+
+def test_log_loss_against_precomputed_values():
+    """Test scoring function close to degree = 0, 1 and 2."""
+    log05 = np.log(0.5)
+    log15 = np.log(1.5)
+    y_obs = [0, 0, 0.5, 0.5, 1, 1]
+    y_pred = [0, 0.5, 0.5, 0.25, 0.5, 1]
+    sf = LogLoss()
+    precomputed = [0, -log05, 0, -0.5 * log05 - 0.5 * log15, -log05, 0]
+    assert_allclose(sf.score_per_obs(y_obs=y_obs, y_pred=y_pred), precomputed)
 
 
 def test_scoring_function_functional():
