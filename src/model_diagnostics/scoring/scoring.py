@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 import numpy.typing as npt
+import polars as pl
 from scipy import special
+from sklearn.isotonic import IsotonicRegression
 
-from .._utils.array import validate_2_arrays
+from .._utils.array import validate_2_arrays, validate_same_first_dimension
 
 
 class _BaseScoringFunction(ABC):
@@ -22,7 +24,23 @@ class _BaseScoringFunction(ABC):
         y_pred: npt.ArrayLike,
         weights: Optional[npt.ArrayLike] = None,
     ) -> np.floating[Any]:
-        """Mean or average score."""
+        """Mean or average score.
+
+        Parameters
+        ----------
+        y_obs : array-like of shape (n_obs)
+            Observed values of the response variable.
+        y_pred : array-like of shape (n_obs)
+            Predicted values of the `functional` of interest, e.g. the conditional
+            expectation of the response, `E(Y|X)`.
+        weights : array-like of shape (n_obs) or None
+            Case weights.
+
+        Returns
+        -------
+        score : float
+            The average score.
+        """
         return np.average(self.score_per_obs(y_obs, y_pred), weights=weights)
 
     @abstractmethod
@@ -122,7 +140,21 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
         y_obs: npt.ArrayLike,
         y_pred: npt.ArrayLike,
     ) -> np.ndarray:
-        """Score per observation."""
+        """Score per observation.
+
+        Parameters
+        ----------
+        y_obs : array-like of shape (n_obs)
+            Observed values of the response variable.
+        y_pred : array-like of shape (n_obs)
+            Predicted values of the `functional` of interest, e.g. the conditional
+            expectation of the response, `E(Y|X)`.
+
+        Returns
+        -------
+        score_per_obs : ndarray
+            Values of the scoring function for each observation.
+        """
         y: np.ndarray
         z: np.ndarray
         y, z = validate_2_arrays(y_obs, y_pred)
@@ -191,6 +223,7 @@ class SquaredError(HomogeneousExpectileScore):
 
     The squared error is strictly consistent for the mean.
     It has a degree of homogeneity of 2.
+    In the context of probabilistic classification, it is also known as Brier score.
 
 
     Attributes
@@ -286,7 +319,21 @@ class LogLoss(_BaseScoringFunction):
         y_obs: npt.ArrayLike,
         y_pred: npt.ArrayLike,
     ) -> np.ndarray:
-        """Score per observation."""
+        """Score per observation.
+
+        Parameters
+        ----------
+        y_obs : array-like of shape (n_obs)
+            Observed values of the response variable.
+        y_pred : array-like of shape (n_obs)
+            Predicted values of the `functional` of interest, e.g. the conditional
+            expectation of the response, `E(Y|X)`.
+
+        Returns
+        -------
+        score_per_obs : ndarray
+            Values of the scoring function for each observation.
+        """
         y: np.ndarray
         z: np.ndarray
         y, z = validate_2_arrays(y_obs, y_pred)
@@ -370,7 +417,21 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
         y_obs: npt.ArrayLike,
         y_pred: npt.ArrayLike,
     ) -> np.ndarray:
-        """Score per observation."""
+        """Score per observation.
+
+        Parameters
+        ----------
+        y_obs : array-like of shape (n_obs)
+            Observed values of the response variable.
+        y_pred : array-like of shape (n_obs)
+            Predicted values of the `functional` of interest, e.g. the conditional
+            expectation of the response, `E(Y|X)`.
+
+        Returns
+        -------
+        score_per_obs : ndarray
+            Values of the scoring function for each observation.
+        """
         y: np.ndarray
         z: np.ndarray
         y, z = validate_2_arrays(y_obs, y_pred)
@@ -407,7 +468,7 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
 class PinballLoss(HomogeneousQuantileScore):
     r"""Pinball loss.
 
-     Parameters
+    Parameters
     ----------
     level : float
         The level of the quantile. (Often called \(\alpha\).)
@@ -433,3 +494,129 @@ class PinballLoss(HomogeneousQuantileScore):
 
     def __init__(self, level: float = 0.5) -> None:
         super().__init__(degree=1, level=level)
+
+
+def decompose(
+    scoring_function: Callable[..., Any],  # TODO: make type hint stricter
+    y_obs: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    weights: Optional[npt.ArrayLike] = None,
+    functional: Optional[str] = None,
+    level: Optional[float] = None,
+) -> pl.DataFrame:
+    r"""Additive decomposition of scores.
+
+    The score is decomposed as
+    `score = miscalibration - discrimination + uncertainty`.
+
+    Parameters
+    ----------
+    scoring_function : callable
+        A scoring function with signature roughly
+        `fun(y_obs, y_pred, weights) -> float`.
+    y_obs : array-like of shape (n_obs)
+        Observed values of the response variable.
+    y_pred : array-like of shape (n_obs)
+        Predicted values of the `functional` of interest, e.g. the conditional
+        expectation of the response, `E(Y|X)`.
+    weights : array-like of shape (n_obs) or None
+        Case weights.
+    functional : str or None
+        The target functionl which `y_pred` aims to predict.
+        If `None`, then it will be inferred from `scoring_function.functional`.
+    level : float or None
+        Functionals like expectiles and quantiles have a level (often called ɑ).
+        If `None`, then it will be inferred from `scoring_function.level`.
+
+    Returns
+    -------
+    decomposition : polars.DataFrame
+        The resulting score decomposition as a dataframe with columns:
+
+        - `miscalibration`
+        - `discrimination`
+        - `uncertainty`
+        - `score`: the average score
+
+    Notes
+    -----
+    To be precise, this function returns the decomposition of the score in terms of
+    auto-miscalibration, auto-discrimination (or resolution) and uncertainy (or
+    entropy), see `[FLM2022]` and references therein.
+    The key element is to esimate the recalibrated predictions, i.e. \(T(Y|m(X))\) for
+    the target functional \(T\) and model predictions \(m(X)\).
+    This is accomplished by isotonic regression, `[Dimitriadis2021]` and
+    `[Gneiting2021]`.
+
+    References
+    ----------
+    `[FLM2022]`
+
+    :   T. Fissler, C. Lorentzen, and M. Mayer.
+        "Model Comparison and Calibration Assessment". (2022)
+        [arxiv:2202.12780](https://arxiv.org/abs/2202.12780).
+
+    `[Dimitriadis2021]`
+
+    :   T. Dimitriadis, T. Gneiting, and A. I. Jordan.
+        "Stable reliability diagrams for probabilistic classifiers". (2021)
+        [doi:10.1073/pnas.2016191118](https://doi.org/10.1073/pnas.2016191118)
+
+    `[Gneiting2021]`
+
+    :   T. Gneiting and J. Resin.
+        "Regression Diagnostics meets Forecast Evaluation: Conditional Calibration,
+        Reliability Diagrams, and Coefficient of Determination". (2021).
+        [arXiv:2108.03210](https://arxiv.org/abs/2108.03210).
+
+    """
+    if functional is None:
+        if hasattr(scoring_function, "functional"):
+            functional = scoring_function.functional
+        else:
+            raise ValueError(
+                "You set functional=None, but scoring_function has no attribute "
+                "functional."
+            )
+    if level is None:
+        if functional == "mean":
+            level = 0.5
+        elif functional in ("expectile", "quantile"):
+            if hasattr(scoring_function, "level"):
+                level = scoring_function.level
+            else:
+                raise ValueError(
+                    "You set level=None, but scoring_function has no attribute "
+                    "level."
+                )
+    if not (functional == "mean" or (functional == "expectile" and level == 0.5)):
+        raise ValueError(
+            f"The given {functional=} and {level=} are not supported (yet)."
+        )
+    y: np.ndarray
+    z: np.ndarray
+    y, z = validate_2_arrays(y_obs, y_pred)
+    if weights is None:
+        w = None
+    else:
+        validate_same_first_dimension(weights, y)
+        w = np.asarray(weights)  # needed to satisfy mypy
+
+    iso = IsotonicRegression(y_min=None, y_max=None).fit(z, y, sample_weight=w)
+    recalibrated = iso.predict(z)
+    marginal = np.full(shape=y.shape, fill_value=np.average(y, weights=w))
+
+    score = scoring_function(y, z, w)
+    score_recalibrated = scoring_function(y, recalibrated, w)
+    score_marginal = scoring_function(y, marginal, w)
+
+    df = pl.DataFrame(
+        {
+            "miscalibration": score - score_recalibrated,
+            "discrimination": score_marginal - score_recalibrated,
+            "uncertainty": score_marginal,
+            "score": score,
+        }
+    )
+
+    return df

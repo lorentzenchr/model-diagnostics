@@ -1,9 +1,11 @@
 from inspect import isclass
 
 import numpy as np
+import polars as pl
 import pytest
 import scipy.stats
 from numpy.testing import assert_allclose
+from polars.testing import assert_frame_equal
 
 from model_diagnostics.scoring import (
     GammaDeviance,
@@ -13,6 +15,7 @@ from model_diagnostics.scoring import (
     PinballLoss,
     PoissonDeviance,
     SquaredError,
+    decompose,
 )
 
 HES = HomogeneousExpectileScore
@@ -233,3 +236,113 @@ def test_scoring_function_functional():
     assert sf.functional == "expectile"
     sf = HomogeneousQuantileScore()
     assert sf.functional == "quantile"
+
+
+@pytest.mark.parametrize(
+    "sf, functional, level, msg",
+    [
+        (SquaredError(), None, None, None),
+        (PinballLoss(), None, None, "The given functional.* not supported \\(yet\\)."),
+        (
+            lambda y, z, w: np.mean((y - z) ** 2),
+            None,
+            None,
+            "You set functional=None, but scoring_function has no attribute "
+            "functional.",
+        ),
+        (
+            lambda y, z, w: np.mean((y - z) ** 2),
+            "expectile",
+            None,
+            "You set level=None, but scoring_function has no attribute " "level.",
+        ),
+        (lambda y, z, w: np.mean((y - z) ** 2), "mean", None, None),
+    ],
+)
+def test_decompose_raises(sf, functional, level, msg):
+    """Test that decompose raises errors."""
+    y_obs = [0, 1]
+    y_pred = [0.5, 0.5]
+    if msg is None:
+        # no error
+        decompose(
+            scoring_function=sf,
+            y_obs=y_obs,
+            y_pred=y_pred,
+            functional=functional,
+            level=level,
+        )
+    else:
+        with pytest.raises(ValueError, match=msg):
+            decompose(
+                scoring_function=sf,
+                y_obs=y_obs,
+                y_pred=y_pred,
+                functional=functional,
+                level=level,
+            )
+
+
+def test_decompose_with_numbers():
+    """Test decompose against R library reliabilitydiag"""
+    # library(reliabilitydiag)
+    # y <- c(0, 0, 0, 1, 1, 1)
+    # z <- c(0.4, 0.3, 0.2, 0.1, 0.5, 0.9)
+    # reldiag <- reliabilitydiag(pred=z, y=y)
+    # summary(reldiag, score = "brier")
+    #
+    # 'brier' score decomposition (see also ?summary.reliabilitydiag)
+    # # A tibble: 1 × 5
+    #   forecast mean_score miscalibration discrimination uncertainty
+    #   <chr>         <dbl>          <dbl>          <dbl>       <dbl>
+    # 1 pred          0.227          0.102          0.125        0.25
+    y = [0, 0, 0, 1, 1, 1]
+    z = [0.4, 0.3, 0.2, 0.1, 0.5, 0.9]
+    df = decompose(
+        scoring_function=SquaredError(),
+        y_obs=y,
+        y_pred=z,
+    )
+    assert (df["miscalibration"] - df["discrimination"] + df["uncertainty"])[
+        0
+    ] == pytest.approx(df["score"][0])
+
+    df_expected = pl.DataFrame(
+        {
+            "miscalibration": 0.1016667,
+            "discrimination": 0.125,
+            "uncertainty": 0.25,
+            "score": 0.2266667,
+        }
+    )
+    assert_frame_equal(df, df_expected, check_exact=False)
+
+    # log_loss_score <- function(obs, pred){
+    #   ifelse(((obs==0 & pred==0) | (obs==1 & pred==1)),
+    #          0,
+    #          -obs * log(pred) - (1 - obs) * log(1 - pred))
+    # }
+    # summary(reldiag, score = "log_loss_score")
+    # 'log_loss_score' score decomposition (see also ?summary.reliabilitydiag)
+    # # A tibble: 1 × 5
+    #   forecast mean_score miscalibration discrimination uncertainty
+    #   <chr>         <dbl>          <dbl>          <dbl>       <dbl>
+    # 1 pred          0.699          0.324          0.318       0.693
+    df = decompose(
+        scoring_function=LogLoss(),
+        y_obs=y,
+        y_pred=z,
+    )
+    assert (df["miscalibration"] - df["discrimination"] + df["uncertainty"])[
+        0
+    ] == pytest.approx(df["score"][0])
+
+    df_expected = pl.DataFrame(
+        {
+            "miscalibration": 0.3237327,
+            "discrimination": 0.3182571,
+            "uncertainty": 0.6931472,
+            "score": 0.6986228,
+        }
+    )
+    assert_frame_equal(df, df_expected, check_exact=False)

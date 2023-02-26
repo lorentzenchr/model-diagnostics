@@ -6,6 +6,7 @@ from .scoring import (
     PinballLoss,
     PoissonDeviance,
     SquaredError,
+    decompose,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "PinballLoss",
     "PoissonDeviance",
     "SquaredError",
+    "decompose",
 ]

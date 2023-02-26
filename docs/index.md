@@ -9,7 +9,15 @@
 
 **Tools for diagnostics and assessment of (machine learning) models**
 
-Read more in the [documentation](https://lorentzenchr.github.io/model-diagnostics/).
+Highlights:
+
+- Assess model calibration with identification functions (generalized residuals).
+- Assess calibration graphically
+    - reliability diagrams for auto-calibration
+    - bias plots for conditional calibration
+- Assess the predictive performance of models
+    - strictly consistent, homogeneous scoring functions
+    - score decomposition into miscalibration, discrimination and uncertainty
 
 **Contributions**
 
