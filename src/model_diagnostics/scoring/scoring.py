@@ -1,3 +1,8 @@
+"""
+The scoring module provides scoring functions and the score decomposition.
+Each scoring function is implemented as a class that needs to be instantiated
+before calling the `__call__` methode, e.g. `SquaredError()(y_obs=[1], y_pred=[2])`.
+"""
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional
 
@@ -120,6 +125,12 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
         "Making and Evaluating Point Forecasts”. (2011)
         [doi:10.1198/jasa.2011.r10138](https://doi.org/10.1198/jasa.2011.r10138)
         [arxiv:0912.0902](https://arxiv.org/abs/0912.0902)
+
+    Examples
+    --------
+    >>> hes = HomogeneousExpectileScore(degree=2, level=0.1)
+    >>> hes(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    0.95
     """
 
     def __init__(self, degree: float = 2, level: float = 0.5) -> None:
@@ -234,6 +245,12 @@ class SquaredError(HomogeneousExpectileScore):
     Notes
     -----
     \(S(y, z) = (y - z)^2\)
+
+    Examples
+    --------
+    >>> se = SquaredError()
+    >>> se(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    0.75
     """
 
     def __init__(self) -> None:
@@ -254,6 +271,12 @@ class PoissonDeviance(HomogeneousExpectileScore):
     Notes
     -----
     \(S(y, z) = 2(y\log\frac{y}{z} - y + z)\)
+
+    Examples
+    --------
+    >>> pd = PoissonDeviance()
+    >>> pd(y_obs=[0, 0, 1, 1], y_pred=[2, 1, 1 , 2])
+    1.6534264097200273
     """
 
     def __init__(self) -> None:
@@ -275,6 +298,12 @@ class GammaDeviance(HomogeneousExpectileScore):
     Notes
     -----
     \(S(y, z) = 2(\frac{y}{z} -\log\frac{y}{z} - 1)\)
+
+    Examples
+    --------
+    >>> gd = GammaDeviance()
+    >>> gd(y_obs=[3, 2, 1, 1], y_pred=[2, 1, 1 , 2])
+    0.2972674459459178
     """
 
     def __init__(self) -> None:
@@ -308,6 +337,12 @@ class LogLoss(_BaseScoringFunction):
     \[
     S(y, z) = - y \log(z) - (1 - y) \log(1-z)
     \]
+
+    Examples
+    --------
+    >>> ll = LogLoss()
+    >>> ll(y_obs=[0, 0.5, 1, 1], y_pred=[0.1, 0.2, 0.8 , 0.9], weights=[1, 2, 1, 1])
+    0.17603033705165635
     """
 
     @property
@@ -400,6 +435,12 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
         "Making and Evaluating Point Forecasts”. (2011)
         [doi:10.1198/jasa.2011.r10138](https://doi.org/10.1198/jasa.2011.r10138)
         [arxiv:0912.0902](https://arxiv.org/abs/0912.0902)
+
+    Examples
+    --------
+    >>> hqs = HomogeneousQuantileScore(degree=3, level=0.1)
+    >>> hqs(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    0.6083333333333334
     """
 
     def __init__(self, degree: float = 2, level: float = 0.5) -> None:
@@ -490,6 +531,12 @@ class PinballLoss(HomogeneousQuantileScore):
 
     The authors do not know where and when the term *pinball loss* was coined. It is
     most famously used in quantile regression.
+
+    Examples
+    --------
+    >>> pl = PinballLoss(level=0.9)
+    >>> pl(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    0.275
     """
 
     def __init__(self, level: float = 0.5) -> None:
@@ -569,6 +616,17 @@ def decompose(
         Reliability Diagrams, and Coefficient of Determination". (2021).
         [arXiv:2108.03210](https://arxiv.org/abs/2108.03210).
 
+    Examples
+    --------
+    >>> decompose(SquaredError(), y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2])
+    shape: (1, 4)
+    ┌────────────────┬────────────────┬─────────────┬───────┐
+    │ miscalibration ┆ discrimination ┆ uncertainty ┆ score │
+    │ ---            ┆ ---            ┆ ---         ┆ ---   │
+    │ f64            ┆ f64            ┆ f64         ┆ f64   │
+    ╞════════════════╪════════════════╪═════════════╪═══════╡
+    │ 0.625          ┆ 0.125          ┆ 0.25        ┆ 0.75  │
+    └────────────────┴────────────────┴─────────────┴───────┘
     """
     if functional is None:
         if hasattr(scoring_function, "functional"):
