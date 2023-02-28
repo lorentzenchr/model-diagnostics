@@ -86,7 +86,8 @@ def identification_function(
 
     Examples
     --------
-
+    >>> identification_function(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    array([-1,  1,  0,  1])
     """
     y_o: np.ndarray
     y_p: np.ndarray
@@ -209,6 +210,29 @@ def compute_bias(
     :   T. Fissler, C. Lorentzen, and M. Mayer.
         "Model Comparison and Calibration Assessment". (2022)
         [arxiv:2202.12780](https://arxiv.org/abs/2202.12780).
+
+    Examples
+    --------
+    >>> compute_bias(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    shape: (1, 4)
+    ┌───────────┬────────────┬─────────────┬──────────┐
+    │ bias_mean ┆ bias_count ┆ bias_stderr ┆ p_value  │
+    │ ---       ┆ ---        ┆ ---         ┆ ---      │
+    │ f64       ┆ i64        ┆ f64         ┆ f64      │
+    ╞═══════════╪════════════╪═════════════╪══════════╡
+    │ 0.25      ┆ 4          ┆ 0.478714    ┆ 0.637618 │
+    └───────────┴────────────┴─────────────┴──────────┘
+    >>> compute_bias(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2], feature=
+    ...: ["a", "a", "b", "b"])
+    shape: (2, 5)
+    ┌─────────┬───────────┬────────────┬─────────────┬─────────┐
+    │ feature ┆ bias_mean ┆ bias_count ┆ bias_stderr ┆ p_value │
+    │ ---     ┆ ---       ┆ ---        ┆ ---         ┆ ---     │
+    │ str     ┆ f64       ┆ u32        ┆ f64         ┆ f64     │
+    ╞═════════╪═══════════╪════════════╪═════════════╪═════════╡
+    │ a       ┆ 0.0       ┆ 2          ┆ 1.0         ┆ 1.0     │
+    │ b       ┆ 0.5       ┆ 2          ┆ 0.5         ┆ 0.5     │
+    └─────────┴───────────┴────────────┴─────────────┴─────────┘
     """
     validate_same_first_dimension(y_obs, y_pred)
     if feature is not None:

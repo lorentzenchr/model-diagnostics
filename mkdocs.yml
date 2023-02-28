@@ -28,6 +28,7 @@ theme:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.instant
+    - search.highlight
 
 nav:
   - Home:
@@ -58,6 +59,8 @@ plugins:
             - src
           options:
             docstring_style: "numpy"
+            filters:
+              - "!^_"
             # Headings
             show_root_heading: true
             show_root_full_path: false
@@ -92,7 +95,8 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg
-  - pymdownx.highlight
+  - pymdownx.highlight:
+      use_pygments: true
   - pymdownx.inlinehilite
   - pymdownx.keys
   - pymdownx.mark
@@ -105,6 +109,6 @@ markdown_extensions:
   - pymdownx.tilde
 
 extra_javascript:
+  - javascripts/mathjax.js
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
-  - javascripts/mathjax.js
