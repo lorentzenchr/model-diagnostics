@@ -33,7 +33,7 @@ def validate_same_first_dimension(a: npt.ArrayLike, b: npt.ArrayLike) -> bool:
 
 
 def length_of_second_dimension(a: npt.ArrayLike) -> int:
-    """Return length of first dimension."""
+    """Return length of second dimension."""
     if not hasattr(a, "shape"):
         a = np.asarray(a)
 
