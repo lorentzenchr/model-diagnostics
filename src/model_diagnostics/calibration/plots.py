@@ -1,9 +1,11 @@
 from typing import Optional
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression
 
 from .._utils.array import array_name
@@ -15,7 +17,9 @@ def plot_reliability_diagram(
     y_pred: npt.ArrayLike,
     weights: Optional[npt.ArrayLike] = None,
     *,
-    ax=None,
+    n_bootstrap: Optional[str] = None,
+    confidence_level: float = 0.9,
+    ax: Optional[matplotlib.axes.Axes] = None,
 ):
     r"""Plot a reliability diagram.
 
@@ -32,10 +36,15 @@ def plot_reliability_diagram(
         For binary classification, y_obs is expected to be in the interval [0, 1].
     y_pred : array-like of shape (n_obs)
         Predicted values of the conditional expectation of Y, \(E(Y|X)\).
-    ax : matplotlib.axes.Axes
-        Axes object to draw the plot onto, otherwise uses the current Axes.
     weights : array-like of shape (n_obs) or None
         Case weights.
+    n_bootstrap : int or None
+        If not `None`, then `scipy.stats.bootstrap` with `n_resamples=n_bootstrap`
+        is used to calculate confidence intervals at level `confidence_level`.
+    confidence_level : float
+        Confidence level for bootstrap uncertainty regions.
+    ax : matplotlib.axes.Axes
+        Axes object to draw the plot onto, otherwise uses the current Axes.
 
     Returns
     -------
@@ -66,13 +75,49 @@ def plot_reliability_diagram(
     if ax is None:
         ax = plt.gca()
 
-    y_obs_min, y_obs_max = np.min(y_obs), np.max(y_obs)
     y_pred_min, y_pred_max = np.min(y_pred), np.max(y_pred)
-    iso = IsotonicRegression(y_min=y_obs_min, y_max=y_obs_max).fit(
-        y_pred, y_obs, sample_weight=weights
-    )
+    iso = IsotonicRegression().fit(y_pred, y_obs, sample_weight=weights)
+
+    # confidence intervals
+    if n_bootstrap is not None:
+
+        def iso_statistic(y_obs, y_pred, weights=None):
+            iso_b = IsotonicRegression(out_of_bounds="clip").fit(
+                y_pred, y_obs, sample_weight=weights
+            )
+            return iso_b.predict(iso.X_thresholds_)
+
+        data: tuple[npt.ArrayLike, ...]
+        if weights is None:
+            data = (y_obs, y_pred)
+        else:
+            data = (y_obs, y_pred, weights)
+
+        boot = bootstrap(
+            data=data,
+            statistic=iso_statistic,
+            n_resamples=n_bootstrap,
+            paired=True,
+            confidence_level=confidence_level,
+            # Note: method="bca" might result in
+            # DegenerateDataWarning: The BCa confidence interval cannot be calculated.
+            # This problem is known to occur when the distribution is degenerate or the
+            # statistic is np.min.
+            method="basic",
+        )
+
     # diagonal line
     ax.plot([y_pred_min, y_pred_max], [y_pred_min, y_pred_max], "k:")
+    # confidence intervals
+    if n_bootstrap is not None:
+        ax.fill_between(
+            iso.X_thresholds_,
+            # We make the interval conservatively monotone increasing by
+            # applying np.maximum.accumulate etc.
+            -np.minimum.accumulate(-boot.confidence_interval.low),
+            np.maximum.accumulate(boot.confidence_interval.high),
+            alpha=0.1,
+        )
     # reliability curve
     ax.plot(iso.X_thresholds_, iso.y_thresholds_)
     ax.set(xlabel="prediction for E(Y|X)", ylabel="estimated E(Y|prediction)")

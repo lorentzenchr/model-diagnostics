@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pytest
 from sklearn.datasets import make_classification
@@ -8,15 +9,26 @@ from sklearn.model_selection import train_test_split
 from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
 
 
+@pytest.mark.parametrize("n_bootstrap", [None, 10])
+@pytest.mark.parametrize("weights", [None, True])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
-def test_plot_reliability_diagram(ax):
+def test_plot_reliability_diagram(n_bootstrap, weights, ax):
     """Test that plot_reliability_diagram works."""
     X, y = make_classification(random_state=42)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
+    if weights is None:
+        X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
+        w_train, w_test = None, None
+    else:
+        weights = np.random.default_rng(42).integers(low=0, high=10, size=y.shape)
+        X_train, X_test, y_train, y_test, w_train, w_test = train_test_split(
+            X, y, weights, random_state=0
+        )
     clf = LogisticRegression(solver="lbfgs")
-    clf.fit(X_train, y_train)
+    clf.fit(X_train, y_train, w_train)
     y_pred = clf.predict_proba(X_test)[:, 1]
-    plt_ax = plot_reliability_diagram(y_obs=y_test, y_pred=y_pred, ax=ax)
+    plt_ax = plot_reliability_diagram(
+        y_obs=y_test, y_pred=y_pred, weights=w_test, ax=ax, n_bootstrap=n_bootstrap
+    )
 
     if ax is not None:
         assert ax is plt_ax
@@ -27,7 +39,9 @@ def test_plot_reliability_diagram(ax):
     plt_ax = plot_reliability_diagram(
         y_obs=y_test,
         y_pred=pd.Series(y_pred, name="simple"),
+        weights=w_test,
         ax=ax,
+        n_bootstrap=n_bootstrap,
     )
     assert plt_ax.get_title() == "Reliability Diagram simple"
 
