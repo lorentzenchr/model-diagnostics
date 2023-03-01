@@ -21,6 +21,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.9']
+    env:
+      # https://github.com/microsoft/azure-pipelines-tasks/issues/16426
+      # https://github.com/orgs/community/discussions/26434
+      MPLBACKEND: Agg
 
     steps:
     - uses: actions/checkout@v3
