@@ -12,7 +12,7 @@ from model_diagnostics.calibration import compute_bias, identification_function
 
 
 @pytest.mark.parametrize(
-    "functional, est",
+    ("functional", "est"),
     [
         ("mean", np.mean),
         ("median", np.median),
@@ -35,7 +35,7 @@ def test_identification_function_equal_input(functional, est, level):
 
 
 @pytest.mark.parametrize(
-    "functional, level, msg",
+    ("functional", "level", "msg"),
     [
         ("no good functional", 0.5, "Argument functional must be one of"),
         ("quantile", 0, "Argument level must fulfil 0 < level < 1"),
@@ -50,7 +50,7 @@ def test_identification_function_raises(functional, level, msg):
 
 
 @pytest.mark.parametrize(
-    "feature, f_grouped",
+    ("feature", "f_grouped"),
     [
         (
             pa.DictionaryArray.from_arrays([0, 0, 1, 1, 1], ["b", "a"]),
@@ -236,6 +236,4 @@ def test_compute_bias_multiple_predictions(feature_type):
         df_expected = df_expected.replace(
             "model_", pl.Series(["model_1", "model_1", "model_2", "model_2"])
         )
-        print(f"left\n{df_bias}")
-        print(f"right\n{df_expected}")
         assert_frame_equal(df_bias, df_expected, check_exact=False)

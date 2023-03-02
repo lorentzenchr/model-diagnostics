@@ -5,7 +5,7 @@ import numpy.typing as npt
 import polars as pl
 from scipy import special
 
-from .._utils._array import (
+from model_diagnostics._utils._array import (
     array_name,
     get_second_dimension,
     length_of_second_dimension,
@@ -94,7 +94,8 @@ def identification_function(
     y_o, y_p = validate_2_arrays(y_obs, y_pred)
 
     if functional in ("expectile", "quantile") and (level <= 0 or level >= 1):
-        raise ValueError(f"Argument level must fulfil 0 < level < 1, got {level}.")
+        msg = f"Argument level must fulfil 0 < level < 1, got {level}."
+        raise ValueError(msg)
 
     if functional == "mean":
         return y_p - y_o
@@ -106,10 +107,11 @@ def identification_function(
         return np.greater_equal(y_p, y_o) - level
     else:
         allowed_functionals = ("mean", "median", "expectile", "quantile")
-        raise ValueError(
+        msg = (
             f"Argument functional must be one of {allowed_functionals}, got "
             f"{functional}."
         )
+        raise ValueError(msg)
 
 
 def compute_bias(
@@ -250,9 +252,8 @@ def compute_bias(
         validate_same_first_dimension(weights, y_obs)
         w = np.asarray(weights)
         if w.ndim > 1:
-            raise ValueError(
-                "The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
-            )
+            msg = "The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
+            raise ValueError(msg)
     else:
         w = np.ones_like(y_obs)
 
@@ -260,10 +261,7 @@ def compute_bias(
     with pl.StringCache():
         for i in range(len(pred_names)):
             # Loop over columns of y_pred.
-            if n_pred == 0:
-                x = y_pred
-            else:
-                x = get_second_dimension(y_pred, i)
+            x = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
 
             bias = identification_function(
                 y_obs=y_obs,
@@ -334,13 +332,12 @@ def compute_bias(
                     # as before.
                     q = np.quantile(
                         feature,
-                        # q=np.linspace(0 + 1 / n_bins, 1 - 1 / n_bins, num=n_bins - 1),
                         # improved rounding errors
                         q=np.linspace(0 + 1, n_bins - 1, num=n_bins - 1) / n_bins,
                         method="inverted_cdf",
                     )  # type: ignore
                     q = np.unique(q)  # Some quantiles might be the same.
-                    # bins[i-1] < x <= bins[i]
+                    # We want: bins[i-1] < x <= bins[i]
                     f_binned = np.digitize(feature, bins=q, right=True)  # type: ignore
                     df = df.hstack([pl.Series("bin", f_binned)])
                     groupby_name = "bin"
@@ -416,10 +413,7 @@ def compute_bias(
 
             # Add column "model".
             if n_pred > 0:
-                if feature_name == "model":
-                    model_col_name = "model_"
-                else:
-                    model_col_name = "model"
+                model_col_name = "model_" if feature_name == "model" else "model"
                 df = df.with_columns(
                     pl.Series(model_col_name, [pred_names[i]] * df.shape[0])
                 )

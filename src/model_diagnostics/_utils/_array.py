@@ -8,7 +8,8 @@ def length_of_first_dimension(a: npt.ArrayLike) -> int:
     """Return length of first dimension."""
     if hasattr(a, "shape"):
         if len(a.shape) < 1:
-            raise ValueError("Array-like object has zero length first dimension.")
+            msg = "Array-like object has zero length first dimension."
+            raise ValueError(msg)
         else:
             return a.shape[0]
     elif hasattr(a, "length") and callable(a.length):
@@ -16,18 +17,18 @@ def length_of_first_dimension(a: npt.ArrayLike) -> int:
     elif hasattr(a, "__len__"):
         return len(a)  # type: ignore
     else:
-        raise ValueError(
-            "Unable to determine array-like object's length of first dimension."
-        )
+        msg = "Unable to determine array-like object's length of first dimension."
+        raise ValueError(msg)
 
 
 def validate_same_first_dimension(a: npt.ArrayLike, b: npt.ArrayLike) -> bool:
     """Validate that 2 array-like have the same length of the first dimension."""
     if length_of_first_dimension(a) != length_of_first_dimension(b):
-        raise ValueError(
+        msg = (
             "The two array-like objects don't have the same length of their first "
             "dimension."
         )
+        raise ValueError(msg)
     else:
         return True
 
@@ -43,7 +44,8 @@ def length_of_second_dimension(a: npt.ArrayLike) -> int:
     elif dim == 2:
         return a.shape[1]
     else:
-        raise ValueError("Array-like has more than 2 dimensions.")
+        msg = "Array-like has more than 2 dimensions."
+        raise ValueError(msg)
 
 
 def get_second_dimension(a: npt.ArrayLike, i: int) -> npt.ArrayLike:
@@ -78,14 +80,12 @@ def validate_2_arrays(
     a = np.asarray(a)
     b = np.asarray(b)
     if a.ndim != b.ndim:
-        raise ValueError(
-            f"Arrays must have the same dimension, got {a.ndim=} and {b.ndim=}."
-        )
+        msg = f"Arrays must have the same dimension, got {a.ndim=} and {b.ndim=}."
+        raise ValueError(msg)
     for i in range(a.ndim):
         if a.shape[i] != b.shape[i]:
-            raise ValueError(
-                f"Arrays must have the same shape, got {a.shape=} and {b.shape=}."
-            )
+            msg = f"Arrays must have the same shape, got {a.shape=} and {b.shape=}."
+            raise ValueError(msg)
     return a, b
 
 
@@ -98,7 +98,7 @@ def array_name(a: Optional[npt.ArrayLike], default: str = "") -> str:
         name = a.name
     elif hasattr(a, "_name"):
         # pyarrow Array / ChunkedArray
-        name = a._name
+        name = a._name  # noqa: SLF001
     else:
         name = default
 

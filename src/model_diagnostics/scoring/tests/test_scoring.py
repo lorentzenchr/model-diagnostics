@@ -82,7 +82,7 @@ def sf_name(sf):
 
 @pytest.mark.parametrize("sf", [HES, HQS])
 @pytest.mark.parametrize(
-    "level, msg",
+    ("level", "msg"),
     [
         (-1, "Argument level must fulfil 0 < level < 1"),
         (0, "Argument level must fulfil 0 < level < 1"),
@@ -97,7 +97,7 @@ def test_scoring_function_raises(sf, level, msg):
 
 
 @pytest.mark.parametrize(
-    "sf, y_obs, y_pred, msg",
+    ("sf", "y_obs", "y_pred", "msg"),
     [
         (HES(degree=1.1), -1, -2, None),
         (HES(degree=1), 0, 1, None),
@@ -239,7 +239,7 @@ def test_scoring_function_functional():
 
 
 @pytest.mark.parametrize(
-    "sf, functional, level, msg",
+    ("sf", "functional", "level", "msg"),
     [
         (SquaredError(), None, None, None),
         (PinballLoss(), None, None, "The given functional.* not supported \\(yet\\)."),
@@ -254,7 +254,7 @@ def test_scoring_function_functional():
             lambda y, z, w: np.mean((y - z) ** 2),
             "expectile",
             None,
-            "You set level=None, but scoring_function has no attribute " "level.",
+            "You set level=None, but scoring_function has no attribute level.",
         ),
         (lambda y, z, w: np.mean((y - z) ** 2), "mean", None, None),
     ],
@@ -284,7 +284,7 @@ def test_decompose_raises(sf, functional, level, msg):
 
 
 def test_decompose_with_numbers():
-    """Test decompose against R library reliabilitydiag"""
+    """Test decompose against R library reliabilitydiag."""
     # library(reliabilitydiag)
     # y <- c(0, 0, 0, 1, 1, 1)
     # z <- c(0.4, 0.3, 0.2, 0.1, 0.5, 0.9)
@@ -292,7 +292,7 @@ def test_decompose_with_numbers():
     # summary(reldiag, score = "brier")
     #
     # 'brier' score decomposition (see also ?summary.reliabilitydiag)
-    # # A tibble: 1 × 5
+    # # A tibble: 1 x 5
     #   forecast mean_score miscalibration discrimination uncertainty
     #   <chr>         <dbl>          <dbl>          <dbl>       <dbl>
     # 1 pred          0.227          0.102          0.125        0.25
@@ -324,7 +324,7 @@ def test_decompose_with_numbers():
     # }
     # summary(reldiag, score = "log_loss_score")
     # 'log_loss_score' score decomposition (see also ?summary.reliabilitydiag)
-    # # A tibble: 1 × 5
+    # # A tibble: 1 x 5
     #   forecast mean_score miscalibration discrimination uncertainty
     #   <chr>         <dbl>          <dbl>          <dbl>       <dbl>
     # 1 pred          0.699          0.324          0.318       0.693
