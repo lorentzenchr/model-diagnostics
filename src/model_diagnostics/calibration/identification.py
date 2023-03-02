@@ -5,7 +5,7 @@ import numpy.typing as npt
 import polars as pl
 from scipy import special
 
-from .._utils.array import (
+from .._utils._array import (
     array_name,
     get_second_dimension,
     length_of_second_dimension,
@@ -222,8 +222,8 @@ def compute_bias(
     ╞═══════════╪════════════╪═════════════╪══════════╡
     │ 0.25      ┆ 4          ┆ 0.478714    ┆ 0.637618 │
     └───────────┴────────────┴─────────────┴──────────┘
-    >>> compute_bias(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2], feature=
-    ...: ["a", "a", "b", "b"])
+    >>> compute_bias(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2],
+    ... feature=["a", "a", "b", "b"])
     shape: (2, 5)
     ┌─────────┬───────────┬────────────┬─────────────┬─────────┐
     │ feature ┆ bias_mean ┆ bias_count ┆ bias_stderr ┆ p_value │

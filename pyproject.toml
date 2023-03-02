@@ -160,3 +160,18 @@ all = [
 
 [tool.hatch.version]
 path = "src/model_diagnostics/__about__.py"
+
+[tool.pytest.ini_options]
+addopts = [
+  "--doctest-modules",
+  "--ignore=docs",
+]
+doctest_optionflags = [
+  "NORMALIZE_WHITESPACE",
+  "IGNORE_EXCEPTION_DETAIL",
+  "ELLIPSIS",
+]
+filterwarnings = [
+  # fail on any warnings that are not explicitly matched below
+  "error",
+]

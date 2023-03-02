@@ -12,7 +12,7 @@ import polars as pl
 from scipy import special
 from sklearn.isotonic import IsotonicRegression
 
-from .._utils.array import validate_2_arrays, validate_same_first_dimension
+from .._utils._array import validate_2_arrays, validate_same_first_dimension
 
 
 class _BaseScoringFunction(ABC):
