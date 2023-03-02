@@ -8,7 +8,7 @@ import polars as pl
 from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression
 
-from .._utils.array import array_name
+from .._utils._array import array_name
 from .identification import (
     compute_bias,
     get_second_dimension,

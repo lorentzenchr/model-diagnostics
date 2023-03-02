@@ -4,7 +4,7 @@ import pyarrow as pa
 import pytest
 from numpy.testing import assert_array_equal
 
-from model_diagnostics._utils.array import (
+from model_diagnostics._utils._array import (
     array_name,
     get_second_dimension,
     length_of_first_dimension,
