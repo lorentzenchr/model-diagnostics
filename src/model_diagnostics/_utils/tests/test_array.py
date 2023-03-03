@@ -15,7 +15,7 @@ from model_diagnostics._utils._array import (
 
 
 @pytest.mark.parametrize(
-    "a, n",
+    ("a", "n"),
     [
         (list(range(5)), 5),
         (np.arange(5), 5),
@@ -32,7 +32,7 @@ def test_length_of_first_dimension(a, n):
 
 
 @pytest.mark.parametrize(
-    "a, msg",
+    ("a", "msg"),
     [
         (np.array(2), "Array-like object has zero length first dimension."),
         (2, "Unable to determine array-like object's length of first dimension."),
@@ -45,7 +45,7 @@ def test_length_of_first_dimension_raises(a, msg):
 
 
 @pytest.mark.parametrize(
-    "a, n",
+    ("a", "n"),
     [
         (list(range(5)), 0),
         (([2, 3, 4], [1, 2, 3]), 3),
@@ -61,7 +61,7 @@ def test_length_of_second_dimension(a, n):
 
 
 @pytest.mark.parametrize(
-    "a, msg",
+    ("a", "msg"),
     [
         (np.ones((2, 2, 2)), "Array-like has more than 2 dimensions."),
         ([[[0], [1]], [[0], [1]]], "Array-like has more than 2 dimensions."),
@@ -74,7 +74,7 @@ def test_length_of_second_dimension_raises(a, msg):
 
 
 @pytest.mark.parametrize(
-    "a, i, result",
+    ("a", "i", "result"),
     [
         (np.ones((5, 3)), 2, np.ones(5)),
         (pd.DataFrame({"a": [0, 1], "b": 0.5}), 0, pd.Series([0, 1], name="a")),
@@ -87,7 +87,7 @@ def test_get_second_dimension(a, i, result):
 
 
 @pytest.mark.parametrize(
-    "a, b",
+    ("a", "b"),
     [
         (list(range(5)), np.zeros(5)),
         (np.zeros(5), np.zeros((5, 15))),
@@ -103,7 +103,7 @@ def test_validate_same_first_dimension_passes(a, b):
 
 
 @pytest.mark.parametrize(
-    "a, b, msg",
+    ("a", "b", "msg"),
     [
         (
             list(range(5)),
@@ -181,7 +181,7 @@ def test_validate_2_arrays_raises():
 
 
 @pytest.mark.parametrize(
-    "a, name",
+    ("a", "name"),
     [
         (np.array([1]), ""),
         (pd.Series([1], name="Numbers"), "Numbers"),

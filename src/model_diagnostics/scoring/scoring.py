@@ -1,5 +1,4 @@
-"""
-The scoring module provides scoring functions and the score decomposition.
+"""The scoring module provides scoring functions and the score decomposition.
 Each scoring function is implemented as a class that needs to be instantiated
 before calling the `__call__` methode, e.g. `SquaredError()(y_obs=[1], y_pred=[2])`.
 """
@@ -12,7 +11,10 @@ import polars as pl
 from scipy import special
 from sklearn.isotonic import IsotonicRegression
 
-from .._utils._array import validate_2_arrays, validate_same_first_dimension
+from model_diagnostics._utils._array import (
+    validate_2_arrays,
+    validate_same_first_dimension,
+)
 
 
 class _BaseScoringFunction(ABC):
@@ -55,7 +57,6 @@ class _BaseScoringFunction(ABC):
         y_pred: npt.ArrayLike,
     ) -> np.ndarray:
         """Score per observation."""
-        pass
 
 
 class HomogeneousExpectileScore(_BaseScoringFunction):
@@ -64,11 +65,11 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
     The smaller the better.
 
     Up to a multiplicative constant, these are the only scoring funtions that are
-    strictly consistent for expectiles at level ɑ and homogeneous functions.
+    strictly consistent for expectiles at level alpha and homogeneous functions.
     The possible additive constant is chosen such that the minimal function value
     equals zero.
 
-    Note that the 1/2-expectile (level ɑ=0.5) equals the mean.
+    Note that the 1/2-expectile (level alpha=0.5) equals the mean.
 
     Parameters
     ----------
@@ -136,7 +137,8 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
     def __init__(self, degree: float = 2, level: float = 0.5) -> None:
         self.degree = degree
         if level <= 0 or level >= 1:
-            raise ValueError(f"Argument level must fulfil 0 < level < 1, got {level}.")
+            msg = f"Argument level must fulfil 0 < level < 1, got {level}."
+            raise ValueError(msg)
         self.level = level
 
     @property
@@ -186,18 +188,20 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
         elif self.degree == 1:
             # Domain: y >= 0 and z > 0
             if not np.all((y >= 0) & (z > 0)):
-                raise ValueError(
-                    f"Valid domain for degree={self.degree} is "
-                    "y_obs >= 0 and y_pred > 0."
+                msg = (
+                    f"Valid domain for degree={self.degree} is y_obs >= 0 and "
+                    "y_pred > 0."
                 )
+                raise ValueError(msg)
             score = 2 * (special.xlogy(y, y / z) - y + z)
         elif self.degree == 0:
             # Domain: y > 0 and z > 0.
             if not np.all((y > 0) & (z > 0)):
-                raise ValueError(
+                msg = (
                     f"Valid domain for degree={self.degree} is "
                     "y_obs > 0 and y_pred > 0."
                 )
+                raise ValueError(msg)
             y_z = y / z
             score = 2 * (y_z - np.log(y_z) - 1)
         else:  # self.degree < 1
@@ -205,16 +209,17 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
             # Domain: y > 0  and z > 0 else
             if self.degree > 0:
                 if not np.all((y >= 0) & (z > 0)):
-                    raise ValueError(
+                    msg = (
                         f"Valid domain for degree={self.degree} is "
                         "y_obs >= 0 and y_pred > 0."
                     )
-            else:
-                if not np.all((y > 0) & (z > 0)):
-                    raise ValueError(
-                        f"Valid domain for degree={self.degree} is "
-                        "y_obs > 0 and y_pred > 0."
-                    )
+                    raise ValueError(msg)
+            elif not np.all((y > 0) & (z > 0)):
+                msg = (
+                    f"Valid domain for degree={self.degree} is "
+                    "y_obs > 0 and y_pred > 0."
+                )
+                raise ValueError(msg)
             # Note: We add 0.0 to be sure we have floating points. Integers are not
             # allowerd to be raised to a negative power.
             score = 2 * (
@@ -374,7 +379,7 @@ class LogLoss(_BaseScoringFunction):
         y, z = validate_2_arrays(y_obs, y_pred)
 
         score = -special.xlogy(y, z) - special.xlogy(1 - y, 1 - z)
-        if np.any((0 < y) & (y < 1)):
+        if np.any((y > 0) & (y < 1)):
             score += special.xlogy(y, y) + special.xlogy(1 - y, 1 - y)
         return score
 
@@ -385,11 +390,11 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
     The smaller the better.
 
     Up to a multiplicative constant, these are the only scoring funtions that are
-    strictly consistent for quantiles at level ɑ and homogeneous functions.
+    strictly consistent for quantiles at level alpha and homogeneous functions.
     The possible additive constant is chosen such that the minimal function value
     equals zero.
 
-    Note that the 1/2-quantile (level ɑ=0.5) equals the median.
+    Note that the 1/2-quantile (level alpha=0.5) equals the median.
 
     Parameters
     ----------
@@ -446,7 +451,8 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
     def __init__(self, degree: float = 2, level: float = 0.5) -> None:
         self.degree = degree
         if level <= 0 or level >= 1:
-            raise ValueError(f"Argument level must fulfil 0 < level < 1, got {level}.")
+            msg = f"Argument level must fulfil 0 < level < 1, got {level}."
+            raise ValueError(msg)
         self.level = level
 
     @property
@@ -486,18 +492,20 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
         elif self.degree == 0:
             # Domain: y > 0 and z > 0.
             if not np.all((y > 0) & (z > 0)):
-                raise ValueError(
+                msg = (
                     f"Valid domain for degree={self.degree} is "
                     "y_obs > 0 and y_pred > 0."
                 )
+                raise ValueError(msg)
             score = np.log(z / y)
         else:
             # Domain: y > 0 and z > 0.
             if not np.all((y > 0) & (z > 0)):
-                raise ValueError(
+                msg = (
                     f"Valid domain for degree={self.degree} is "
                     "y_obs > 0 and y_pred > 0."
                 )
+                raise ValueError(msg)
             score = (np.power(z, self.degree) - np.power(y, self.degree)) / self.degree
 
         if self.level == 0.5:
@@ -572,7 +580,7 @@ def decompose(
         The target functionl which `y_pred` aims to predict.
         If `None`, then it will be inferred from `scoring_function.functional`.
     level : float or None
-        Functionals like expectiles and quantiles have a level (often called ɑ).
+        Functionals like expectiles and quantiles have a level (often called alpha).
         If `None`, then it will be inferred from `scoring_function.level`.
 
     Returns
@@ -632,10 +640,11 @@ def decompose(
         if hasattr(scoring_function, "functional"):
             functional = scoring_function.functional
         else:
-            raise ValueError(
+            msg = (
                 "You set functional=None, but scoring_function has no attribute "
                 "functional."
             )
+            raise ValueError(msg)
     if level is None:
         if functional == "mean":
             level = 0.5
@@ -643,14 +652,15 @@ def decompose(
             if hasattr(scoring_function, "level"):
                 level = scoring_function.level
             else:
-                raise ValueError(
+                msg = (
                     "You set level=None, but scoring_function has no attribute "
                     "level."
                 )
+                raise ValueError(msg)
     if not (functional == "mean" or (functional == "expectile" and level == 0.5)):
-        raise ValueError(
-            f"The given {functional=} and {level=} are not supported (yet)."
-        )
+        msg = f"The given {functional=} and {level=} are not supported (yet)."
+        raise ValueError(msg)
+
     y: np.ndarray
     z: np.ndarray
     y, z = validate_2_arrays(y_obs, y_pred)

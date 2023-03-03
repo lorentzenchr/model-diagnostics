@@ -1,6 +1,6 @@
 from typing import Optional
 
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
@@ -8,7 +8,8 @@ import polars as pl
 from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression
 
-from .._utils._array import array_name
+from model_diagnostics._utils._array import array_name
+
 from .identification import (
     compute_bias,
     get_second_dimension,
@@ -23,7 +24,7 @@ def plot_reliability_diagram(
     *,
     n_bootstrap: Optional[str] = None,
     confidence_level: float = 0.9,
-    ax: Optional[matplotlib.axes.Axes] = None,
+    ax: Optional[mpl.axes.Axes] = None,
 ):
     r"""Plot a reliability diagram.
 
@@ -85,17 +86,10 @@ def plot_reliability_diagram(
         y_pred_min, y_pred_max = np.inf, -np.inf
         for i in range(n_pred):
             y_pred_i = get_second_dimension(y_pred, i)
-            if hasattr(y_pred_i, "min"):
-                y_pred_min = np.amin([y_pred_min, y_pred_i.min()])  # type: ignore
-                y_pred_max = np.amax([y_pred_max, y_pred_i.max()])  # type: ignore
-            else:
-                y_pred_array = np.asarray(y_pred)
-                y_pred_min = np.amin(
-                    [y_pred_min, np.amin(y_pred_array)]
-                )  # type: ignore
-                y_pred_max = np.amax(
-                    [y_pred_max, np.amax(y_pred_array)]
-                )  # type: ignore
+            if not hasattr(y_pred_i, "min"):
+                y_pred_i = np.asarray(y_pred)
+            y_pred_min = np.amin([y_pred_min, y_pred_i.min()])  # type: ignore
+            y_pred_max = np.amax([y_pred_max, y_pred_i.max()])  # type: ignore
     else:
         y_pred_array = np.asarray(y_pred)
         y_pred_min, y_pred_max = np.amin(y_pred_array), np.amax(y_pred_array)
@@ -115,10 +109,7 @@ def plot_reliability_diagram(
         # confidence intervals
         if n_bootstrap is not None:
             data: tuple[npt.ArrayLike, ...]
-            if weights is None:
-                data = (y_obs, y_pred_i)
-            else:
-                data = (y_obs, y_pred_i, weights)
+            data = (y_obs, y_pred_i) if weights is None else (y_obs, y_pred_i, weights)
 
             boot = bootstrap(
                 data=data,
