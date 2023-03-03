@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
@@ -9,10 +10,23 @@ from sklearn.model_selection import train_test_split
 from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
 
 
+@pytest.mark.parametrize(
+    ("param", "value", "msg"),
+    [("diagram_type", "XXX", "Parameter diagram_type must be either.*XXX")],
+)
+def test_plot_reliability_diagram_raises(param, value, msg):
+    """Test that plot_reliability_diagram raises errors."""
+    y_obs = [0, 1]
+    y_pred = [-1, 1]
+    with pytest.raises(ValueError, match=msg):
+        plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, **{param: value})
+
+
+@pytest.mark.parametrize("diagram_type", ["reliability", "bias"])
 @pytest.mark.parametrize("n_bootstrap", [None, 10])
 @pytest.mark.parametrize("weights", [None, True])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
-def test_plot_reliability_diagram(n_bootstrap, weights, ax):
+def test_plot_reliability_diagram(diagram_type, n_bootstrap, weights, ax):
     """Test that plot_reliability_diagram works."""
     X, y = make_classification(random_state=42)
     if weights is None:
@@ -27,14 +41,23 @@ def test_plot_reliability_diagram(n_bootstrap, weights, ax):
     clf.fit(X_train, y_train, w_train)
     y_pred = clf.predict_proba(X_test)[:, 1]
     plt_ax = plot_reliability_diagram(
-        y_obs=y_test, y_pred=y_pred, weights=w_test, ax=ax, n_bootstrap=n_bootstrap
+        y_obs=y_test,
+        y_pred=y_pred,
+        weights=w_test,
+        ax=ax,
+        n_bootstrap=n_bootstrap,
+        diagram_type=diagram_type,
     )
 
     if ax is not None:
         assert ax is plt_ax
     assert plt_ax.get_xlabel() == "prediction for E(Y|X)"
-    assert plt_ax.get_ylabel() == "estimated E(Y|prediction)"
-    assert plt_ax.get_title() == "Reliability Diagram"
+    if diagram_type == "reliability":
+        assert plt_ax.get_ylabel() == "estimated E(Y|prediction)"
+        assert plt_ax.get_title() == "Reliability Diagram"
+    else:
+        assert plt_ax.get_ylabel() == "bias = prediction - estimated E(Y|prediction)"
+        assert plt_ax.get_title() == "Bias Reliability Diagram"
 
     plt_ax = plot_reliability_diagram(
         y_obs=y_test,
@@ -42,8 +65,12 @@ def test_plot_reliability_diagram(n_bootstrap, weights, ax):
         weights=w_test,
         ax=ax,
         n_bootstrap=n_bootstrap,
+        diagram_type=diagram_type,
     )
-    assert plt_ax.get_title() == "Reliability Diagram simple"
+    if diagram_type == "reliability":
+        assert plt_ax.get_title() == "Reliability Diagram simple"
+    else:
+        assert plt_ax.get_title() == "Bias Reliability Diagram simple"
 
 
 def test_plot_reliability_diagram_multiple_predictions():
@@ -61,6 +88,21 @@ def test_plot_reliability_diagram_multiple_predictions():
     assert len(legend_text) == 2
     assert legend_text[0].get_text() == "model_1"
     assert legend_text[1].get_text() == "model_2"
+
+
+@pytest.mark.parametrize(
+    ("list2array", "multidim"),
+    [(lambda x: x, True), (np.asarray, True), (pd.Series, False), (pl.Series, False)],
+)
+def test_plot_reliability_diagram_array_like(list2array, multidim):
+    """Test that plot_reliability_diagram raises errors."""
+    y_obs = list2array([0, 1, 2])
+    y_pred = list2array([-1, 1, 0])
+    plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
+
+    if multidim:
+        y_pred = list2array([[-1, 1, 0], [1, 2, 3], [-3, -2, -1]])
+        plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
 
 
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])

@@ -199,8 +199,8 @@ style = [
   "black --check --diff {args:.}",
 ]
 fmt = [
-  "ruff --fix {args:.}",
   "black {args:.}",
+  "ruff --fix {args:.}",
   "style",
 ]
 all = [
