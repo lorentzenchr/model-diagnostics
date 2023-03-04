@@ -56,6 +56,8 @@ def get_second_dimension(a: npt.ArrayLike, i: int) -> npt.ArrayLike:
     elif hasattr(a, "column"):
         # pyarrow
         return a.column(i)  # a[i] would also work
+    elif isinstance(a, (list, tuple)):
+        return np.asarray(a)[:, i]
     else:
         # numpy
         return a[:, i]  # type: ignore

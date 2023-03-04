@@ -24,12 +24,14 @@ def plot_reliability_diagram(
     *,
     n_bootstrap: Optional[str] = None,
     confidence_level: float = 0.9,
+    diagram_type: str = "reliability",
     ax: Optional[mpl.axes.Axes] = None,
 ):
     r"""Plot a reliability diagram.
 
     A reliability diagram or calibration curve assess auto-calibration. It plots the
-    conditional expectation given the predictions (y-axis) vs the predictions (x-axis).
+    conditional expectation given the predictions `E(y_obs|y_pred)` (y-axis) vs the
+    predictions `y_pred` (x-axis).
     The conditional expectation is estimated via isotonic regression (PAV algorithm)
     of `y_obs` on `y_pred`.
     See Notes for further details.
@@ -48,6 +50,10 @@ def plot_reliability_diagram(
         is used to calculate confidence intervals at level `confidence_level`.
     confidence_level : float
         Confidence level for bootstrap uncertainty regions.
+    diagram_type: str
+        - `"reliability"`: Plot a reliability diagram.
+        - `"bias"`: Plot roughly a 45 degree rotated reliability diagram. The resulting
+          plot is similar to `plot_bias`, i.e. `y_pred - E(y_obs|y_pred)` vs `y_pred`.
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.
 
@@ -80,6 +86,13 @@ def plot_reliability_diagram(
     if ax is None:
         ax = plt.gca()
 
+    if diagram_type not in ("reliability", "bias"):
+        msg = (
+            "Parameter diagram_type must be either 'reliability', 'bias', "
+            f"got {diagram_type}."
+        )
+        raise ValueError(msg)
+
     # diagonal line
     n_pred = length_of_second_dimension(y_pred)
     if n_pred > 0:
@@ -91,9 +104,19 @@ def plot_reliability_diagram(
             y_pred_min = np.amin([y_pred_min, y_pred_i.min()])  # type: ignore
             y_pred_max = np.amax([y_pred_max, y_pred_i.max()])  # type: ignore
     else:
-        y_pred_array = np.asarray(y_pred)
-        y_pred_min, y_pred_max = np.amin(y_pred_array), np.amax(y_pred_array)
-    ax.plot([y_pred_min, y_pred_max], [y_pred_min, y_pred_max], "k:")
+        if not (hasattr(y_pred, "min") and hasattr(y_pred, "max")):
+            y_pred = np.asarray(y_pred)
+        y_pred_min, y_pred_max = y_pred.min(), y_pred.max()
+
+    if diagram_type == "reliability":
+        ax.plot(
+            [y_pred_min, y_pred_max],
+            [y_pred_min, y_pred_max],
+            color="k",
+            linestyle="dotted",
+        )
+    else:
+        ax.hlines(y=0, xmin=y_pred_min, xmax=y_pred_max, color="k", linestyle="dotted")
 
     def iso_statistic(y_obs, y_pred, weights=None):
         iso_b = IsotonicRegression(out_of_bounds="clip").fit(
@@ -126,14 +149,24 @@ def plot_reliability_diagram(
 
         # confidence intervals
         if n_bootstrap is not None:
-            ax.fill_between(
-                iso.X_thresholds_,
-                # We make the interval conservatively monotone increasing by
-                # applying np.maximum.accumulate etc.
-                -np.minimum.accumulate(-boot.confidence_interval.low),
-                np.maximum.accumulate(boot.confidence_interval.high),
-                alpha=0.1,
-            )
+            if diagram_type == "reliability":
+                ax.fill_between(
+                    iso.X_thresholds_,
+                    # We make the interval conservatively monotone increasing by
+                    # applying np.maximum.accumulate etc.
+                    -np.minimum.accumulate(-boot.confidence_interval.low),
+                    np.maximum.accumulate(boot.confidence_interval.high),
+                    alpha=0.1,
+                )
+            else:
+                ax.fill_between(
+                    iso.X_thresholds_,
+                    iso.X_thresholds_
+                    + np.minimum.accumulate(-boot.confidence_interval.low),
+                    iso.X_thresholds_
+                    - np.maximum.accumulate(boot.confidence_interval.high),
+                    alpha=0.1,
+                )
 
         # reliability curve
         if n_pred >= 2:
@@ -142,19 +175,32 @@ def plot_reliability_diagram(
                 label = str(i)
         else:
             label = None
-        ax.plot(iso.X_thresholds_, iso.y_thresholds_, label=label)
+        if diagram_type == "reliability":
+            ax.plot(iso.X_thresholds_, iso.y_thresholds_, label=label)
+        else:
+            ax.plot(
+                iso.X_thresholds_, iso.X_thresholds_ - iso.y_thresholds_, label=label
+            )
 
-    ax.set(xlabel="prediction for E(Y|X)", ylabel="estimated E(Y|prediction)")
+    if diagram_type == "reliability":
+        ax.set(xlabel="prediction for E(Y|X)", ylabel="estimated E(Y|prediction)")
+        title = "Reliability Diagram"
+    else:
+        ax.set(
+            xlabel="prediction for E(Y|X)",
+            ylabel="bias = prediction - estimated E(Y|prediction)",
+        )
+        title = "Bias Reliability Diagram"
 
     if n_pred >= 2:
-        ax.set_title("Reliability Diagram")
+        ax.set_title(title)
         ax.legend()
     else:
         y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
         if len(model_name := array_name(y_pred_i, default="")) > 0:
-            ax.set_title("Reliability Diagram " + model_name)
+            ax.set_title(title + " " + model_name)
         else:
-            ax.set_title("Reliability Diagram")
+            ax.set_title(title)
 
     return ax
 
@@ -270,7 +316,7 @@ def plot_bias(
     else:
         min_max = {"min": df[feature_name].min(), "max": df[feature_name].max()}
     ax.hlines(
-        y=0, xmin=min_max["min"], xmax=min_max["max"], color="k", linestyles="dotted"
+        y=0, xmin=min_max["min"], xmax=min_max["max"], color="k", linestyle="dotted"
     )
 
     # bias plot
