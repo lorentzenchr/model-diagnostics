@@ -13,6 +13,7 @@ from model_diagnostics._utils._array import array_name
 from .identification import (
     compute_bias,
     get_second_dimension,
+    get_sorted_array_names,
     length_of_second_dimension,
 )
 
@@ -93,30 +94,12 @@ def plot_reliability_diagram(
         )
         raise ValueError(msg)
 
-    # diagonal line
-    n_pred = length_of_second_dimension(y_pred)
-    if n_pred > 0:
-        y_pred_min, y_pred_max = np.inf, -np.inf
-        for i in range(n_pred):
-            y_pred_i = get_second_dimension(y_pred, i)
-            if not hasattr(y_pred_i, "min"):
-                y_pred_i = np.asarray(y_pred)
-            y_pred_min = np.amin([y_pred_min, y_pred_i.min()])  # type: ignore
-            y_pred_max = np.amax([y_pred_max, y_pred_i.max()])  # type: ignore
-    else:
-        if not (hasattr(y_pred, "min") and hasattr(y_pred, "max")):
-            y_pred = np.asarray(y_pred)
-        y_pred_min, y_pred_max = y_pred.min(), y_pred.max()
-
     if diagram_type == "reliability":
-        ax.plot(
-            [y_pred_min, y_pred_max],
-            [y_pred_min, y_pred_max],
-            color="k",
-            linestyle="dotted",
-        )
+        # diagonal line, transform=ax.transAxes means in axes coordinates
+        ax.plot([0, 1], [0, 1], transform=ax.transAxes)
     else:
-        ax.hlines(y=0, xmin=y_pred_min, xmax=y_pred_max, color="k", linestyle="dotted")
+        # horizontal line at y=0
+        ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
 
     def iso_statistic(y_obs, y_pred, weights=None):
         iso_b = (
@@ -126,7 +109,10 @@ def plot_reliability_diagram(
         )
         return iso_b.predict(iso.X_thresholds_)
 
-    for i in range(np.maximum(1, n_pred)):
+    n_pred = length_of_second_dimension(y_pred)
+    pred_names, pred_indices = get_sorted_array_names(y_pred)
+
+    for i in pred_indices:
         y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
 
         iso = (
@@ -165,12 +151,7 @@ def plot_reliability_diagram(
             ax.fill_between(iso.X_thresholds_, lower, upper, alpha=0.1)
 
         # reliability curve
-        if n_pred >= 2:
-            label = array_name(y_pred_i, default="")
-            if len(label) == 0:
-                label = str(i)
-        else:
-            label = None
+        label = pred_names[i] if n_pred >= 2 else None
 
         y_plot = (
             iso.y_thresholds_
@@ -192,8 +173,8 @@ def plot_reliability_diagram(
         ax.legend()
     else:
         y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
-        if len(model_name := array_name(y_pred_i, default="")) > 0:
-            ax.set_title(title + " " + model_name)
+        if len(pred_names[0]) > 0:
+            ax.set_title(title + " " + pred_names[0])
         else:
             ax.set_title(title)
 

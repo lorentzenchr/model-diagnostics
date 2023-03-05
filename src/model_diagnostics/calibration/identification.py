@@ -9,6 +9,7 @@ from scipy import special
 from model_diagnostics._utils._array import (
     array_name,
     get_second_dimension,
+    get_sorted_array_names,
     length_of_second_dimension,
     validate_2_arrays,
     validate_same_first_dimension,
@@ -240,13 +241,7 @@ def compute_bias(
     """
     validate_same_first_dimension(y_obs, y_pred)
     n_pred = length_of_second_dimension(y_pred)
-    if n_pred == 0:
-        pred_names = [""]
-    else:
-        pred_names = []
-        for i in range(n_pred):
-            x = get_second_dimension(y_pred, i)
-            pred_names.append(array_name(x, default=str(i)))
+    pred_names, pred_indices = get_sorted_array_names(y_pred)
 
     if weights is not None:
         validate_same_first_dimension(weights, y_obs)
@@ -308,7 +303,7 @@ def compute_bias(
                     )
                     warnings.warn(msg, UserWarning)
 
-        for i in range(len(pred_names)):
+        for i in pred_indices:
             # Loop over columns of y_pred.
             x = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
 

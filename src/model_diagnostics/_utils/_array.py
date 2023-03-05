@@ -112,3 +112,32 @@ def array_name(a: Optional[npt.ArrayLike], default: str = "") -> str:
         name = default
 
     return name
+
+
+def get_sorted_array_names(y_pred: Union[npt.ArrayLike, pl.Series, pl.DataFrame]):
+    """Get names of an array and sorted indices.
+
+    Returns
+    -------
+    pred_names : list
+        The (column) names of the predictions.
+    sorted_indices : list
+        A list of indices such that `[pred_names[i] for i in sorted_indices]`
+        is a sorted list.
+    """
+    n_pred = length_of_second_dimension(y_pred)
+    if n_pred == 0:
+        pred_names = [array_name(y_pred, default="")]
+    else:
+        pred_names = []
+        for i in range(n_pred):
+            x = get_second_dimension(y_pred, i)
+            pred_names.append(array_name(x, default=str(i)))
+
+    if n_pred >= 2:
+        # https://stackoverflow.com/questions/6422700
+        sorted_indices = sorted(range(len(pred_names)), key=pred_names.__getitem__)
+    else:
+        sorted_indices = [0]
+
+    return pred_names, sorted_indices

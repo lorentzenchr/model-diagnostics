@@ -78,7 +78,7 @@ def test_plot_reliability_diagram_multiple_predictions():
     n_obs = 10
     y_obs = np.arange(n_obs)
     y_obs[::2] = 0
-    y_pred = pd.DataFrame({"model_1": np.ones(n_obs), "model_2": 3 * np.ones(n_obs)})
+    y_pred = pd.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
     plt_ax = plot_reliability_diagram(
         y_obs=y_obs,
         y_pred=y_pred,
@@ -186,8 +186,8 @@ def test_plot_bias_feature_none():
     y_pred = pd.DataFrame(
         {
             "model_1": np.arange(10) + 0.5,
-            "model_2": (y_obs - 5) ** 2,
-            "model_3": (y_obs - 3) ** 2,
+            "model_3": (y_obs - 5) ** 2,
+            "model_2": (y_obs - 3) ** 2,
         }
     )
     fig, ax = plt.subplots()
@@ -213,8 +213,8 @@ def test_plot_bias_multiple_predictions(feature_type):
     y_pred = pl.DataFrame(
         {
             "model_1": np.arange(n_obs) + 0.5,
-            "model_2": (y_obs - 5) ** 2,
-            "model_3": (y_obs - 3) ** 2,
+            "model_3": (y_obs - 5) ** 2,
+            "model_2": (y_obs - 3) ** 2,
         }
     )
     # string

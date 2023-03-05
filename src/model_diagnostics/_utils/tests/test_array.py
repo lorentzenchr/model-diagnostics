@@ -7,6 +7,7 @@ from numpy.testing import assert_array_equal
 from model_diagnostics._utils._array import (
     array_name,
     get_second_dimension,
+    get_sorted_array_names,
     length_of_first_dimension,
     length_of_second_dimension,
     validate_2_arrays,
@@ -199,3 +200,33 @@ def test_array_name_none():
     a = pd.Series([1, 2])  # We dont set name is Series => it is None.
     assert array_name(a, default="default") == "default"
     assert array_name(None, default="default")
+
+
+def test_get_sorted_array_names():
+    """Test that get_sorted_array_names does its job."""
+    y_pred = [1]
+    names, indices = get_sorted_array_names(y_pred)
+    assert names == [""]
+    assert indices == [0]
+
+    y_pred = [[1, 10], [2, 20]]
+    names, indices = get_sorted_array_names(y_pred)
+    assert names == ["0", "1"]
+    assert indices == [0, 1]
+
+    y_pred = pd.Series(data=[0, 1], name="model_1")
+    names, indices = get_sorted_array_names(y_pred)
+    assert names == ["model_1"]
+    assert indices == [0]
+
+    y_pred = pd.DataFrame(
+        {
+            "model_2": [0, 1],
+            "model_3": [1, 1],
+            "model_1": [2, 1],
+            "": [2, 2],
+        }
+    )
+    names, indices = get_sorted_array_names(y_pred)
+    assert names == ["model_2", "model_3", "model_1", ""]
+    assert indices == [3, 2, 0, 1]
