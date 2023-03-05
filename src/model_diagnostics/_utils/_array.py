@@ -1,7 +1,10 @@
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import numpy.typing as npt
+import polars as pl
+
+AL_or_polars = Union[npt.ArrayLike, pl.Series]
 
 
 def length_of_first_dimension(a: npt.ArrayLike) -> int:
@@ -21,7 +24,7 @@ def length_of_first_dimension(a: npt.ArrayLike) -> int:
         raise ValueError(msg)
 
 
-def validate_same_first_dimension(a: npt.ArrayLike, b: npt.ArrayLike) -> bool:
+def validate_same_first_dimension(a: AL_or_polars, b: AL_or_polars) -> bool:
     """Validate that 2 array-like have the same length of the first dimension."""
     if length_of_first_dimension(a) != length_of_first_dimension(b):
         msg = (

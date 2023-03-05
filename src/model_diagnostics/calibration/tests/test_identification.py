@@ -237,3 +237,51 @@ def test_compute_bias_multiple_predictions(feature_type):
             "model_", pl.Series(["model_1", "model_1", "model_2", "model_2"])
         )
         assert_frame_equal(df_bias, df_expected, check_exact=False)
+
+
+def test_compute_bias_many_sparse_feature_values():
+    """Test that compute_bias returns same values for high cardinality feature."""
+    n_obs = 100
+    y_obs = np.arange(n_obs)
+    y_pred = pl.DataFrame(
+        {
+            "model_1": np.arange(n_obs) + 0.5,
+            "model_2": (y_obs - 5) ** 2,
+            "model_3": (y_obs - 3) ** 2,
+        }
+    )
+    rng = np.random.default_rng(42)
+    feature = rng.integers(low=0, high=n_obs // 2, size=n_obs).astype(str)
+
+    df = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+        n_bins=10,
+    )
+
+    assert set(df.filter(pl.col("model") == "model_1")["feature"]) == set(
+        df.filter(pl.col("model") == "model_2")["feature"]
+    )
+    assert set(df.filter(pl.col("model") == "model_1")["feature"]) == set(
+        df.filter(pl.col("model") == "model_3")["feature"]
+    )
+
+
+def test_compute_bias_warning_for_n_bins():
+    """Test that compute_bias gives warning for n_bins to small."""
+    y_obs = np.arange(6)
+    y_pred = y_obs + 1
+    feature = ["a", "a", "b", "b", "c", "c"]
+
+    with pytest.warns(
+        UserWarning, match="Due to ties, the effective number of bins is 0"
+    ):
+        df = compute_bias(
+            y_obs=y_obs,
+            y_pred=y_pred,
+            feature=feature,
+            n_bins=2,
+        )
+
+    assert df.shape[0] == 0

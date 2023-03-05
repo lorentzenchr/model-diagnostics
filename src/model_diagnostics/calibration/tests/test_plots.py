@@ -56,7 +56,7 @@ def test_plot_reliability_diagram(diagram_type, n_bootstrap, weights, ax):
         assert plt_ax.get_ylabel() == "estimated E(Y|prediction)"
         assert plt_ax.get_title() == "Reliability Diagram"
     else:
-        assert plt_ax.get_ylabel() == "bias = prediction - estimated E(Y|prediction)"
+        assert plt_ax.get_ylabel() == "prediction - estimated E(Y|prediction)"
         assert plt_ax.get_title() == "Bias Reliability Diagram"
 
     plt_ax = plot_reliability_diagram(
@@ -105,9 +105,10 @@ def test_plot_reliability_diagram_array_like(list2array, multidim):
         plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
 
 
-@pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
-def test_plot_bias(ax, feature_type):
+@pytest.mark.parametrize("with_errorbars", [False, True])
+@pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
+def test_plot_bias(feature_type, with_errorbars, ax):
     """Test that plot_bias works."""
     X, y = make_classification(
         n_samples=100,
@@ -119,14 +120,21 @@ def test_plot_bias(ax, feature_type):
     clf.fit(X_train, y_train)
     feature = X_test[:, 0]
     if feature_type == "cat":
-        feature = pd.Series(feature.astype("=U8"), dtype="category")
+        # We first convert to string as polars does not like pandas.categorical with
+        # non-string values.
+        bins = np.quantile(feature, [0.2, 0.5, 0.8])
+        feature = pd.Series(
+            np.digitize(feature, bins=bins).astype("=U8"), dtype="category"
+        )
     elif feature_type == "string":
-        feature = feature.astype("=U8")
+        bins = np.quantile(feature, [0.2, 0.5, 0.8])
+        feature = np.digitize(feature, bins=bins).astype("=U8")
 
     plt_ax = plot_bias(
         y_obs=y_test,
         y_pred=clf.predict_proba(X_test)[:, 1],
         feature=feature,
+        with_errorbars=with_errorbars,
         ax=ax,
     )
 
@@ -143,6 +151,7 @@ def test_plot_bias(ax, feature_type):
         y_obs=y_test,
         y_pred=pd.Series(clf.predict_proba(X_test)[:, 1], name="simple"),
         feature=feature,
+        with_errorbars=with_errorbars,
         ax=ax,
     )
     assert plt_ax.get_title() == "Bias Plot simple"
@@ -170,18 +179,27 @@ def test_plot_bias_feature_none():
     ]
 
 
-def test_plot_bias_multiple_predictions():
-    """Test that plot_bias works for multiple predictions."""
-    y_obs = np.arange(10)
-    y_pred = pd.DataFrame(
+@pytest.mark.parametrize("feature_type", ["num", "string"])
+def test_plot_bias_multiple_predictions(feature_type):
+    """Test that plot_bias works for multiple predictions.
+
+    This also tests feature to be a string with many different values
+    """
+    n_obs = 100
+    y_obs = np.arange(n_obs)
+    y_pred = pl.DataFrame(
         {
-            "model_1": np.arange(10) + 0.5,
+            "model_1": np.arange(n_obs) + 0.5,
             "model_2": (y_obs - 5) ** 2,
             "model_3": (y_obs - 3) ** 2,
         }
     )
-    feature = np.ones(10)
-    feature[::2] = 0
+    # string
+    rng = np.random.default_rng(42)
+    feature = rng.integers(low=0, high=n_obs // 2, size=n_obs)
+    if feature_type == "string":
+        feature = feature.astype(str)
+
     fig, ax = plt.subplots()
     ax = plot_bias(
         y_obs=y_obs,

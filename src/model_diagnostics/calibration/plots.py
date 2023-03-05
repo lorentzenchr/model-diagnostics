@@ -149,24 +149,14 @@ def plot_reliability_diagram(
 
         # confidence intervals
         if n_bootstrap is not None:
-            if diagram_type == "reliability":
-                ax.fill_between(
-                    iso.X_thresholds_,
-                    # We make the interval conservatively monotone increasing by
-                    # applying np.maximum.accumulate etc.
-                    -np.minimum.accumulate(-boot.confidence_interval.low),
-                    np.maximum.accumulate(boot.confidence_interval.high),
-                    alpha=0.1,
-                )
-            else:
-                ax.fill_between(
-                    iso.X_thresholds_,
-                    iso.X_thresholds_
-                    + np.minimum.accumulate(-boot.confidence_interval.low),
-                    iso.X_thresholds_
-                    - np.maximum.accumulate(boot.confidence_interval.high),
-                    alpha=0.1,
-                )
+            # We make the interval conservatively monotone increasing by applying
+            # np.maximum.accumulate etc.
+            lower = -np.minimum.accumulate(-boot.confidence_interval.low)
+            upper = np.maximum.accumulate(boot.confidence_interval.high)
+            if diagram_type == "bias":
+                lower = iso.X_thresholds_ - lower
+                upper = iso.X_thresholds_ - upper
+            ax.fill_between(iso.X_thresholds_, lower, upper, alpha=0.1)
 
         # reliability curve
         if n_pred >= 2:
@@ -175,22 +165,21 @@ def plot_reliability_diagram(
                 label = str(i)
         else:
             label = None
-        if diagram_type == "reliability":
-            ax.plot(iso.X_thresholds_, iso.y_thresholds_, label=label)
-        else:
-            ax.plot(
-                iso.X_thresholds_, iso.X_thresholds_ - iso.y_thresholds_, label=label
-            )
+
+        y_plot = (
+            iso.y_thresholds_
+            if diagram_type == "reliability"
+            else iso.X_thresholds_ - iso.y_thresholds_
+        )
+        ax.plot(iso.X_thresholds_, y_plot, label=label)
 
     if diagram_type == "reliability":
-        ax.set(xlabel="prediction for E(Y|X)", ylabel="estimated E(Y|prediction)")
+        ylabel = "estimated E(Y|prediction)"
         title = "Reliability Diagram"
     else:
-        ax.set(
-            xlabel="prediction for E(Y|X)",
-            ylabel="bias = prediction - estimated E(Y|prediction)",
-        )
+        ylabel = "prediction - estimated E(Y|prediction)"
         title = "Bias Reliability Diagram"
+    ax.set(xlabel="prediction for E(Y|X)", ylabel=ylabel)
 
     if n_pred >= 2:
         ax.set_title(title)
@@ -253,7 +242,8 @@ def plot_bias(
         `level=0.5` and `functional="quantile"` gives the median.
     n_bins : int
         The number of bins for numerical features and the maximal number of (most
-        frequent) categories shown for categorical features.
+        frequent) categories shown for categorical features. Due to ties, the effective
+        number of bins might be smaller than `n_bins`.
     with_errorbars : bool
         Whether or not to plot error bars.
     ax : matplotlib.axes.Axes
@@ -310,21 +300,18 @@ def plot_bias(
     elif df.get_column(feature_name).dtype in [pl.Utf8, pl.Object]:
         is_string = True
 
+    n_x = df[feature_name].n_unique()
+
     # horizontal line at y=0
-    if is_categorical or is_string:
-        min_max = {"min": 0, "max": df[feature_name].n_unique() - 1}
-    else:
-        min_max = {"min": df[feature_name].min(), "max": df[feature_name].max()}
-    ax.hlines(
-        y=0, xmin=min_max["min"], xmax=min_max["max"], color="k", linestyle="dotted"
-    )
+    ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
 
     # bias plot
     if feature is None or col_model is None:
         model_names = [None]
     else:
         model_names = df[col_model].unique().sort(descending=False)
-    with_label = feature is not None and len(model_names) >= 2
+    n_models = len(model_names)
+    with_label = feature is not None and n_models >= 2
 
     for i, m in enumerate(model_names):
         filter_condition = True if m is None else pl.col(col_model) == m
@@ -332,27 +319,39 @@ def plot_bias(
         label = m if with_label else None
 
         if df_i["bias_stderr"].null_count() > 0 or with_errorbars is False:
-            ax.plot(df_i[feature_name], df_i["bias_mean"], "o-", label=label)
-        else:
-            # We x-shift a little for a better visual.
-            span = min_max["max"] - min_max["min"]
-            if is_categorical or is_string:
-                x = np.arange(df_i[feature_name].shape[0])
+            if is_string or is_categorical:
+                ax.plot(df_i[feature_name], df_i["bias_mean"], "o", label=label)
             else:
-                x = df_i[feature_name]
-            x = x + (i - len(model_names) // 2) * span * 5e-3
-
+                ax.plot(df_i[feature_name], df_i["bias_mean"], "o-", label=label)
+        elif is_string or is_categorical:
+            # We x-shift a little for a better visual.
+            span = (n_x - 1) / n_x / n_models  # length for one cat value and one model
+            x = np.arange(n_x)
+            if n_models > 1:
+                x = x + (i - n_models // 2) * span * 0.5
             ax.errorbar(
                 x,
                 df_i["bias_mean"],
                 yerr=df_i["bias_stderr"],
-                fmt="o-",
+                marker="o",
+                linestyle="None",
                 capsize=4,
+                label=label,
+            )
+        else:
+            lower = df_i["bias_mean"] - df_i["bias_stderr"]
+            upper = df_i["bias_mean"] + df_i["bias_stderr"]
+            ax.fill_between(df_i[feature_name], lower, upper, alpha=0.1)
+            ax.plot(
+                df_i[feature_name],
+                df_i["bias_mean"],
+                linestyle="solid",
+                marker="o",
                 label=label,
             )
 
     if is_categorical or is_string:
-        ax.set_xticks(x, df_i[feature_name])
+        ax.set_xticks(np.arange(n_x), df_i[feature_name])
         ax.set(xlabel=feature_name, ylabel="bias")
     elif feature_name is not None:
         ax.set(xlabel="binned " + feature_name, ylabel="bias")
