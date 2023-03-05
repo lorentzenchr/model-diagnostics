@@ -105,6 +105,29 @@ def test_plot_reliability_diagram_array_like(list2array, multidim):
         plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
 
 
+def test_plot_reliability_diagram_constant_prediction_transform_output():
+    """Test that plot_reliability_diagram works for a constant prediction.
+
+    This is tested with and without a scikit-learn context manager which sets
+    transform_output="pandas".
+    """
+    n_obs = 10
+    np.random.default_rng(42)
+    y_obs = np.arange(n_obs)
+    y_pred = np.full_like(y_obs, 14.1516)  # a constant prediction
+    y_obs = pd.Series(y_obs, name="y")
+    y_pred = pd.Series(y_pred, name="z")
+
+    plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, n_bootstrap=10)
+
+    import sklearn
+
+    with sklearn.config_context(transform_output="pandas"):
+        # Without our internal code setting set_output(transform="default"),
+        # this test will error.
+        plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, n_bootstrap=10)
+
+
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
 @pytest.mark.parametrize("with_errorbars", [False, True])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])

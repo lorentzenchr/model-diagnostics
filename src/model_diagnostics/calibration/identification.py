@@ -259,7 +259,6 @@ def compute_bias(
 
     df_list = []
     with pl.StringCache():
-
         is_categorical = False
         is_numeric = False
         is_string = False
@@ -282,15 +281,16 @@ def compute_bias(
 
             if is_categorical or is_string:
                 # For categorical and string features, knowing the frequency table in
-                # advance makes life easier in order to make results consistent. Consider
+                # advance makes life easier in order to make results consistent.
+                # Consider
                 #     feature  counts
                 #         "a"      3
                 #         "b"      2
                 #         "c"      2
                 #         "d"      1
-                # with n_bins = 2. As we want the effective number of bins to be at most
-                # n_bins, we watn, in the above case, only "a" in the final result.
-                # Therefore, we need to internally decrease n_bins to 1.
+                # with n_bins = 2. As we want the effective number of bins to be at
+                # most n_bins, we watn, in the above case, only "a" in the final
+                # result. Therefore, we need to internally decrease n_bins to 1.
                 value_count = feature.value_counts(sort=True)
                 if n_bins >= value_count.shape[0]:
                     n_bins = value_count.shape[0]

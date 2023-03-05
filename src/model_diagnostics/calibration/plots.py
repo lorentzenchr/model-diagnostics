@@ -119,15 +119,21 @@ def plot_reliability_diagram(
         ax.hlines(y=0, xmin=y_pred_min, xmax=y_pred_max, color="k", linestyle="dotted")
 
     def iso_statistic(y_obs, y_pred, weights=None):
-        iso_b = IsotonicRegression(out_of_bounds="clip").fit(
-            y_pred, y_obs, sample_weight=weights
+        iso_b = (
+            IsotonicRegression(out_of_bounds="clip")
+            .set_output(transform="default")
+            .fit(y_pred, y_obs, sample_weight=weights)
         )
         return iso_b.predict(iso.X_thresholds_)
 
     for i in range(np.maximum(1, n_pred)):
         y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
 
-        iso = IsotonicRegression().fit(y_pred_i, y_obs, sample_weight=weights)
+        iso = (
+            IsotonicRegression()
+            .set_output(transform="default")
+            .fit(y_pred_i, y_obs, sample_weight=weights)
+        )
 
         # confidence intervals
         if n_bootstrap is not None:
