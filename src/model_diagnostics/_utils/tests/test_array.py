@@ -77,6 +77,7 @@ def test_length_of_second_dimension_raises(a, msg):
 @pytest.mark.parametrize(
     ("a", "i", "result"),
     [
+        ([[1, 2], [3, 4]], 1, [2, 4]),
         (np.ones((5, 3)), 2, np.ones(5)),
         (pd.DataFrame({"a": [0, 1], "b": 0.5}), 0, pd.Series([0, 1], name="a")),
         (pa.table({"a": [0, 1], "b": ["A", "B"]}), 1, pa.array(["A", "B"])),

@@ -241,7 +241,7 @@ def compute_bias(
     """
     validate_same_first_dimension(y_obs, y_pred)
     n_pred = length_of_second_dimension(y_pred)
-    pred_names, pred_indices = get_sorted_array_names(y_pred)
+    pred_names, _ = get_sorted_array_names(y_pred)
 
     if weights is not None:
         validate_same_first_dimension(weights, y_obs)
@@ -303,7 +303,7 @@ def compute_bias(
                     )
                     warnings.warn(msg, UserWarning)
 
-        for i in pred_indices:
+        for i in range(len(pred_names)):
             # Loop over columns of y_pred.
             x = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
 

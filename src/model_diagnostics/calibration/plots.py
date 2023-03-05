@@ -95,24 +95,19 @@ def plot_reliability_diagram(
         raise ValueError(msg)
 
     if diagram_type == "reliability":
-        # diagonal line, transform=ax.transAxes means in axes coordinates
-        ax.plot([0, 1], [0, 1], transform=ax.transAxes)
+        if hasattr(y_pred, "max") and hasattr(y_pred, "min"):
+            y_max, y_min = y_pred.max(), y_pred.min()
+        else:
+            y_max, y_min = np.max(y_pred), np.min(y_pred)
+        ax.plot([y_min, y_max], [y_min, y_max], color="k", linestyle="dotted")
     else:
         # horizontal line at y=0
         ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
 
-    def iso_statistic(y_obs, y_pred, weights=None):
-        iso_b = (
-            IsotonicRegression(out_of_bounds="clip")
-            .set_output(transform="default")
-            .fit(y_pred, y_obs, sample_weight=weights)
-        )
-        return iso_b.predict(iso.X_thresholds_)
-
     n_pred = length_of_second_dimension(y_pred)
-    pred_names, pred_indices = get_sorted_array_names(y_pred)
+    pred_names, _ = get_sorted_array_names(y_pred)
 
-    for i in pred_indices:
+    for i in range(len(pred_names)):
         y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
 
         iso = (
@@ -125,6 +120,14 @@ def plot_reliability_diagram(
         if n_bootstrap is not None:
             data: tuple[npt.ArrayLike, ...]
             data = (y_obs, y_pred_i) if weights is None else (y_obs, y_pred_i, weights)
+
+            def iso_statistic(y_obs, y_pred, weights=None):
+                iso_b = (
+                    IsotonicRegression(out_of_bounds="clip")
+                    .set_output(transform="default")
+                    .fit(y_pred, y_obs, sample_weight=weights)
+                )
+                return iso_b.predict(iso.X_thresholds_)
 
             boot = bootstrap(
                 data=data,
@@ -139,8 +142,6 @@ def plot_reliability_diagram(
                 method="basic",
             )
 
-        # confidence intervals
-        if n_bootstrap is not None:
             # We make the interval conservatively monotone increasing by applying
             # np.maximum.accumulate etc.
             lower = -np.minimum.accumulate(-boot.confidence_interval.low)
@@ -294,13 +295,14 @@ def plot_bias(
 
     # bias plot
     if feature is None or col_model is None:
-        model_names = [None]
+        pred_names = [None]
     else:
-        model_names = df[col_model].unique().sort(descending=False)
-    n_models = len(model_names)
+        # pred_names = df[col_model].unique() this automatically sorts
+        pred_names, _ = get_sorted_array_names(y_pred)
+    n_models = len(pred_names)
     with_label = feature is not None and n_models >= 2
 
-    for i, m in enumerate(model_names):
+    for i, m in enumerate(pred_names):
         filter_condition = True if m is None else pl.col(col_model) == m
         df_i = df.filter(filter_condition)
         label = m if with_label else None

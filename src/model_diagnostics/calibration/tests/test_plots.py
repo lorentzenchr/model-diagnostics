@@ -86,8 +86,8 @@ def test_plot_reliability_diagram_multiple_predictions():
     assert plt_ax.get_title() == "Reliability Diagram"
     legend_text = plt_ax.get_legend().get_texts()
     assert len(legend_text) == 2
-    assert legend_text[0].get_text() == "model_1"
-    assert legend_text[1].get_text() == "model_2"
+    assert legend_text[0].get_text() == "model_2"
+    assert legend_text[1].get_text() == "model_1"
 
 
 @pytest.mark.parametrize(
@@ -197,8 +197,8 @@ def test_plot_bias_feature_none():
     assert ax.get_xlabel() == "model"
     assert [x.get_text() for x in ax.get_xmajorticklabels()] == [
         "model_1",
-        "model_2",
         "model_3",
+        "model_2",
     ]
 
 
@@ -233,5 +233,5 @@ def test_plot_bias_multiple_predictions(feature_type):
     legend_text = ax.get_legend().get_texts()
     assert len(legend_text) == 3
     assert legend_text[0].get_text() == "model_1"
-    assert legend_text[1].get_text() == "model_2"
-    assert legend_text[2].get_text() == "model_3"
+    assert legend_text[1].get_text() == "model_3"
+    assert legend_text[2].get_text() == "model_2"

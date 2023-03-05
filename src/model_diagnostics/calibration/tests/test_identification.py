@@ -239,6 +239,25 @@ def test_compute_bias_multiple_predictions(feature_type):
         assert_frame_equal(df_bias, df_expected, check_exact=False)
 
 
+@pytest.mark.parametrize("feature", [None, [1, 1]])
+def test_compute_bias_model_name_order(feature):
+    """Test that the order of the colum model is not sorted."""
+    y_obs = [0, 0]
+    y_pred = pl.DataFrame(
+        {
+            "model_3": [1, 1],
+            "model_1": [0, 1],
+            "model_2": [0, 1],
+        }
+    )
+    df_bias = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+    )
+    assert df_bias.get_column("model").to_list() == ["model_3", "model_1", "model_2"]
+
+
 def test_compute_bias_many_sparse_feature_values():
     """Test that compute_bias returns same values for high cardinality feature."""
     n_obs = 100
