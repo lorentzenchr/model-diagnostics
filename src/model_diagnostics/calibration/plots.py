@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Optional
 
 import matplotlib as mpl
@@ -104,6 +105,15 @@ def plot_reliability_diagram(
         # horizontal line at y=0
         ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
 
+    if n_bootstrap is not None:
+        def iso_statistic(y_obs, y_pred, weights=None, x_values=None):
+            iso_b = (
+                IsotonicRegression(out_of_bounds="clip")
+                .set_output(transform="default")
+                .fit(y_pred, y_obs, sample_weight=weights)
+            )
+            return iso_b.predict(x_values)
+
     n_pred = length_of_second_dimension(y_pred)
     pred_names, _ = get_sorted_array_names(y_pred)
 
@@ -121,17 +131,10 @@ def plot_reliability_diagram(
             data: tuple[npt.ArrayLike, ...]
             data = (y_obs, y_pred_i) if weights is None else (y_obs, y_pred_i, weights)
 
-            def iso_statistic(y_obs, y_pred, weights=None):
-                iso_b = (
-                    IsotonicRegression(out_of_bounds="clip")
-                    .set_output(transform="default")
-                    .fit(y_pred, y_obs, sample_weight=weights)
-                )
-                return iso_b.predict(iso.X_thresholds_)
 
             boot = bootstrap(
                 data=data,
-                statistic=iso_statistic,
+                statistic=partial(iso_statistic, x_values=iso.X_thresholds_),
                 n_resamples=n_bootstrap,
                 paired=True,
                 confidence_level=confidence_level,
