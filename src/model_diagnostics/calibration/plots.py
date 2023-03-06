@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Optional
 
 import matplotlib as mpl
@@ -118,11 +119,11 @@ def plot_reliability_diagram(
     else:
         ax.hlines(y=0, xmin=y_pred_min, xmax=y_pred_max, color="k", linestyle="dotted")
 
-    def iso_statistic(y_obs, y_pred, weights=None):
+    def iso_statistic(y_obs, y_pred, weights=None, x_values=None):
         iso_b = IsotonicRegression(out_of_bounds="clip").fit(
             y_pred, y_obs, sample_weight=weights
         )
-        return iso_b.predict(iso.X_thresholds_)
+        return iso_b.predict(x_values)
 
     for i in range(np.maximum(1, n_pred)):
         y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
@@ -136,7 +137,7 @@ def plot_reliability_diagram(
 
             boot = bootstrap(
                 data=data,
-                statistic=iso_statistic,
+                statistic=partial(iso_statistic, x_values=iso.X_thresholds_),
                 n_resamples=n_bootstrap,
                 paired=True,
                 confidence_level=confidence_level,
