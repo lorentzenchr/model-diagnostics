@@ -114,6 +114,28 @@ def array_name(a: Optional[npt.ArrayLike], default: str = "") -> str:
     return name
 
 
+def get_array_min_max(a: npt.ArrayLike):
+    """Get min and max over all elements of ArrayLike.
+
+    Returns
+    -------
+    a_min :
+        The minimum value of a.
+    a_max :
+        The maximum value of a.
+    """
+    if hasattr(a, "max") and hasattr(a, "min"):
+        a_min, a_max = a.min(), a.max()
+        if hasattr(a_min, "to_numpy"):
+            # Polars and pandas dataframes return min/max per column and have different
+            # semantics of a second call a_min.min() wrt the axis argument. Therefor we
+            # simply convert to numpy.
+            a_min, a_max = a_min.to_numpy().min(), a_max.to_numpy().max()
+    else:
+        a_min, a_max = np.min(a), np.max(a)
+    return a_min, a_max
+
+
 def get_sorted_array_names(y_pred: Union[npt.ArrayLike, pl.Series, pl.DataFrame]):
     """Get names of an array and sorted indices.
 

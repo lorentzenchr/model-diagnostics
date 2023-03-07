@@ -9,14 +9,15 @@ import polars as pl
 from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression
 
-from model_diagnostics._utils._array import array_name
-
-from .identification import (
-    compute_bias,
+from model_diagnostics._utils._array import (
+    array_name,
+    get_array_min_max,
     get_second_dimension,
     get_sorted_array_names,
     length_of_second_dimension,
 )
+
+from .identification import compute_bias
 
 
 def plot_reliability_diagram(
@@ -95,17 +96,18 @@ def plot_reliability_diagram(
         )
         raise ValueError(msg)
 
+    y_min, y_max = get_array_min_max(y_pred)
     if diagram_type == "reliability":
-        if hasattr(y_pred, "max") and hasattr(y_pred, "min"):
-            y_max, y_min = y_pred.max(), y_pred.min()
-        else:
-            y_max, y_min = np.max(y_pred), np.min(y_pred)
         ax.plot([y_min, y_max], [y_min, y_max], color="k", linestyle="dotted")
     else:
         # horizontal line at y=0
-        ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
+        # The following plots in axis coordinates
+        # ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
+        # but we plot in data coordinates instead.
+        ax.hlines(0, xmin=y_min, xmax=y_max, color="k", linestyle="dotted")
 
     if n_bootstrap is not None:
+
         def iso_statistic(y_obs, y_pred, weights=None, x_values=None):
             iso_b = (
                 IsotonicRegression(out_of_bounds="clip")
@@ -130,7 +132,6 @@ def plot_reliability_diagram(
         if n_bootstrap is not None:
             data: tuple[npt.ArrayLike, ...]
             data = (y_obs, y_pred_i) if weights is None else (y_obs, y_pred_i, weights)
-
 
             boot = bootstrap(
                 data=data,
