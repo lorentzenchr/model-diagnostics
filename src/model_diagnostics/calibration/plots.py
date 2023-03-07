@@ -205,7 +205,7 @@ def plot_bias(
     level: float = 0.5,
     n_bins: int = 10,
     with_errorbars: bool = True,
-    ax=None,
+    ax: Optional[mpl.axes.Axes] = None,
 ):
     r"""Plot model bias conditional on a feature.
 
