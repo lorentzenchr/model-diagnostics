@@ -62,7 +62,7 @@ def get_second_dimension(a: npt.ArrayLike, i: int) -> npt.ArrayLike:
     elif isinstance(a, (list, tuple)):
         return np.asarray(a)[:, i]
     else:
-        # numpy
+        # numpy or polars
         return a[:, i]  # type: ignore
 
 

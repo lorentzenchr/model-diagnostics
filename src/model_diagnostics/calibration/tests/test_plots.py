@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import polars as pl
+import pyarrow as pa
 import pytest
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
@@ -20,6 +21,16 @@ def test_plot_reliability_diagram_raises(param, value, msg):
     y_pred = [-1, 1]
     with pytest.raises(ValueError, match=msg):
         plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, **{param: value})
+
+
+def test_plot_reliability_diagram_raises_y_obs_multdim():
+    """Test that plot_reliability_diagram raises errors for y_obs.ndim > 1."""
+    y_obs = [[0], [1]]
+    y_pred = [-1, 1]
+    plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
+    y_obs = [[0, 1], [1, 2]]
+    with pytest.raises(ValueError, match="Array-like y_obs has more than 2 dimensions"):
+        plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
 
 
 @pytest.mark.parametrize("diagram_type", ["reliability", "bias"])
@@ -91,18 +102,30 @@ def test_plot_reliability_diagram_multiple_predictions():
 
 
 @pytest.mark.parametrize(
-    ("list2array", "multidim"),
-    [(lambda x: x, True), (np.asarray, True), (pd.Series, False), (pl.Series, False)],
+    "list2array",
+    [lambda x: x, np.asarray, pa.array, pd.Series, pl.Series],
 )
-def test_plot_reliability_diagram_array_like(list2array, multidim):
-    """Test that plot_reliability_diagram raises errors."""
+def test_plot_reliability_diagram_1d_array_like(list2array):
+    """Test that plot_reliability_diagram workds for 1d array-likes."""
     y_obs = list2array([0, 1, 2])
     y_pred = list2array([-1, 1, 0])
     plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
 
-    if multidim:
-        y_pred = list2array([[-1, 1, 0], [1, 2, 3], [-3, -2, -1]])
-        plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
+
+@pytest.mark.parametrize(
+    "list2array",
+    [
+        lambda x: x,
+        np.asarray,
+        lambda x: pa.table(x, names=["0", "1", "2"]),
+        lambda x: pl.DataFrame(x, schema=["0", "1", "2"], orient="row"),
+    ],
+)
+def test_plot_reliability_diagram_2d_array_like(list2array):
+    """Test that plot_reliability_diagram workds for 2d array-likes."""
+    y_obs = [0, 1, 2]
+    y_pred = list2array([[-1, 1, 0], [1, 2, 3], [-3, -2, -1]])
+    plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
 
 
 def test_plot_reliability_diagram_constant_prediction_transform_output():

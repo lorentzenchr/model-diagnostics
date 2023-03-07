@@ -96,6 +96,15 @@ def plot_reliability_diagram(
         )
         raise ValueError(msg)
 
+    if (n_cols := length_of_second_dimension(y_obs)) > 0:
+        if n_cols == 1:
+            y_obs = get_second_dimension(y_obs, 0)
+        else:
+            msg = (
+                f"Array-like y_obs has more than 2 dimensions, y_obs.shape[1]={n_cols}"
+            )
+            raise ValueError(msg)
+
     y_min, y_max = get_array_min_max(y_pred)
     if diagram_type == "reliability":
         ax.plot([y_min, y_max], [y_min, y_max], color="k", linestyle="dotted")
