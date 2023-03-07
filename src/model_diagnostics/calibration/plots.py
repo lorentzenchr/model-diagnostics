@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Optional
 
 import matplotlib as mpl
@@ -8,13 +9,15 @@ import polars as pl
 from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression
 
-from model_diagnostics._utils._array import array_name
-
-from .identification import (
-    compute_bias,
+from model_diagnostics._utils._array import (
+    array_name,
+    get_array_min_max,
     get_second_dimension,
+    get_sorted_array_names,
     length_of_second_dimension,
 )
+
+from .identification import compute_bias
 
 
 def plot_reliability_diagram(
@@ -93,41 +96,46 @@ def plot_reliability_diagram(
         )
         raise ValueError(msg)
 
-    # diagonal line
-    n_pred = length_of_second_dimension(y_pred)
-    if n_pred > 0:
-        y_pred_min, y_pred_max = np.inf, -np.inf
-        for i in range(n_pred):
-            y_pred_i = get_second_dimension(y_pred, i)
-            if not hasattr(y_pred_i, "min"):
-                y_pred_i = np.asarray(y_pred)
-            y_pred_min = np.amin([y_pred_min, y_pred_i.min()])  # type: ignore
-            y_pred_max = np.amax([y_pred_max, y_pred_i.max()])  # type: ignore
-    else:
-        if not (hasattr(y_pred, "min") and hasattr(y_pred, "max")):
-            y_pred = np.asarray(y_pred)
-        y_pred_min, y_pred_max = y_pred.min(), y_pred.max()
+    if (n_cols := length_of_second_dimension(y_obs)) > 0:
+        if n_cols == 1:
+            y_obs = get_second_dimension(y_obs, 0)
+        else:
+            msg = (
+                f"Array-like y_obs has more than 2 dimensions, y_obs.shape[1]={n_cols}"
+            )
+            raise ValueError(msg)
 
+    y_min, y_max = get_array_min_max(y_pred)
     if diagram_type == "reliability":
-        ax.plot(
-            [y_pred_min, y_pred_max],
-            [y_pred_min, y_pred_max],
-            color="k",
-            linestyle="dotted",
-        )
+        ax.plot([y_min, y_max], [y_min, y_max], color="k", linestyle="dotted")
     else:
-        ax.hlines(y=0, xmin=y_pred_min, xmax=y_pred_max, color="k", linestyle="dotted")
+        # horizontal line at y=0
+        # The following plots in axis coordinates
+        # ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
+        # but we plot in data coordinates instead.
+        ax.hlines(0, xmin=y_min, xmax=y_max, color="k", linestyle="dotted")
 
-    def iso_statistic(y_obs, y_pred, weights=None):
-        iso_b = IsotonicRegression(out_of_bounds="clip").fit(
-            y_pred, y_obs, sample_weight=weights
-        )
-        return iso_b.predict(iso.X_thresholds_)
+    if n_bootstrap is not None:
 
-    for i in range(np.maximum(1, n_pred)):
+        def iso_statistic(y_obs, y_pred, weights=None, x_values=None):
+            iso_b = (
+                IsotonicRegression(out_of_bounds="clip")
+                .set_output(transform="default")
+                .fit(y_pred, y_obs, sample_weight=weights)
+            )
+            return iso_b.predict(x_values)
+
+    n_pred = length_of_second_dimension(y_pred)
+    pred_names, _ = get_sorted_array_names(y_pred)
+
+    for i in range(len(pred_names)):
         y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
 
-        iso = IsotonicRegression().fit(y_pred_i, y_obs, sample_weight=weights)
+        iso = (
+            IsotonicRegression()
+            .set_output(transform="default")
+            .fit(y_pred_i, y_obs, sample_weight=weights)
+        )
 
         # confidence intervals
         if n_bootstrap is not None:
@@ -136,7 +144,7 @@ def plot_reliability_diagram(
 
             boot = bootstrap(
                 data=data,
-                statistic=iso_statistic,
+                statistic=partial(iso_statistic, x_values=iso.X_thresholds_),
                 n_resamples=n_bootstrap,
                 paired=True,
                 confidence_level=confidence_level,
@@ -147,58 +155,40 @@ def plot_reliability_diagram(
                 method="basic",
             )
 
-        # confidence intervals
-        if n_bootstrap is not None:
-            if diagram_type == "reliability":
-                ax.fill_between(
-                    iso.X_thresholds_,
-                    # We make the interval conservatively monotone increasing by
-                    # applying np.maximum.accumulate etc.
-                    -np.minimum.accumulate(-boot.confidence_interval.low),
-                    np.maximum.accumulate(boot.confidence_interval.high),
-                    alpha=0.1,
-                )
-            else:
-                ax.fill_between(
-                    iso.X_thresholds_,
-                    iso.X_thresholds_
-                    + np.minimum.accumulate(-boot.confidence_interval.low),
-                    iso.X_thresholds_
-                    - np.maximum.accumulate(boot.confidence_interval.high),
-                    alpha=0.1,
-                )
+            # We make the interval conservatively monotone increasing by applying
+            # np.maximum.accumulate etc.
+            lower = -np.minimum.accumulate(-boot.confidence_interval.low)
+            upper = np.maximum.accumulate(boot.confidence_interval.high)
+            if diagram_type == "bias":
+                lower = iso.X_thresholds_ - lower
+                upper = iso.X_thresholds_ - upper
+            ax.fill_between(iso.X_thresholds_, lower, upper, alpha=0.1)
 
         # reliability curve
-        if n_pred >= 2:
-            label = array_name(y_pred_i, default="")
-            if len(label) == 0:
-                label = str(i)
-        else:
-            label = None
-        if diagram_type == "reliability":
-            ax.plot(iso.X_thresholds_, iso.y_thresholds_, label=label)
-        else:
-            ax.plot(
-                iso.X_thresholds_, iso.X_thresholds_ - iso.y_thresholds_, label=label
-            )
+        label = pred_names[i] if n_pred >= 2 else None
+
+        y_plot = (
+            iso.y_thresholds_
+            if diagram_type == "reliability"
+            else iso.X_thresholds_ - iso.y_thresholds_
+        )
+        ax.plot(iso.X_thresholds_, y_plot, label=label)
 
     if diagram_type == "reliability":
-        ax.set(xlabel="prediction for E(Y|X)", ylabel="estimated E(Y|prediction)")
+        ylabel = "estimated E(Y|prediction)"
         title = "Reliability Diagram"
     else:
-        ax.set(
-            xlabel="prediction for E(Y|X)",
-            ylabel="bias = prediction - estimated E(Y|prediction)",
-        )
+        ylabel = "prediction - estimated E(Y|prediction)"
         title = "Bias Reliability Diagram"
+    ax.set(xlabel="prediction for E(Y|X)", ylabel=ylabel)
 
     if n_pred >= 2:
         ax.set_title(title)
         ax.legend()
     else:
         y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
-        if len(model_name := array_name(y_pred_i, default="")) > 0:
-            ax.set_title(title + " " + model_name)
+        if len(pred_names[0]) > 0:
+            ax.set_title(title + " " + pred_names[0])
         else:
             ax.set_title(title)
 
@@ -253,7 +243,8 @@ def plot_bias(
         `level=0.5` and `functional="quantile"` gives the median.
     n_bins : int
         The number of bins for numerical features and the maximal number of (most
-        frequent) categories shown for categorical features.
+        frequent) categories shown for categorical features. Due to ties, the effective
+        number of bins might be smaller than `n_bins`.
     with_errorbars : bool
         Whether or not to plot error bars.
     ax : matplotlib.axes.Axes
@@ -310,49 +301,59 @@ def plot_bias(
     elif df.get_column(feature_name).dtype in [pl.Utf8, pl.Object]:
         is_string = True
 
+    n_x = df[feature_name].n_unique()
+
     # horizontal line at y=0
-    if is_categorical or is_string:
-        min_max = {"min": 0, "max": df[feature_name].n_unique() - 1}
-    else:
-        min_max = {"min": df[feature_name].min(), "max": df[feature_name].max()}
-    ax.hlines(
-        y=0, xmin=min_max["min"], xmax=min_max["max"], color="k", linestyle="dotted"
-    )
+    ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
 
     # bias plot
     if feature is None or col_model is None:
-        model_names = [None]
+        pred_names = [None]
     else:
-        model_names = df[col_model].unique().sort(descending=False)
-    with_label = feature is not None and len(model_names) >= 2
+        # pred_names = df[col_model].unique() this automatically sorts
+        pred_names, _ = get_sorted_array_names(y_pred)
+    n_models = len(pred_names)
+    with_label = feature is not None and n_models >= 2
 
-    for i, m in enumerate(model_names):
+    for i, m in enumerate(pred_names):
         filter_condition = True if m is None else pl.col(col_model) == m
         df_i = df.filter(filter_condition)
         label = m if with_label else None
 
         if df_i["bias_stderr"].null_count() > 0 or with_errorbars is False:
-            ax.plot(df_i[feature_name], df_i["bias_mean"], "o-", label=label)
-        else:
-            # We x-shift a little for a better visual.
-            span = min_max["max"] - min_max["min"]
-            if is_categorical or is_string:
-                x = np.arange(df_i[feature_name].shape[0])
+            if is_string or is_categorical:
+                ax.plot(df_i[feature_name], df_i["bias_mean"], "o", label=label)
             else:
-                x = df_i[feature_name]
-            x = x + (i - len(model_names) // 2) * span * 5e-3
-
+                ax.plot(df_i[feature_name], df_i["bias_mean"], "o-", label=label)
+        elif is_string or is_categorical:
+            # We x-shift a little for a better visual.
+            span = (n_x - 1) / n_x / n_models  # length for one cat value and one model
+            x = np.arange(n_x)
+            if n_models > 1:
+                x = x + (i - n_models // 2) * span * 0.5
             ax.errorbar(
                 x,
                 df_i["bias_mean"],
                 yerr=df_i["bias_stderr"],
-                fmt="o-",
+                marker="o",
+                linestyle="None",
                 capsize=4,
+                label=label,
+            )
+        else:
+            lower = df_i["bias_mean"] - df_i["bias_stderr"]
+            upper = df_i["bias_mean"] + df_i["bias_stderr"]
+            ax.fill_between(df_i[feature_name], lower, upper, alpha=0.1)
+            ax.plot(
+                df_i[feature_name],
+                df_i["bias_mean"],
+                linestyle="solid",
+                marker="o",
                 label=label,
             )
 
     if is_categorical or is_string:
-        ax.set_xticks(x, df_i[feature_name])
+        ax.set_xticks(np.arange(n_x), df_i[feature_name])
         ax.set(xlabel=feature_name, ylabel="bias")
     elif feature_name is not None:
         ax.set(xlabel="binned " + feature_name, ylabel="bias")

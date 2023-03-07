@@ -1,12 +1,15 @@
 import numpy as np
 import pandas as pd
+import polars as pl
 import pyarrow as pa
 import pytest
 from numpy.testing import assert_array_equal
 
 from model_diagnostics._utils._array import (
     array_name,
+    get_array_min_max,
     get_second_dimension,
+    get_sorted_array_names,
     length_of_first_dimension,
     length_of_second_dimension,
     validate_2_arrays,
@@ -20,10 +23,12 @@ from model_diagnostics._utils._array import (
         (list(range(5)), 5),
         (np.arange(5), 5),
         (np.ones((5, 3)), 5),
-        (pd.Series(range(5)), 5),
         (pa.array(range(5)), 5),
-        (pd.DataFrame({"a": [0, 1], "b": 0.5}), 2),
         (pa.table({"a": [0, 1], "b": ["A", "B"]}), 2),
+        (pd.Series(range(5)), 5),
+        (pd.DataFrame({"a": [0, 1], "b": 0.5}), 2),
+        (pl.Series(range(5)), 5),
+        (pl.DataFrame({"a": [0, 1], "b": 0.5}), 2),
     ],
 )
 def test_length_of_first_dimension(a, n):
@@ -51,8 +56,12 @@ def test_length_of_first_dimension_raises(a, msg):
         (([2, 3, 4], [1, 2, 3]), 3),
         (np.arange(5), 0),
         (np.ones((5, 3)), 3),
-        (pd.DataFrame({"a": [0, 1], "b": 0.5}), 2),
+        (pa.array(range(5)), 0),
         (pa.table({"a": [0, 1], "b": ["A", "B"]}), 2),
+        (pd.Series(range(5)), 0),
+        (pd.DataFrame({"a": [0, 1], "b": 0.5}), 2),
+        (pl.Series(range(5)), 0),
+        (pl.DataFrame({"a": [0, 1], "b": 0.5}), 2),
     ],
 )
 def test_length_of_second_dimension(a, n):
@@ -76,9 +85,11 @@ def test_length_of_second_dimension_raises(a, msg):
 @pytest.mark.parametrize(
     ("a", "i", "result"),
     [
+        ([[1, 2], [3, 4]], 1, [2, 4]),
         (np.ones((5, 3)), 2, np.ones(5)),
-        (pd.DataFrame({"a": [0, 1], "b": 0.5}), 0, pd.Series([0, 1], name="a")),
         (pa.table({"a": [0, 1], "b": ["A", "B"]}), 1, pa.array(["A", "B"])),
+        (pd.DataFrame({"a": [0, 1], "b": 0.5}), 0, pd.Series([0, 1], name="a")),
+        (pl.DataFrame({"a": [0, 1], "b": 0.5}), 0, pl.Series(values=[0, 1], name="a")),
     ],
 )
 def test_get_second_dimension(a, i, result):
@@ -91,10 +102,12 @@ def test_get_second_dimension(a, i, result):
     [
         (list(range(5)), np.zeros(5)),
         (np.zeros(5), np.zeros((5, 15))),
-        (pd.Series(range(5)), np.zeros(5)),
         (pa.array(range(5)), np.zeros(5)),
-        (pd.DataFrame({"a": [0, 1], "b": 0.5})["b"], np.zeros(2)),
         (pa.table({"a": [0, 1], "b": ["A", "B"]}).column("b"), np.zeros(2)),
+        (pd.Series(range(5)), np.zeros(5)),
+        (pd.DataFrame({"a": [0, 1], "b": 0.5})["b"], np.zeros(2)),
+        (pl.Series(range(5)), np.zeros(5)),
+        (pl.DataFrame({"a": [0, 1], "b": 0.5})["b"], np.zeros(2)),
     ],
 )
 def test_validate_same_first_dimension_passes(a, b):
@@ -199,3 +212,55 @@ def test_array_name_none():
     a = pd.Series([1, 2])  # We dont set name is Series => it is None.
     assert array_name(a, default="default") == "default"
     assert array_name(None, default="default")
+
+
+@pytest.mark.parametrize(
+    "a",
+    [
+        (0, 1, 99),
+        [0, 1, 99],
+        [[0, 1], [2, 99]],
+        np.array([0, 1, 99]),
+        np.array([[0, 1], [2, 99]]),
+        pa.array([0, 1, 99]),
+        pa.table({"0": [0, 1], "1": [2, 99]}),
+        pd.Series([0, 1, 99]),
+        pd.DataFrame({"0": [0, 1], "1": [2, 99]}),
+        pl.Series([0, 1, 99]),
+        pl.DataFrame({"0": [0, 1], "1": [2, 99]}),
+    ],
+)
+def test_get_array_min_max(a):
+    """Test that get_array_min_max does its job"""
+    a_min, a_max = get_array_min_max(a)
+    assert (a_min, a_max) == (0, 99)
+
+
+def test_get_sorted_array_names():
+    """Test that get_sorted_array_names does its job."""
+    y_pred = [1]
+    names, indices = get_sorted_array_names(y_pred)
+    assert names == [""]
+    assert indices == [0]
+
+    y_pred = [[1, 10], [2, 20]]
+    names, indices = get_sorted_array_names(y_pred)
+    assert names == ["0", "1"]
+    assert indices == [0, 1]
+
+    y_pred = pd.Series(data=[0, 1], name="model_1")
+    names, indices = get_sorted_array_names(y_pred)
+    assert names == ["model_1"]
+    assert indices == [0]
+
+    y_pred = pd.DataFrame(
+        {
+            "model_2": [0, 1],
+            "model_3": [1, 1],
+            "model_1": [2, 1],
+            "": [2, 2],
+        }
+    )
+    names, indices = get_sorted_array_names(y_pred)
+    assert names == ["model_2", "model_3", "model_1", ""]
+    assert indices == [3, 2, 0, 1]

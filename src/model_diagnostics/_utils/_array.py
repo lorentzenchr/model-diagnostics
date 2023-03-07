@@ -1,7 +1,10 @@
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import numpy.typing as npt
+import polars as pl
+
+AL_or_polars = Union[npt.ArrayLike, pl.Series]
 
 
 def length_of_first_dimension(a: npt.ArrayLike) -> int:
@@ -21,7 +24,7 @@ def length_of_first_dimension(a: npt.ArrayLike) -> int:
         raise ValueError(msg)
 
 
-def validate_same_first_dimension(a: npt.ArrayLike, b: npt.ArrayLike) -> bool:
+def validate_same_first_dimension(a: AL_or_polars, b: AL_or_polars) -> bool:
     """Validate that 2 array-like have the same length of the first dimension."""
     if length_of_first_dimension(a) != length_of_first_dimension(b):
         msg = (
@@ -59,7 +62,7 @@ def get_second_dimension(a: npt.ArrayLike, i: int) -> npt.ArrayLike:
     elif isinstance(a, (list, tuple)):
         return np.asarray(a)[:, i]
     else:
-        # numpy
+        # numpy or polars
         return a[:, i]  # type: ignore
 
 
@@ -109,3 +112,54 @@ def array_name(a: Optional[npt.ArrayLike], default: str = "") -> str:
         name = default
 
     return name
+
+
+def get_array_min_max(a: npt.ArrayLike):
+    """Get min and max over all elements of ArrayLike.
+
+    Returns
+    -------
+    a_min :
+        The minimum value of a.
+    a_max :
+        The maximum value of a.
+    """
+    if hasattr(a, "max") and hasattr(a, "min"):
+        a_min, a_max = a.min(), a.max()
+        if hasattr(a_min, "to_numpy"):
+            # Polars and pandas dataframes return min/max per column and have different
+            # semantics of a second call a_min.min() wrt the axis argument. Therefor we
+            # simply convert to numpy.
+            a_min, a_max = a_min.to_numpy().min(), a_max.to_numpy().max()
+    else:
+        a_min, a_max = np.min(a), np.max(a)
+    return a_min, a_max
+
+
+def get_sorted_array_names(y_pred: Union[npt.ArrayLike, pl.Series, pl.DataFrame]):
+    """Get names of an array and sorted indices.
+
+    Returns
+    -------
+    pred_names : list
+        The (column) names of the predictions.
+    sorted_indices : list
+        A list of indices such that `[pred_names[i] for i in sorted_indices]`
+        is a sorted list.
+    """
+    n_pred = length_of_second_dimension(y_pred)
+    if n_pred == 0:
+        pred_names = [array_name(y_pred, default="")]
+    else:
+        pred_names = []
+        for i in range(n_pred):
+            x = get_second_dimension(y_pred, i)
+            pred_names.append(array_name(x, default=str(i)))
+
+    if n_pred >= 2:
+        # https://stackoverflow.com/questions/6422700
+        sorted_indices = sorted(range(len(pred_names)), key=pred_names.__getitem__)
+    else:
+        sorted_indices = [0]
+
+    return pred_names, sorted_indices

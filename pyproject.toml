@@ -23,7 +23,7 @@ keywords = ["machine learning", "model diagnostics", "calibration"]
 dependencies = [
   "polars >= 0.16.8",
   "matplotlib >= 3.6.1",
-  "scikit-learn >= 1.0",
+  "scikit-learn >=1.2.0",  # We rely on the set_output API.
 ]
 dynamic = ["version"]
 
@@ -176,7 +176,7 @@ ci-build = "mkdocs gh-deploy --force {args}"
 [tool.hatch.envs.jupyter]
 extra-dependencies = [
   "jupyterlab>=3.6",
-  "scikit-learn>=1.2.0",
+  "scikit-learn>=1.2.0",  # TODO: Increa so 1.3.0 as soon as released.
 ]
 
 [tool.hatch.envs.jupyter.scripts]
