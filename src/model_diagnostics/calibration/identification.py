@@ -323,17 +323,22 @@ def compute_bias(
                 # We want: bins[i-1] < x <= bins[i]
                 f_binned = np.digitize(feature, bins=q, right=True)  # type: ignore
                 # Now, we insert Null values again at the original places.
-                f_binned = pl.LazyFrame(
-                    [
-                        pl.Series("__f_binned", f_binned, dtype=feature.dtype),
-                        feature,
-                    ]
-                ).select(
-                    pl.when(pl.col(feature_name).is_null())
-                    .then(None)
-                    .otherwise(pl.col("__f_binned"))
-                    .alias("bin")
-                ).collect().get_column("bin")
+                f_binned = (
+                    pl.LazyFrame(
+                        [
+                            pl.Series("__f_binned", f_binned, dtype=feature.dtype),
+                            feature,
+                        ]
+                    )
+                    .select(
+                        pl.when(pl.col(feature_name).is_null())
+                        .then(None)
+                        .otherwise(pl.col("__f_binned"))
+                        .alias("bin")
+                    )
+                    .collect()
+                    .get_column("bin")
+                )
 
         for i in range(len(pred_names)):
             # Loop over columns of y_pred.

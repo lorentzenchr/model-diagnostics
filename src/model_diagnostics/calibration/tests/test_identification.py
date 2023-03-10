@@ -65,8 +65,8 @@ def test_identification_function_raises(functional, level, msg):
             pa.array([0.1, 0.9]),
         ),
         (
-            pa.array([None, np.nan, 1., 1, 1]),
-            pa.array([None, 1.]),
+            pa.array([None, np.nan, 1.0, 1, 1]),
+            pa.array([None, 1.0]),
         ),
         (
             pa.array(["a", "a", None, None, None]),
