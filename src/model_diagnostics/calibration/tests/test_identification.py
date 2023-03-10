@@ -64,6 +64,14 @@ def test_identification_function_raises(functional, level, msg):
             pa.array([0.1, 0.1, 0.9, 0.9, 0.9]),
             pa.array([0.1, 0.9]),
         ),
+        (
+            pa.array([None, np.nan, 1., 1, 1]),
+            pa.array([None, 1.]),
+        ),
+        (
+            pa.array(["a", "a", None, None, None]),
+            pa.array(["a", None]),
+        ),
     ],
 )
 def test_compute_bias(feature, f_grouped):
@@ -96,7 +104,7 @@ def test_compute_bias(feature, f_grouped):
                     ttest_1samp([0, -2, -1], 0).pvalue,
                 ],
             }
-        )
+        ).sort("feature")
         assert_frame_equal(df_bias, df_expected, check_exact=False)
 
 
