@@ -120,21 +120,20 @@ def test_compute_bias(feature, f_grouped):
             feature=feature.take([0, 4, 4]).alias("feature"),
         )
         # V = [0.5, -2/3, -4/3]
-        df_expected = (
-            df_expected.replace("bias_count", pl.Series(values=[1, 2], dtype=pl.UInt32))
-            .replace(
+        df_expected = pl.DataFrame(
+            {
+                "feature": f_grouped,
+                "bias_mean": [0.5, -1],
+                "bias_count": pl.Series(values=[1, 2], dtype=pl.UInt32),
+                "bias_weights": pl.Series(values=[2, 3], dtype=pl.Float64),
                 # For feature[0], the variance is 0 because there is only one
                 # observation. For feature[4], a direct calculation gives:
                 # SE = sqrt((1.5 * 1/9 + 1.5 * 1/9) / 3 / (2-1)) = sqrt(1 / (3 * 3 * 1))
                 #    = sqrt(1/9) = 1/3
-                "bias_stderr",
-                pl.Series(values=[0.0, 1 / 3]),
-            )
-            .replace(
-                "p_value",
-                pl.Series(values=[np.nan, 2 * stdtr(2 - 1, -np.abs(-1 / (1 / 3)))]),
-            )
-        )
+                "bias_stderr": [0.0, 1 / 3],
+                "p_value": [np.nan, 2 * stdtr(2 - 1, -np.abs(-1 / (1 / 3)))],
+            }
+        ).sort("feature")
         assert_frame_equal(df_bias, df_expected, check_exact=False)
 
 
