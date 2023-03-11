@@ -205,7 +205,7 @@ def compute_bias(
     = \frac{1}{n-1} \frac{1}{\sum_i w_i} \sum_i w_i (V(m(x_i), y_i) - \bar{V})^2\) with
     the implied relation \(\operatorname{Var}(V(m(x_i), y_i)) \sim \frac{1}{w_i} \).
     If your weights are for repeated observations, so-called frequency weights, then
-    the above estimate is on the conservative site because is used \(n - 1\) instead
+    the above estimate is on the conservative side because it uses \(n - 1\) instead
     of \((\sum_i w_i) - 1\).
 
     References
@@ -219,25 +219,25 @@ def compute_bias(
     Examples
     --------
     >>> compute_bias(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
-    shape: (1, 4)
-    ┌───────────┬────────────┬─────────────┬──────────┐
-    │ bias_mean ┆ bias_count ┆ bias_stderr ┆ p_value  │
-    │ ---       ┆ ---        ┆ ---         ┆ ---      │
-    │ f64       ┆ i64        ┆ f64         ┆ f64      │
-    ╞═══════════╪════════════╪═════════════╪══════════╡
-    │ 0.25      ┆ 4          ┆ 0.478714    ┆ 0.637618 │
-    └───────────┴────────────┴─────────────┴──────────┘
+    shape: (1, 5)
+    ┌───────────┬────────────┬──────────────┬─────────────┬──────────┐
+    │ bias_mean ┆ bias_count ┆ bias_weights ┆ bias_stderr ┆ p_value  │
+    │ ---       ┆ ---        ┆ ---          ┆ ---         ┆ ---      │
+    │ f64       ┆ u32        ┆ f64          ┆ f64         ┆ f64      │
+    ╞═══════════╪════════════╪══════════════╪═════════════╪══════════╡
+    │ 0.25      ┆ 4          ┆ 4.0          ┆ 0.478714    ┆ 0.637618 │
+    └───────────┴────────────┴──────────────┴─────────────┴──────────┘
     >>> compute_bias(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2],
     ... feature=["a", "a", "b", "b"])
-    shape: (2, 5)
-    ┌─────────┬───────────┬────────────┬─────────────┬─────────┐
-    │ feature ┆ bias_mean ┆ bias_count ┆ bias_stderr ┆ p_value │
-    │ ---     ┆ ---       ┆ ---        ┆ ---         ┆ ---     │
-    │ str     ┆ f64       ┆ u32        ┆ f64         ┆ f64     │
-    ╞═════════╪═══════════╪════════════╪═════════════╪═════════╡
-    │ a       ┆ 0.0       ┆ 2          ┆ 1.0         ┆ 1.0     │
-    │ b       ┆ 0.5       ┆ 2          ┆ 0.5         ┆ 0.5     │
-    └─────────┴───────────┴────────────┴─────────────┴─────────┘
+    shape: (2, 6)
+    ┌─────────┬───────────┬────────────┬──────────────┬─────────────┬─────────┐
+    │ feature ┆ bias_mean ┆ bias_count ┆ bias_weights ┆ bias_stderr ┆ p_value │
+    │ ---     ┆ ---       ┆ ---        ┆ ---          ┆ ---         ┆ ---     │
+    │ str     ┆ f64       ┆ u32        ┆ f64          ┆ f64         ┆ f64     │
+    ╞═════════╪═══════════╪════════════╪══════════════╪═════════════╪═════════╡
+    │ a       ┆ 0.0       ┆ 2          ┆ 2.0          ┆ 1.0         ┆ 1.0     │
+    │ b       ┆ 0.5       ┆ 2          ┆ 2.0          ┆ 0.5         ┆ 0.5     │
+    └─────────┴───────────┴────────────┴──────────────┴─────────────┴─────────┘
     """
     validate_same_first_dimension(y_obs, y_pred)
     n_pred = length_of_second_dimension(y_pred)
@@ -247,10 +247,10 @@ def compute_bias(
         validate_same_first_dimension(weights, y_obs)
         w = np.asarray(weights)
         if w.ndim > 1:
-            msg = "The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
+            msg = f"The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
             raise ValueError(msg)
     else:
-        w = np.ones_like(y_obs)
+        w = np.ones_like(y_obs, dtype=float)
 
     df_list = []
     with pl.StringCache():
@@ -290,7 +290,7 @@ def compute_bias(
                 #         "c"      2
                 #         "d"      1
                 # with n_bins = 2. As we want the effective number of bins to be at
-                # most n_bins, we watn, in the above case, only "a" in the final
+                # most n_bins, we want, in the above case, only "a" in the final
                 # result. Therefore, we need to internally decrease n_bins to 1.
                 value_count = feature.value_counts(sort=True)
                 if n_bins >= value_count.shape[0]:
@@ -362,7 +362,7 @@ def compute_bias(
                 df = pl.DataFrame(
                     {
                         "bias_mean": [bias_mean],
-                        "bias_count": [bias_count],
+                        "bias_count": pl.Series([bias_count], dtype=pl.UInt32),
                         "bias_weights": [bias_weights],
                         "bias_stderr": [np.sqrt(bias_stddev)],
                     }
@@ -480,7 +480,13 @@ def compute_bias(
                 col_selection.append(model_col_name)
             if feature_name is not None and feature_name in df.columns:
                 col_selection.append(feature_name)
-            col_selection += ["bias_mean", "bias_count", "bias_stderr", "p_value"]
+            col_selection += [
+                "bias_mean",
+                "bias_count",
+                "bias_weights",
+                "bias_stderr",
+                "p_value",
+            ]
             df_list.append(df.select(col_selection))
 
         df = pl.concat(df_list)
