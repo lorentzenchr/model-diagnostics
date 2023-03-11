@@ -6,6 +6,7 @@ import polars as pl
 import pyarrow as pa
 import pytest
 from polars.testing import assert_frame_equal
+from scipy.special import stdtr
 from scipy.stats import expectile, ttest_1samp
 
 from model_diagnostics.calibration import compute_bias, identification_function
@@ -79,6 +80,7 @@ def test_compute_bias(feature, f_grouped):
                 "feature": feature,
             }
         )
+        # V = [1, 0, 0, -2, -1]
         df_bias = compute_bias(
             y_obs=df.column("y_obs"),
             y_pred=df.column("y_pred"),
@@ -89,6 +91,7 @@ def test_compute_bias(feature, f_grouped):
                 "feature": f_grouped,
                 "bias_mean": [0.5, -1],
                 "bias_count": pl.Series(values=[2, 3], dtype=pl.UInt32),
+                "bias_weights": pl.Series(values=[2, 3], dtype=pl.Float64),
                 "bias_stderr": np.sqrt([(0.25 + 0.25), (1 + 1 + 0) / 2])
                 / np.sqrt([2, 3]),
                 "p_value": [
@@ -96,6 +99,33 @@ def test_compute_bias(feature, f_grouped):
                     ttest_1samp([0, -2, -1], 0).pvalue,
                 ],
             }
+        )
+        assert_frame_equal(df_bias, df_expected, check_exact=False)
+
+        # Same with weights.
+        feature = pl.Series(values=feature)
+        df_bias = compute_bias(
+            # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
+            y_obs=[0.5, 8 / 3, 10 / 3],
+            y_pred=[1, 2, 2],
+            weights=[2, 1.5, 1.5],
+            feature=feature.take([0, 4, 4]).alias("feature"),
+        )
+        # V = [0.5, -2/3, -4/3]
+        df_expected = (
+            df_expected.replace("bias_count", pl.Series(values=[1, 2], dtype=pl.UInt32))
+            .replace(
+                # For feature[0], the variance is 0 because there is only one
+                # observation. For feature[4], a direct calculation gives:
+                # SE = sqrt((1.5 * 1/9 + 1.5 * 1/9) / 3 / (2-1)) = sqrt(1 / (3 * 3 * 1))
+                #    = sqrt(1/9) = 1/3
+                "bias_stderr",
+                pl.Series(values=[0.0, 1 / 3]),
+            )
+            .replace(
+                "p_value",
+                pl.Series(values=[np.nan, 2 * stdtr(2 - 1, -np.abs(-1 / (1 / 3)))]),
+            )
         )
         assert_frame_equal(df_bias, df_expected, check_exact=False)
 
@@ -108,6 +138,7 @@ def test_compute_bias_feature_none():
             "y_pred": [1, 1, 2, 2, 2],
         }
     )
+    # V = [1, 0, 0, -2, -1]
     df_bias = compute_bias(
         y_obs=df.column("y_obs"),
         y_pred=df.column("y_pred"),
@@ -116,7 +147,8 @@ def test_compute_bias_feature_none():
     df_expected = pl.DataFrame(
         {
             "bias_mean": [-0.4],  # (1 + 0 + 0 - 2 - 1) / 5
-            "bias_count": [5],
+            "bias_count": pl.Series(values=[5], dtype=pl.UInt32),
+            "bias_weights": [5.0],
             "bias_stderr": [np.std([1, 0, 0, -2, -1], ddof=1) / np.sqrt(5)],
             "p_value": [
                 ttest_1samp([1, 0, 0, -2, -1], 0).pvalue,
@@ -124,6 +156,30 @@ def test_compute_bias_feature_none():
         }
     )
     assert_frame_equal(df_bias, df_expected)
+
+    # Same with weights.
+    df_bias = compute_bias(
+        # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
+        y_obs=[0.5, 8 / 3, 10 / 3],
+        y_pred=[1, 2, 2],
+        weights=[2, 1.5, 1.5],
+        feature=None,
+    )
+    # V = [0.5, -2/3, -4/3]
+    df_expected = (
+        df_expected.replace("bias_count", pl.Series(values=[3], dtype=pl.UInt32))
+        .replace(
+            # SE = sqrt((2 * 0.9**2 + 1.5 * 0.8**2/9 + 1.5 * 2.8**2/9) / 5 / (3-1))
+            #    = sqrt(91 / 300)
+            "bias_stderr",
+            pl.Series(values=[np.sqrt(91 / 300)]),
+        )
+        .replace(
+            "p_value",
+            pl.Series(values=[2 * stdtr(3 - 1, -np.abs(-0.4 / np.sqrt(91 / 300)))]),
+        )
+    )
+    assert_frame_equal(df_bias, df_expected, check_exact=False)
 
 
 def test_compute_bias_numerical_feature():
@@ -150,6 +206,7 @@ def test_compute_bias_numerical_feature():
             "feature": 0.045 + 0.1 * np.arange(10),
             "bias_mean": 0.955 - 0.1 * np.arange(10),
             "bias_count": n_steps * np.ones(n_bins, dtype=np.uint32),
+            "bias_weights": [n_obs / n_bins] * n_bins,
             "bias_stderr": [
                 np.std(bias[n : n + n_steps], ddof=1) / np.sqrt(n_steps)
                 for n in range(0, n_obs, n_steps)
@@ -192,7 +249,8 @@ def test_compute_bias_multiple_predictions(feature_type):
                 "model": ["model_1", "model_1", "model_2", "model_2"],
                 "nice_feature": f_expected,
                 "bias_mean": [0.0, -1, 2, 1],
-                "bias_count": np.array([5] * 4, dtype=np.uint32),
+                "bias_count": pl.Series(values=[5] * 4, dtype=pl.UInt32),
+                "bias_weights": [5.0] * 4,
                 "bias_stderr": [0.0] * 4,
                 "p_value": [np.nan] * 4,
             }
@@ -304,3 +362,11 @@ def test_compute_bias_warning_for_n_bins():
         )
 
     assert df.shape[0] == 0
+
+
+def test_compute_bias_raises_weights_shape():
+    y_obs, y_pred = np.arange(5), np.arange(5)
+    weights = np.arange(5)[:, None]
+    msg = "The array weights must be 1-dimensional, got weights.ndim=2."
+    with pytest.raises(ValueError, match=msg):
+        compute_bias(y_obs, y_pred, weights=weights)
