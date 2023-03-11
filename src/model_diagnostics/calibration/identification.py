@@ -271,7 +271,13 @@ def compute_bias(
             elif feature.dtype in [pl.Utf8, pl.Object]:
                 # We could convert strings to categoricals.
                 is_string = True
+            elif feature.is_float():
+                is_numeric = True
+                # We treat NaN as Null values, numpy will see a Null as a NaN.
+                if feature.is_float():
+                    feature = feature.fill_nan(None)
             else:
+                # integers
                 is_numeric = True
 
             if is_categorical or is_string:
@@ -302,6 +308,37 @@ def compute_bias(
                         f"Consider to increase n_bins>={n_bins_tmp}."
                     )
                     warnings.warn(msg, UserWarning)
+            else:
+                # Binning
+                # We use method="inverted_cdf" (same as "lower") instead of the
+                # default "linear" because "linear" produces as many unique values
+                # as before.
+                q = np.nanquantile(
+                    feature,
+                    # Improved rounding errors by using integers inside linspace.
+                    q=np.linspace(0 + 1, n_bins - 1, num=n_bins - 1) / n_bins,
+                    method="inverted_cdf",
+                )  # type: ignore
+                q = np.unique(q)  # Some quantiles might be the same.
+                # We want: bins[i-1] < x <= bins[i]
+                f_binned = np.digitize(feature, bins=q, right=True)  # type: ignore
+                # Now, we insert Null values again at the original places.
+                f_binned = (
+                    pl.LazyFrame(
+                        [
+                            pl.Series("__f_binned", f_binned, dtype=feature.dtype),
+                            feature,
+                        ]
+                    )
+                    .select(
+                        pl.when(pl.col(feature_name).is_null())
+                        .then(None)
+                        .otherwise(pl.col("__f_binned"))
+                        .alias("bin")
+                    )
+                    .collect()
+                    .get_column("bin")
+                )
 
         for i in range(len(pred_names)):
             # Loop over columns of y_pred.
@@ -357,20 +394,8 @@ def compute_bias(
                 if is_categorical or is_string:
                     groupby_name = feature_name
                 else:
-                    # Binning
-                    # We use method="inverted_cdf" (same as "lower") instead of the
-                    # default "linear" because "linear" produces as many unique values
-                    # as before.
-                    q = np.quantile(
-                        feature,
-                        # Improved rounding errors by using integers inside linspace.
-                        q=np.linspace(0 + 1, n_bins - 1, num=n_bins - 1) / n_bins,
-                        method="inverted_cdf",
-                    )  # type: ignore
-                    q = np.unique(q)  # Some quantiles might be the same.
-                    # We want: bins[i-1] < x <= bins[i]
-                    f_binned = np.digitize(feature, bins=q, right=True)  # type: ignore
-                    df = df.hstack([pl.Series("bin", f_binned)])
+                    # See above for the creation of the binned feature f_binned.
+                    df = df.hstack([f_binned])
                     groupby_name = "bin"
                     agg_list.append(pl.col(feature_name).mean())
 
