@@ -214,6 +214,13 @@ def test_array_name_none():
     assert array_name(None, default="default")
 
 
+def test_array_name_empty_string():
+    """Test that array_name gives default if name is empty string."""
+    a = pl.Series(name="", values=[1, 2])
+    assert array_name(a, default="default") == "default"
+    assert array_name(a, default="") == ""
+
+
 @pytest.mark.parametrize(
     "a",
     [
@@ -262,5 +269,5 @@ def test_get_sorted_array_names():
         }
     )
     names, indices = get_sorted_array_names(y_pred)
-    assert names == ["model_2", "model_3", "model_1", ""]
+    assert names == ["model_2", "model_3", "model_1", "3"]
     assert indices == [3, 2, 0, 1]

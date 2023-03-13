@@ -377,3 +377,27 @@ def test_compute_bias_raises_weights_shape():
     msg = "The array weights must be 1-dimensional, got weights.ndim=2."
     with pytest.raises(ValueError, match=msg):
         compute_bias(y_obs, y_pred, weights=weights)
+
+
+@pytest.mark.parametrize(
+    "list2array",
+    [lambda x: x, np.asarray, pa.array, pd.Series, pl.Series],
+)
+def test_compute_bias_1d_array_like(list2array):
+    """Test that plot_reliability_diagram workds for 1d array-likes."""
+    y_obs = list2array([0, 1, 2, 3])
+    y_pred = list2array([-1, 1, 0, 2])
+    feature = list2array([0, 1, 0, 1])
+    weights = list2array([1, 1, 1, 1])
+    df_bias = compute_bias(y_obs=y_obs, y_pred=y_pred, weights=weights, feature=feature)
+    df_expected = pl.DataFrame(
+        {
+            "feature": [0.0, 1.0],
+            "bias_mean": [-1.5, -0.5],
+            "bias_count": pl.Series(values=[2, 2], dtype=pl.UInt32),
+            "bias_weights": [2, 2],
+            "bias_stderr": [0.5, 0.5],
+            "p_value": [0.204833, 0.5],
+        }
+    )
+    assert_frame_equal(df_bias, df_expected)
