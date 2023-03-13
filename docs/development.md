@@ -33,7 +33,7 @@ This will require credentials for <https://test.pypi.org> and <https://pypi.org>
   - `git checkout main`
   - `git pull origin main` (origin might be upstream)
 - Create annotated git tag on branch main for the current commit (not needed for release candidates):
-  `git tag -a v1.4 -m "my version 1.4"`
+  `git tag -a v1.4.0 -m "Release v1.4.0"`
 - Push the annotated tag: `git push origin <tag_name>`.
   Note that `origin` might be to be replaced by `upstream` depending on your setup.
 - Run `hatch build`.
