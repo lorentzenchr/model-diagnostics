@@ -421,12 +421,18 @@ def compute_bias(
                             .alias("bias_stderr"),
                         ]
                     )
-                    .sort("bias_count", descending=True)
-                    # .head(n_bins) alone could lose the null, but we want to keep it.
-                    .filter(
-                        pl.col(feature_name).is_null()
-                        | pl.col("bias_count").is_in(pl.col("bias_count").head(n_bins))
+                    # With sort and head alone, we could lose the null value, but we
+                    # want to keep it.
+                    # .sort("bias_count", descending=True)
+                    # .head(n_bins)
+                    .with_columns(
+                        pl.when(pl.col(feature_name).is_null())
+                        .then(pl.max("bias_count"))
+                        .otherwise(pl.col("bias_count"))
+                        .alias("__priority")
                     )
+                    .sort("__priority", descending=True)
+                    .head(n_bins)
                     .sort(feature_name, descending=False)
                 )
 
