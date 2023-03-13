@@ -9,7 +9,19 @@
 
 **Tools for diagnostics and assessment of (machine learning) models**
 
+Highlights:
+
+- Assess model calibration with identification functions (generalized residuals).
+- Assess calibration and bias graphically
+    - reliability diagrams for auto-calibration
+    - bias plots for conditional calibration
+- Assess the predictive performance of models
+    - strictly consistent, homogeneous scoring functions
+    - score decomposition into miscalibration, discrimination and uncertainty
+
 Read more in the [documentation](https://lorentzenchr.github.io/model-diagnostics/).
+
+This package relies on the giant shoulders of, among others, [polars](https://pola.rs/), [matplotlib](https://matplotlib.org), [scipy](https://scipy.org) and [scikit-learn](https://scikit-learn.org).
 
 **Installation**
 

@@ -11,13 +11,15 @@
 
 Highlights:
 
-- Assess model calibration with identification functions (generalized residuals).
-- Assess calibration graphically
-    - reliability diagrams for auto-calibration
-    - bias plots for conditional calibration
+- Assess model calibration with [identification functions][model_diagnostics.calibration.identification.identification_function] (generalized residuals).
+- Assess calibration and bias graphically
+    - [reliability diagrams][model_diagnostics.calibration.plots.plot_reliability_diagram] for auto-calibration
+    - [bias plots][model_diagnostics.calibration.plots.plot_bias] for conditional calibration
 - Assess the predictive performance of models
     - strictly consistent, homogeneous scoring functions
-    - score decomposition into miscalibration, discrimination and uncertainty
+    - [score decomposition][model_diagnostics.scoring.decompose] into miscalibration, discrimination and uncertainty
+
+This package relies on the giant shoulders of, among others, [polars](https://pola.rs/), [matplotlib](https://matplotlib.org), [scipy](https://scipy.org) and [scikit-learn](https://scikit-learn.org).
 
 ## Installation
 
