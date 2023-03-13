@@ -454,7 +454,7 @@ def compute_bias(
             #   RuntimeWarning: A builtin ctypes object gave a PEP3118 format string
             #   that does not match its itemsize, so a best-guess will be made of the
             #   data type. Newer versions of python may behave correctly.
-            stderr_ = df.get_column("bias_stderr") 
+            stderr_ = df.get_column("bias_stderr")
             p_value = np.full_like(stderr_, fill_value=np.nan)
             n = df.get_column("bias_count")
             p_value[(n > 1) & (stderr_ == 0)] = 0
