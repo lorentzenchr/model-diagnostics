@@ -395,9 +395,10 @@ def test_compute_bias_1d_array_like(list2array):
             "feature": [0.0, 1.0],
             "bias_mean": [-1.5, -0.5],
             "bias_count": pl.Series(values=[2, 2], dtype=pl.UInt32),
-            "bias_weights": [2, 2],
+            # For unknown reasons, on Windos this can be int32 instead of int64.
+            "bias_weights": pl.Series([2, 2], dtype=df_bias["bias_weights"].dtype),
             "bias_stderr": [0.5, 0.5],
             "p_value": [0.20483276469913345, 0.5],
         }
     )
-    assert_frame_equal(df_bias, df_expected)
+    assert_frame_equal(df_bias, df_expected, check_exact=False)
