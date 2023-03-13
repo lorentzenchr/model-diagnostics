@@ -52,5 +52,6 @@ jobs:
     - name: Run tests
       run: hatch run cov --cov-report=xml
 
-    - name: Upload coverage reports to Codecov
+    - if: matrix.python-version == '3.9' && runner.os == 'Linux'
+      name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
