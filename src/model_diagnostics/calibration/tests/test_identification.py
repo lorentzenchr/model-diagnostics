@@ -259,7 +259,7 @@ def test_compute_bias_multiple_predictions(feature_type):
                 "bias_count": pl.Series(values=[5] * 4, dtype=pl.UInt32),
                 "bias_weights": [5.0] * 4,
                 "bias_stderr": [0.0] * 4,
-                "p_value": [np.nan] * 4,
+                "p_value": [0.0] * 4,
             }
         )
 
