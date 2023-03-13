@@ -424,11 +424,10 @@ def compute_bias(
                         ]
                     )
                     .sort("bias_count", descending=True)
-                    .head(n_bins)
+                    # .head(n_bins) alone could lose the null, but we want to keep it.
+                    .filter(pl.col(feature_name).is_null() | pl.col("bias_count").is_in(pl.col("bias_count").head(n_bins)))
                     .sort(feature_name, descending=False)
                 )
-                if is_numeric:
-                    df = df.drop("bin")
 
                 df = df.select(
                     [
