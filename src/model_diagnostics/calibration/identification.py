@@ -456,6 +456,8 @@ def compute_bias(
             #   data type. Newer versions of python may behave correctly.
             stderr_ = df.get_column("bias_stderr")
             p_value = np.full_like(stderr_, fill_value=np.nan)
+            n = df.get_column("bias_count")
+            p_value[(n > 1) & (stderr_ == 0)] = 0
             mask = stderr_ > 0
             x = df.get_column("bias_mean").filter(mask).to_numpy()
             n = df.get_column("bias_count").filter(mask).to_numpy()
