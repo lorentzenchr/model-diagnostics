@@ -255,7 +255,6 @@ def compute_bias(
     df_list = []
     with pl.StringCache():
         is_categorical = False
-        is_numeric = False
         is_string = False
 
         if feature is None:
@@ -272,13 +271,12 @@ def compute_bias(
                 # We could convert strings to categoricals.
                 is_string = True
             elif feature.is_float():
-                is_numeric = True
                 # We treat NaN as Null values, numpy will see a Null as a NaN.
                 if feature.is_float():
                     feature = feature.fill_nan(None)
             else:
                 # integers
-                is_numeric = True
+                pass
 
             if is_categorical or is_string:
                 # For categorical and string features, knowing the frequency table in
@@ -425,7 +423,10 @@ def compute_bias(
                     )
                     .sort("bias_count", descending=True)
                     # .head(n_bins) alone could lose the null, but we want to keep it.
-                    .filter(pl.col(feature_name).is_null() | pl.col("bias_count").is_in(pl.col("bias_count").head(n_bins)))
+                    .filter(
+                        pl.col(feature_name).is_null()
+                        | pl.col("bias_count").is_in(pl.col("bias_count").head(n_bins))
+                    )
                     .sort(feature_name, descending=False)
                 )
 
