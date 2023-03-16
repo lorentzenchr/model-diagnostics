@@ -218,7 +218,7 @@ def test_array_name_empty_string():
     """Test that array_name gives default if name is empty string."""
     a = pl.Series(name="", values=[1, 2])
     assert array_name(a, default="default") == "default"
-    assert array_name(a, default="") == ""
+    assert not array_name(a, default="")  # test for empty string ""
 
 
 @pytest.mark.parametrize(

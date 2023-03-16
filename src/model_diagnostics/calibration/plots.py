@@ -365,7 +365,7 @@ def plot_bias(
         ax.legend()
     else:
         model_name = array_name(y_pred, default="")
-        if model_name == "":
+        if not model_name:  # test for empty string ""
             ax.set_title("Bias Plot")
         else:
             ax.set_title("Bias Plot " + model_name)
