@@ -97,6 +97,7 @@ select = [
   "YTT",  # flake8-2020
 ]
 ignore = [
+  "C901",
   "PD901",
   "PLR0912",
   "PLR0913",
@@ -188,7 +189,7 @@ dependencies = [
   "black>=22.8.0",
   "mypy>=0.971",
   "numpy>=1.22",
-  "ruff>=0.0.243",
+  "ruff==0.0.256",
 ]
 
 [tool.hatch.envs.lint.scripts]

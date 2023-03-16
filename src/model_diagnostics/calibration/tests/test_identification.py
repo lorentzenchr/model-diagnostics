@@ -5,7 +5,7 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa
 import pytest
-from polars.testing import assert_frame_equal
+from polars.testing import assert_frame_equal, assert_series_equal
 from scipy.special import stdtr
 from scipy.stats import expectile, ttest_1samp
 
@@ -227,6 +227,22 @@ def test_compute_bias_numerical_feature():
     assert_frame_equal(df_bias, df_expected, check_exact=False)
 
 
+@pytest.mark.parametrize("n_bins", [2, 10])
+def test_compute_bias_n_bins_numerical_feature(n_bins):
+    """Test compute_bias returns right number of bins for a numerical feature."""
+    n_obs = 10
+    y_obs = np.linspace(-1, 1, num=n_obs, endpoint=False)
+    y_pred = y_obs**2
+    feature = [4, 4, 4, 4, 3, 3, 3, 2, 2, 11]
+    df_bias = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+        n_bins=n_bins,
+    )
+    assert df_bias.shape[0] == np.min([n_bins, 4])
+
+
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
 def test_compute_bias_multiple_predictions(feature_type):
     """test compute_bias for multiple predictions."""
@@ -349,6 +365,47 @@ def test_compute_bias_many_sparse_feature_values():
     )
     assert set(df.filter(pl.col("model") == "model_1")["feature"]) == set(
         df.filter(pl.col("model") == "model_3")["feature"]
+    )
+
+
+def test_compute_bias_keeps_null_values():
+    """Test that compute_bias keeps Null values."""
+    n_obs = 10
+    y_obs = np.arange(n_obs)
+    y_pred = (y_obs - 5) ** 2
+    feature = pl.Series([np.nan, None, 1, 1, 1, 2, 2, 2, 2, 2.0])
+
+    df_bias = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+        n_bins=1,
+    )
+    assert_series_equal(df_bias["feature"], pl.Series("feature", [None]))
+    assert_series_equal(
+        df_bias["bias_count"], pl.Series("bias_count", [2], dtype=pl.UInt32)
+    )
+
+    df_bias = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+        n_bins=2,
+    )
+    assert_series_equal(df_bias["feature"], pl.Series("feature", [None, 1.625]))
+    assert_series_equal(
+        df_bias["bias_count"], pl.Series("bias_count", [2, 8], dtype=pl.UInt32)
+    )
+
+    df_bias = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+        n_bins=3,
+    )
+    assert_series_equal(df_bias["feature"], pl.Series("feature", [None, 1.0, 2.0]))
+    assert_series_equal(
+        df_bias["bias_count"], pl.Series("bias_count", [2, 3, 5], dtype=pl.UInt32)
     )
 
 

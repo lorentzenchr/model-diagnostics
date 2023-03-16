@@ -165,7 +165,8 @@ def compute_bias(
     n_bins : int
         The number of bins for numerical features and the maximal number of (most
         frequent) categories shown for categorical features. Due to ties, the effective
-        number of bins might be smaller than `n_bins`.
+        number of bins might be smaller than `n_bins`. Null values are always included
+        in the output, accounting for one bin. NaN values are treated as null values.
 
     Returns
     -------
@@ -255,7 +256,6 @@ def compute_bias(
     df_list = []
     with pl.StringCache():
         is_categorical = False
-        is_numeric = False
         is_string = False
 
         if feature is None:
@@ -272,13 +272,12 @@ def compute_bias(
                 # We could convert strings to categoricals.
                 is_string = True
             elif feature.is_float():
-                is_numeric = True
                 # We treat NaN as Null values, numpy will see a Null as a NaN.
                 if feature.is_float():
                     feature = feature.fill_nan(None)
             else:
                 # integers
-                is_numeric = True
+                pass
 
             if is_categorical or is_string:
                 # For categorical and string features, knowing the frequency table in
@@ -318,10 +317,10 @@ def compute_bias(
                     # Improved rounding errors by using integers inside linspace.
                     q=np.linspace(0 + 1, n_bins - 1, num=n_bins - 1) / n_bins,
                     method="inverted_cdf",
-                )  # type: ignore
+                )
                 q = np.unique(q)  # Some quantiles might be the same.
                 # We want: bins[i-1] < x <= bins[i]
-                f_binned = np.digitize(feature, bins=q, right=True)  # type: ignore
+                f_binned = np.digitize(feature, bins=q, right=True)
                 # Now, we insert Null values again at the original places.
                 f_binned = (
                     pl.LazyFrame(
@@ -423,12 +422,20 @@ def compute_bias(
                             .alias("bias_stderr"),
                         ]
                     )
-                    .sort("bias_count", descending=True)
+                    # With sort and head alone, we could lose the null value, but we
+                    # want to keep it.
+                    # .sort("bias_count", descending=True)
+                    # .head(n_bins)
+                    .with_columns(
+                        pl.when(pl.col(feature_name).is_null())
+                        .then(pl.max("bias_count") + 1)
+                        .otherwise(pl.col("bias_count"))
+                        .alias("__priority")
+                    )
+                    .sort("__priority", descending=True)
                     .head(n_bins)
                     .sort(feature_name, descending=False)
                 )
-                if is_numeric:
-                    df = df.drop("bin")
 
                 df = df.select(
                     [

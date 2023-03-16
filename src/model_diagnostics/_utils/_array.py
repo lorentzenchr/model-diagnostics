@@ -107,7 +107,7 @@ def array_name(a: Optional[npt.ArrayLike], default: str = "") -> str:
     else:
         name = default
 
-    if name is None or name == "":
+    if name is None or not name:  # not name is same as name == ""
         # The name attribute could be None, at least for pandas.Series, or "".
         name = default
 
