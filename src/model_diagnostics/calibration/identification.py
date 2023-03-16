@@ -316,10 +316,10 @@ def compute_bias(
                     # Improved rounding errors by using integers inside linspace.
                     q=np.linspace(0 + 1, n_bins - 1, num=n_bins - 1) / n_bins,
                     method="inverted_cdf",
-                )  # type: ignore
+                )
                 q = np.unique(q)  # Some quantiles might be the same.
                 # We want: bins[i-1] < x <= bins[i]
-                f_binned = np.digitize(feature, bins=q, right=True)  # type: ignore
+                f_binned = np.digitize(feature, bins=q, right=True)
                 # Now, we insert Null values again at the original places.
                 f_binned = (
                     pl.LazyFrame(
@@ -427,7 +427,7 @@ def compute_bias(
                     # .head(n_bins)
                     .with_columns(
                         pl.when(pl.col(feature_name).is_null())
-                        .then(pl.max("bias_count"))
+                        .then(pl.max("bias_count") + 1)
                         .otherwise(pl.col("bias_count"))
                         .alias("__priority")
                     )
