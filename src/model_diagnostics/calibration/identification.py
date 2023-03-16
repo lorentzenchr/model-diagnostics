@@ -165,7 +165,8 @@ def compute_bias(
     n_bins : int
         The number of bins for numerical features and the maximal number of (most
         frequent) categories shown for categorical features. Due to ties, the effective
-        number of bins might be smaller than `n_bins`.
+        number of bins might be smaller than `n_bins`. Null values are always included
+        in the output, accounting for one bin. NaN values are treated as null values.
 
     Returns
     -------
