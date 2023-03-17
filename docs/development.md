@@ -2,7 +2,8 @@
 
 Applied principles are:
 
-- Test driven development (TDD)
+- Trunk-based development 
+- Test driven development (TDD) (in spirit)
 - Open source, community contributions are warmly welcome
 - Continuous integration (CI) automation
 
