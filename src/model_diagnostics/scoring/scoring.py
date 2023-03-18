@@ -320,7 +320,7 @@ class LogLoss(_BaseScoringFunction):
 
     The log loss is a strictly consistent scoring function for the mean for
     observations and predictions in the range 0 to 1.
-    It is also referred to as (half the) Bernoulli deviance, 
+    It is also referred to as (half the) Bernoulli deviance,
     (half the) Binomial log-likelihood, logistic loss and binary cross-entropy.
     Its minimal function value is zero.
 
