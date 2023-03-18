@@ -196,7 +196,7 @@ def compute_bias(
     This generalises the classical residual (up to a minus sign) for target functionals
     other than the mean. See `[FLM2022]`.
 
-    The standard error for \(\bar{V}\) is caluclated in the standard way as
+    The standard error for \(\bar{V}\) is calculated in the standard way as
     \(\mathrm{SE} = \sqrt{\operatorname{Var}(\bar{V})} = \frac{\sigma}{\sqrt{n}}\) and
     the standard variance estimator for \(\sigma^2 = \operatorname{Var}(\phi(x_i)
     V(m(x_i), y_i))\) with Bessel correction, i.e. division by \(n-1\) instead of
@@ -206,7 +206,7 @@ def compute_bias(
     = \frac{1}{n-1} \frac{1}{\sum_i w_i} \sum_i w_i (V(m(x_i), y_i) - \bar{V})^2\) with
     the implied relation \(\operatorname{Var}(V(m(x_i), y_i)) \sim \frac{1}{w_i} \).
     If your weights are for repeated observations, so-called frequency weights, then
-    the above estimate is on the conservative side because it uses \(n - 1\) instead
+    the above estimate is conservative because it uses \(n - 1\) instead
     of \((\sum_i w_i) - 1\).
 
     References
