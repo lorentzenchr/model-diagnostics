@@ -64,7 +64,7 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
 
     The smaller the better.
 
-    Up to a multiplicative constant, these are the only scoring funtions that are
+    Up to a multiplicative constant, these are the only scoring functions that are
     strictly consistent for expectiles at level alpha and homogeneous functions.
     The possible additive constant is chosen such that the minimal function value
     equals zero.
@@ -115,7 +115,7 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
 
     For the common domains, \(S_{\frac{1}{2}}^h\) equals the
     [Tweedie deviance](https://en.wikipedia.org/wiki/Tweedie_distribution) with the
-    following relation between the degree of homogeneity \(h\) and the with Tweedie
+    following relation between the degree of homogeneity \(h\) and the Tweedie
     power \(p\): \(h = 2-p\).
 
     References
@@ -318,11 +318,11 @@ class GammaDeviance(HomogeneousExpectileScore):
 class LogLoss(_BaseScoringFunction):
     r"""Log loss.
 
-    The log loss is a strictly consistent scoring function for the mean for the
+    The log loss is a strictly consistent scoring function for the mean for
     observations and predictions in the range 0 to 1.
-    It is also referred to as Bernoulli deviance, Binomial log-likelihood, logistic
-    loss and binary cross-entropy.
-    It's minimal function value is zero.
+    It is also referred to as (half the) Bernoulli deviance,
+    (half the) Binomial log-likelihood, logistic loss and binary cross-entropy.
+    Its minimal function value is zero.
 
     Attributes
     ----------
@@ -577,7 +577,7 @@ def decompose(
     weights : array-like of shape (n_obs) or None
         Case weights.
     functional : str or None
-        The target functionl which `y_pred` aims to predict.
+        The target functional which `y_pred` aims to predict.
         If `None`, then it will be inferred from `scoring_function.functional`.
     level : float or None
         Functionals like expectiles and quantiles have a level (often called alpha).
@@ -598,7 +598,7 @@ def decompose(
     To be precise, this function returns the decomposition of the score in terms of
     auto-miscalibration, auto-discrimination (or resolution) and uncertainy (or
     entropy), see `[FLM2022]` and references therein.
-    The key element is to esimate the recalibrated predictions, i.e. \(T(Y|m(X))\) for
+    The key element is to estimate the recalibrated predictions, i.e. \(T(Y|m(X))\) for
     the target functional \(T\) and model predictions \(m(X)\).
     This is accomplished by isotonic regression, `[Dimitriadis2021]` and
     `[Gneiting2021]`.

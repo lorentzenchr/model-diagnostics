@@ -32,7 +32,7 @@ def plot_reliability_diagram(
 ):
     r"""Plot a reliability diagram.
 
-    A reliability diagram or calibration curve assess auto-calibration. It plots the
+    A reliability diagram or calibration curve assesses auto-calibration. It plots the
     conditional expectation given the predictions `E(y_obs|y_pred)` (y-axis) vs the
     predictions `y_pred` (x-axis).
     The conditional expectation is estimated via isotonic regression (PAV algorithm)
@@ -258,7 +258,7 @@ def plot_bias(
     -----
     A model \(m(X)\) is conditionally calibrated iff \(E(V(m(X), Y))=0\) a.s. The
     empirical version, given some data, reads \(\frac{1}{n}\sum_i V(m(x_i), y_i)\).
-    This generali. See [FLM2022]`.
+    See [FLM2022]`.
 
     References
     ----------
