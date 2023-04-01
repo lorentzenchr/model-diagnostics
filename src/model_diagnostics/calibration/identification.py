@@ -312,10 +312,14 @@ def compute_bias(
                 # We use method="inverted_cdf" (same as "lower") instead of the
                 # default "linear" because "linear" produces as many unique values
                 # as before.
+                # If we have Null values, we should reserve one bin for it and reduce
+                # the effective number of bins by 1.
+                n_bins_ef = max(1, n_bins - (feature.null_count() >= 1))
                 q = np.nanquantile(
                     feature,
-                    # Improved rounding errors by using integers inside linspace.
-                    q=np.linspace(0 + 1, n_bins - 1, num=n_bins - 1) / n_bins,
+                    # Improved rounding errors by using integers and dividing at the
+                    # end as opposed to np.linspace with 1/n_bins step size.
+                    q=np.arange(1, n_bins_ef) / n_bins_ef,
                     method="inverted_cdf",
                 )
                 q = np.unique(q)  # Some quantiles might be the same.
