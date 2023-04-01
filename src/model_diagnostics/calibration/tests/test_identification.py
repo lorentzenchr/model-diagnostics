@@ -241,6 +241,7 @@ def test_compute_bias_n_bins_numerical_feature(n_bins):
         n_bins=n_bins,
     )
     assert df_bias.shape[0] == np.min([n_bins, 4])
+    assert df_bias["bias_count"].sum() == n_obs
 
 
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
@@ -385,6 +386,7 @@ def test_compute_bias_keeps_null_values():
     assert_series_equal(
         df_bias["bias_count"], pl.Series("bias_count", [2], dtype=pl.UInt32)
     )
+    assert df_bias["bias_count"].sum() == 2
 
     df_bias = compute_bias(
         y_obs=y_obs,
@@ -396,17 +398,19 @@ def test_compute_bias_keeps_null_values():
     assert_series_equal(
         df_bias["bias_count"], pl.Series("bias_count", [2, 8], dtype=pl.UInt32)
     )
+    assert df_bias["bias_count"].sum() == n_obs
 
     df_bias = compute_bias(
         y_obs=y_obs,
         y_pred=y_pred,
         feature=feature,
-        n_bins=3,
+        n_bins=4,
     )
     assert_series_equal(df_bias["feature"], pl.Series("feature", [None, 1.0, 2.0]))
     assert_series_equal(
         df_bias["bias_count"], pl.Series("bias_count", [2, 3, 5], dtype=pl.UInt32)
     )
+    assert df_bias["bias_count"].sum() == n_obs
 
 
 def test_compute_bias_warning_for_n_bins():
