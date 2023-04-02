@@ -1,4 +1,5 @@
 from .scoring import (
+    ElementaryScore,
     GammaDeviance,
     HomogeneousExpectileScore,
     HomogeneousQuantileScore,
@@ -10,6 +11,7 @@ from .scoring import (
 )
 
 __all__ = [
+    "ElementaryScore",
     "GammaDeviance",
     "HomogeneousExpectileScore",
     "HomogeneousQuantileScore",
