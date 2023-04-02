@@ -96,10 +96,11 @@ def sf_name(sf):
 )
 def test_scoring_function_raises(sf, level, msg):
     """Test that scoring function raises error for invalid input."""
-    with pytest.raises(ValueError, match=msg):
-        if sf is ElementaryScore:
+    if sf is ElementaryScore:
+        with pytest.raises(ValueError, match=msg):
             sf(eta=0, functional="quantile", level=level)
-        else:
+    else:
+        with pytest.raises(ValueError, match=msg):
             sf(level=level)
 
 
