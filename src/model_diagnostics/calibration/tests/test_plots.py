@@ -245,7 +245,7 @@ def test_plot_bias_multiple_predictions(with_null, feature_type):
     feature = rng.integers(low=0, high=n_obs // 2, size=n_obs)
     if feature_type == "string":
         feature = feature.astype(str)
-    
+
     if with_null:
         feature = pl.Series(feature).set_at_idx([0, 5], None)
 
