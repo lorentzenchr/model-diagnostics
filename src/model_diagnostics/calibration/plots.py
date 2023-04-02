@@ -215,6 +215,10 @@ def plot_bias(
     around zero.
     See Notes for further details.
 
+    For numerical features, NaN are treated as Null values. Null values are always
+    plotted as rightmost value on the x-axis and marked with a diamond instead of a
+    dot.
+
     Parameters
     ----------
     y_obs : array-like of shape (n_obs)
@@ -350,6 +354,35 @@ def plot_bias(
                 linestyle="solid",
                 marker="o",
                 label=label,
+            )
+
+        if not (is_string or is_categorical) and df_i[feature_name].null_count() > 0:
+            color = ax.get_lines()[-1].get_color()  # previous line color
+            x_min = df_i[feature_name].min()
+            x_max = df_i[feature_name].max()
+            if n_x == 1:
+                # df_i[feature_name] is the null value.
+                x_null, span = 0, 1
+            elif n_x == 2:
+                x_null, span = 2 * x_max, 0.5 * x_max / n_models
+            else:
+                x_null = x_max + (x_max - x_min) / n_x
+                span = (x_null - x_max) / n_models
+
+            if n_models > 1:
+                x_null = x_null + (i - n_models // 2) * span * 0.5
+
+            df_i_null = df_i.filter(pl.col(feature_name).is_null())
+
+            ax.errorbar(
+                x_null,
+                df_i_null["bias_mean"],
+                yerr=df_i_null["bias_stderr"] if with_errorbars else None,
+                marker="D",
+                linestyle="None",
+                capsize=4,
+                label=None,
+                color=color,
             )
 
     if is_categorical or is_string:
