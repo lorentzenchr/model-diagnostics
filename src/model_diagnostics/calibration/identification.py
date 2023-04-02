@@ -291,16 +291,26 @@ def compute_bias(
                 # with n_bins = 2. As we want the effective number of bins to be at
                 # most n_bins, we want, in the above case, only "a" in the final
                 # result. Therefore, we need to internally decrease n_bins to 1.
-                value_count = feature.value_counts(sort=True)
-                if n_bins >= value_count.shape[0]:
+                if feature.null_count() == 0:
+                    value_count = feature.value_counts(sort=True)
+                    n_bins_ef = n_bins
+                else:
+                    value_count = feature.drop_nulls().value_counts(sort=True)
+                    n_bins_ef = n_bins - 1
+
+                if n_bins_ef >= value_count.shape[0]:
                     n_bins = value_count.shape[0]
                 else:
-                    n = value_count["counts"][n_bins]
+                    n = value_count["counts"][n_bins_ef]
                     n_bins_tmp = value_count.filter(pl.col("counts") >= n).shape[0]
-                    if n_bins_tmp > n_bins:
+                    if n_bins_tmp > n_bins_ef:
                         n_bins = value_count.filter(pl.col("counts") > n).shape[0]
                     else:
                         n_bins = n_bins_tmp
+
+                if feature.null_count() >= 1:
+                    n_bins += 1
+
                 if n_bins == 0:
                     msg = (
                         "Due to ties, the effective number of bins is 0. "

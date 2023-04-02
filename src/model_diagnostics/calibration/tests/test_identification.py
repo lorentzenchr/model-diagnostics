@@ -244,6 +244,31 @@ def test_compute_bias_n_bins_numerical_feature(n_bins):
     assert df_bias["bias_count"].sum() == n_obs
 
 
+def test_compute_n_bins_string_feature():
+    """Test compute_bias returns right number of bins and sorted for string feature."""
+    n_bins = 3
+    n_obs = 6
+    y_obs = np.arange(n_obs)
+    y_pred = pl.Series("model", np.arange(n_obs) + 0.5)
+    feature = pl.Series("feature", ["a", "a", None, "b", "b", "c"])
+
+    df_expected = pl.DataFrame(
+        {
+            "feature": [None, "a", "b"],
+            "bias_mean": 0.5,
+            "bias_count": pl.Series([1, 2, 2], dtype=pl.UInt32),
+        }
+    )
+    for _i in range(10):
+        # The default args in polars groupby(..., maintain_order=False) does not does
+        # return non-deterministic ordering which compute_bias should take care of such
+        # that compute_bias is deterministic.
+        df = compute_bias(y_obs=y_obs, y_pred=y_pred, feature=feature, n_bins=n_bins)
+        assert_frame_equal(
+            df.select(["feature", "bias_mean", "bias_count"]), df_expected
+        )
+
+
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
 def test_compute_bias_multiple_predictions(feature_type):
     """test compute_bias for multiple predictions."""
