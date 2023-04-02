@@ -15,6 +15,7 @@ from model_diagnostics._utils._array import (
     validate_2_arrays,
     validate_same_first_dimension,
 )
+from model_diagnostics.calibration import identification_function
 
 
 class _BaseScoringFunction(ABC):
@@ -62,7 +63,7 @@ class _BaseScoringFunction(ABC):
 class HomogeneousExpectileScore(_BaseScoringFunction):
     r"""Homogeneous scoring function of degree h for expectiles.
 
-    The smaller the better.
+    The smaller the better, minimum is zero.
 
     Up to a multiplicative constant, these are the only scoring functions that are
     strictly consistent for expectiles at level alpha and homogeneous functions.
@@ -123,7 +124,7 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
     `[Gneiting2011]`
 
     :   T. Gneiting.
-        "Making and Evaluating Point Forecasts”. (2011)
+        "Making and Evaluating Point Forecasts". (2011)
         [doi:10.1198/jasa.2011.r10138](https://doi.org/10.1198/jasa.2011.r10138)
         [arxiv:0912.0902](https://arxiv.org/abs/0912.0902)
 
@@ -237,6 +238,8 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
 class SquaredError(HomogeneousExpectileScore):
     r"""Squared error.
 
+    The smaller the better, minimum is zero.
+
     The squared error is strictly consistent for the mean.
     It has a degree of homogeneity of 2.
     In the context of probabilistic classification, it is also known as Brier score.
@@ -265,6 +268,8 @@ class SquaredError(HomogeneousExpectileScore):
 class PoissonDeviance(HomogeneousExpectileScore):
     r"""Poisson deviance.
 
+    The smaller the better, minimum is zero.
+
     The Poisson deviance is strictly consistent for the mean.
     It has a degree of homogeneity of 1.
 
@@ -290,6 +295,8 @@ class PoissonDeviance(HomogeneousExpectileScore):
 
 class GammaDeviance(HomogeneousExpectileScore):
     r"""Gamma deviance.
+
+    The smaller the better, minimum is zero.
 
     The Gamma deviance is strictly consistent for the mean.
     It has a degree of homogeneity of 0 and is therefore insensitive to a change of
@@ -317,6 +324,8 @@ class GammaDeviance(HomogeneousExpectileScore):
 
 class LogLoss(_BaseScoringFunction):
     r"""Log loss.
+
+    The smaller the better, minimum is zero.
 
     The log loss is a strictly consistent scoring function for the mean for
     observations and predictions in the range 0 to 1.
@@ -387,7 +396,7 @@ class LogLoss(_BaseScoringFunction):
 class HomogeneousQuantileScore(_BaseScoringFunction):
     r"""Homogeneous scoring function of degree h for quantiles.
 
-    The smaller the better.
+    The smaller the better, minimum is zero.
 
     Up to a multiplicative constant, these are the only scoring funtions that are
     strictly consistent for quantiles at level alpha and homogeneous functions.
@@ -437,7 +446,7 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
     `[Gneiting2011]`
 
     :   T. Gneiting.
-        "Making and Evaluating Point Forecasts”. (2011)
+        "Making and Evaluating Point Forecasts". (2011)
         [doi:10.1198/jasa.2011.r10138](https://doi.org/10.1198/jasa.2011.r10138)
         [arxiv:0912.0902](https://arxiv.org/abs/0912.0902)
 
@@ -517,6 +526,10 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
 class PinballLoss(HomogeneousQuantileScore):
     r"""Pinball loss.
 
+    The smaller the better, minimum is zero.
+
+    The pinball loss is strictly consistent for quantiles.
+
     Parameters
     ----------
     level : float
@@ -549,6 +562,125 @@ class PinballLoss(HomogeneousQuantileScore):
 
     def __init__(self, level: float = 0.5) -> None:
         super().__init__(degree=1, level=level)
+
+
+class ElementaryScore(_BaseScoringFunction):
+    r"""Elementary scoring function.
+
+    The smaller the better.
+
+    The elementary scoring function is consistent for the specified `functional` for
+    all values of `eta` and is the main ingredient for Murphy diagrams.
+    See Notes for further details.
+
+    Parameters
+    ----------
+    eta : float
+        Free parameter.
+    functional : str
+        The functional that is induced by the identification function `V`. Options are:
+        - `"mean"`. Argument `level` is neglected.
+        - `"median"`. Argument `level` is neglected.
+        - `"expectile"`
+        - `"quantile"`
+    level : float
+        The level of the expectile of quantile. (Often called \(\alpha\).)
+        It must be `0 < level < 1`.
+        `level=0.5` and `functional="expectile"` gives the mean.
+        `level=0.5` and `functional="quantile"` gives the median.
+
+    Notes
+    -----
+    The elementary scoring or loss function is given by
+
+    \[
+    S_\eta^h(y, z) = (\mathbf{1}\{\eta \le z\} - \mathbf{1}\{\eta \le y\})
+    V(y, \eta)
+    \]
+
+    with [identification functions]
+    [model_diagnostics.calibration.identification_function]
+    \(V\) for the given `functional` \(T\) . If allows for the mixture or Choquet
+    representation
+
+    \[
+    S(y, z) = \int S_\eta(y, z) \,dH(\eta)
+    \]
+
+    for some locally finite measure \(H\). It follows that the scoring function \(S\)
+    is consistent for \(T\).
+
+    References
+    ----------
+    `[Jordan2022]`
+
+    :   A.I. Jordan, A. Mühlemann, J.F. Ziegel.
+        "Characterizing the optimal solutions to the isotonic regression problem for
+        identifiable functionals". (2022)
+        [doi:10.1007/s10463-021-00808-0](https://doi.org/10.1007/s10463-021-00808-0)
+
+    `[GneitingResin2022]`
+
+    :   T. Gneiting, J. Resin.
+        "Regression Diagnostics meets Forecast Evaluation: Conditional Calibration,
+        Reliability Diagrams, and Coefficient of Determination".
+        [arxiv:2108.03210](https://arxiv.org/abs/2108.03210)
+
+    Examples
+    --------
+    >>> el_score = ElementaryScore(eta=2, functional="mean")
+    >>> el_score(y_obs=[1, 2, 2, 1], y_pred=[4, 1, 2, 3])
+    0.5
+    """
+
+    def __init__(
+        self, eta: float, functional: str = "mean", level: float = 0.5
+    ) -> None:
+        self.eta = eta
+        self._functional = functional
+        if level <= 0 or level >= 1:
+            msg = f"Argument level must fulfil 0 < level < 1, got {level}."
+            raise ValueError(msg)
+        self.level = level
+
+    @property
+    def functional(self):
+        return self._functional
+
+    def score_per_obs(
+        self,
+        y_obs: npt.ArrayLike,
+        y_pred: npt.ArrayLike,
+    ) -> np.ndarray:
+        """Score per observation.
+
+        Parameters
+        ----------
+        y_obs : array-like of shape (n_obs)
+            Observed values of the response variable.
+        y_pred : array-like of shape (n_obs)
+            Predicted values of the `functional` of interest, e.g. the conditional
+            expectation of the response, `E(Y|X)`.
+
+        Returns
+        -------
+        score_per_obs : ndarray
+            Values of the scoring function for each observation.
+        """
+        y: np.ndarray
+        z: np.ndarray
+        y, z = validate_2_arrays(y_obs, y_pred)
+
+        # eta_term = np.less_equal(self.eta, z) - np.less_equal(self.eta, y)
+        eta_term = np.logical_xor(
+            np.less_equal(self.eta, z), np.less_equal(self.eta, y)
+        )
+        return eta_term * identification_function(
+            y_obs=y_obs,
+            y_pred=np.full(y.shape, fill_value=float(self.eta)),
+            functional=self.functional,
+            level=self.level,
+        )
 
 
 def decompose(

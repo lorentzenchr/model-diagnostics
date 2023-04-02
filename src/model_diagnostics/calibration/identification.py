@@ -82,7 +82,7 @@ def identification_function(
     `[Gneiting2011]`
 
     :   T. Gneiting.
-        "Making and Evaluating Point Forecasts”. (2011)
+        "Making and Evaluating Point Forecasts". (2011)
         [doi:10.1198/jasa.2011.r10138](https://doi.org/10.1198/jasa.2011.r10138)
         [arxiv:0912.0902](https://arxiv.org/abs/0912.0902)
 

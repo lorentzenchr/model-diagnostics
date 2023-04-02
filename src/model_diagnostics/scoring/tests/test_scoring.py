@@ -8,6 +8,7 @@ from numpy.testing import assert_allclose
 from polars.testing import assert_frame_equal
 
 from model_diagnostics.scoring import (
+    ElementaryScore,
     GammaDeviance,
     HomogeneousExpectileScore,
     HomogeneousQuantileScore,
@@ -65,6 +66,9 @@ SCORES = [
     HQS(degree=3, level=0.5),
     HQS(degree=3, level=0.99),
     LogLoss(),
+    ElementaryScore(eta=0, functional="mean"),
+    ElementaryScore(eta=0, functional="expectile", level=0.2),
+    ElementaryScore(eta=0, functional="quantile", level=0.8),
 ]
 
 
@@ -80,7 +84,7 @@ def sf_name(sf):
         return sf
 
 
-@pytest.mark.parametrize("sf", [HES, HQS])
+@pytest.mark.parametrize("sf", [HES, HQS, ElementaryScore])
 @pytest.mark.parametrize(
     ("level", "msg"),
     [
@@ -92,8 +96,12 @@ def sf_name(sf):
 )
 def test_scoring_function_raises(sf, level, msg):
     """Test that scoring function raises error for invalid input."""
-    with pytest.raises(ValueError, match=msg):
-        sf(level=level)
+    if sf is ElementaryScore:
+        with pytest.raises(ValueError, match=msg):
+            sf(eta=0, functional="quantile", level=level)
+    else:
+        with pytest.raises(ValueError, match=msg):
+            sf(level=level)
 
 
 @pytest.mark.parametrize(
@@ -179,7 +187,7 @@ def test_homogeneous_scoring_function_close_to_0_1_2(degree):
 
 
 def test_homogeneous_scoring_function_against_precomputed_values():
-    """Test scoring function close to degree = 0, 1 and 2."""
+    """Test scoring function for precomputed values."""
     y_obs = [1, 2]
     y_pred = [4, 1]
 
@@ -213,7 +221,7 @@ def test_homogeneous_scoring_function_against_precomputed_values():
 
 
 def test_log_loss_against_precomputed_values():
-    """Test scoring function close to degree = 0, 1 and 2."""
+    """Test log loss for precomputed values."""
     log05 = np.log(0.5)
     log15 = np.log(1.5)
     y_obs = [0, 0, 0.5, 0.5, 1, 1]
@@ -226,6 +234,33 @@ def test_log_loss_against_precomputed_values():
     y_obs = [0, 0, 0, 1, 1, 1]
     precomputed = -scipy.stats.bernoulli.logpmf(y_obs, y_pred)
     assert_allclose(sf.score_per_obs(y_obs=y_obs, y_pred=y_pred), precomputed)
+
+
+def test_elemantary_scoring_function_against_precomputed_values():
+    """Test elementary scoring function for precomputed values."""
+    y_obs = [1, 2]
+    y_pred = [4, 1]
+
+    for functional in ("mean", "expectile", "quantile"):
+        sf = ElementaryScore(eta=0, functional=functional)
+        precomputed = 0
+        assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
+
+    sf = ElementaryScore(eta=2, functional="mean")
+    precomputed = (1 + 0) / 2
+    assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
+
+    sf = ElementaryScore(eta=1.75, functional="mean")
+    precomputed = (0.75 - 0.25) / 2
+    assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
+
+    sf = ElementaryScore(eta=1.75, functional="expectile", level=0.2)
+    precomputed = 2 * ((1 - 0.2) * 0.75 - 0.2 * 0.25) / 2
+    assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
+
+    sf = ElementaryScore(eta=1.75, functional="quantile", level=0.2)
+    precomputed = ((1 - 0.2) - 0.2) / 2
+    assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
 
 
 def test_scoring_function_functional():
