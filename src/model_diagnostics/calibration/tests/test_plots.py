@@ -225,8 +225,9 @@ def test_plot_bias_feature_none():
     ]
 
 
+@pytest.mark.parametrize("with_null", [False, True])
 @pytest.mark.parametrize("feature_type", ["num", "string"])
-def test_plot_bias_multiple_predictions(feature_type):
+def test_plot_bias_multiple_predictions(with_null, feature_type):
     """Test that plot_bias works for multiple predictions.
 
     This also tests feature to be a string with many different values
@@ -240,11 +241,13 @@ def test_plot_bias_multiple_predictions(feature_type):
             "model_2": (y_obs - 3) ** 2,
         }
     )
-    # string
     rng = np.random.default_rng(42)
     feature = rng.integers(low=0, high=n_obs // 2, size=n_obs)
     if feature_type == "string":
         feature = feature.astype(str)
+    
+    if with_null:
+        feature = pl.Series(feature).set_at_idx([0, 5], None)
 
     fig, ax = plt.subplots()
     ax = plot_bias(
