@@ -247,19 +247,23 @@ def test_elemantary_scoring_function_against_precomputed_values():
         assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
 
     sf = ElementaryScore(eta=2, functional="mean")
+    precomputed = 7 - 2
+    assert sf(y_obs=[7], y_pred=[-1]) == pytest.approx(precomputed)
+
+    sf = ElementaryScore(eta=2, functional="mean")
     precomputed = (1 + 0) / 2
     assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
 
     sf = ElementaryScore(eta=1.75, functional="mean")
-    precomputed = (0.75 - 0.25) / 2
+    precomputed = (0.75 + 0.25) / 2
     assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
 
     sf = ElementaryScore(eta=1.75, functional="expectile", level=0.2)
-    precomputed = 2 * ((1 - 0.2) * 0.75 - 0.2 * 0.25) / 2
+    precomputed = 2 * ((1 - 0.2) * 0.75 + 0.2 * 0.25) / 2
     assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
 
     sf = ElementaryScore(eta=1.75, functional="quantile", level=0.2)
-    precomputed = ((1 - 0.2) - 0.2) / 2
+    precomputed = ((1 - 0.2) + 0.2) / 2
     assert sf(y_obs=y_obs, y_pred=y_pred) == pytest.approx(precomputed)
 
 

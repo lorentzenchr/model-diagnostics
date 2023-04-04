@@ -671,13 +671,11 @@ class ElementaryScore(_BaseScoringFunction):
         z: np.ndarray
         y, z = validate_2_arrays(y_obs, y_pred)
 
-        # eta_term = np.less_equal(self.eta, z) - np.less_equal(self.eta, y)
-        eta_term = np.logical_xor(
-            np.less_equal(self.eta, z), np.less_equal(self.eta, y)
-        )
+        eta = self.eta
+        eta_term = np.less_equal(eta, z).astype(float) - np.less_equal(eta, y)
         return eta_term * identification_function(
             y_obs=y_obs,
-            y_pred=np.full(y.shape, fill_value=float(self.eta)),
+            y_pred=np.full(y.shape, fill_value=float(eta)),
             functional=self.functional,
             level=self.level,
         )
