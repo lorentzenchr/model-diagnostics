@@ -1,3 +1,4 @@
+from .plots import plot_murphy_diagram
 from .scoring import (
     ElementaryScore,
     GammaDeviance,
@@ -11,6 +12,7 @@ from .scoring import (
 )
 
 __all__ = [
+    "plot_murphy_diagram",
     "ElementaryScore",
     "GammaDeviance",
     "HomogeneousExpectileScore",
