@@ -2,7 +2,7 @@ import math
 
 
 def pretty(start: float, stop: float, num: int = 5) -> list:
-    r"""Pretty Intervals.
+    """Pretty Intervals.
 
     Returns about num evenly spaced values covering the interval [start, stop].
     In contrast to `numpy.linspace()`, the values will be "pretty", see
