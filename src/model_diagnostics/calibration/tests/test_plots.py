@@ -90,6 +90,7 @@ def test_plot_reliability_diagram_multiple_predictions():
     y_obs = np.arange(n_obs)
     y_obs[::2] = 0
     y_pred = pd.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
+    fig, ax = plt.subplots()
     plt_ax = plot_reliability_diagram(
         y_obs=y_obs,
         y_pred=y_pred,

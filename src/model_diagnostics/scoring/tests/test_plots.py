@@ -21,7 +21,7 @@ from model_diagnostics.scoring import plot_murphy_diagram
     ],
 )
 def test_plot_murphy_diagram_raises(param, value, msg):
-    """Test that plot_reliability_diagram raises errors."""
+    """Test that plot_murphy_diagram raises errors."""
     if param == "y":
         y_obs, y_pred = value[0], value[1]
         kwargs = {}
@@ -31,6 +31,16 @@ def test_plot_murphy_diagram_raises(param, value, msg):
         kwargs = {param: value}
     with pytest.raises(ValueError, match=msg):
         plot_murphy_diagram(y_obs=y_obs, y_pred=y_pred, **kwargs)
+
+
+def test_plot_murphy_diagram_raises_y_obs_multdim():
+    """Test that plot_murphy_diagram raises errors for y_obs.ndim > 1."""
+    y_obs = [[0], [1]]
+    y_pred = [-1, 1]
+    plot_murphy_diagram(y_obs=y_obs, y_pred=y_pred)
+    y_obs = [[0, 1], [1, 2]]
+    with pytest.raises(ValueError, match="Array-like y_obs has more than 2 dimensions"):
+        plot_murphy_diagram(y_obs=y_obs, y_pred=y_pred)
 
 
 @pytest.mark.parametrize(
@@ -79,3 +89,22 @@ def test_plot_murphy_diagram(functional, level, etas, weights, ax):
         ax=ax,
     )
     assert plt_ax.get_title() == "Murphy Diagram simple"
+
+
+def test_plot_murphy_diagram_multiple_predictions():
+    """Test that plot_murphy_diagram works for multiple predictions."""
+    n_obs = 10
+    y_obs = np.arange(n_obs)
+    y_obs[::2] = 0
+    y_pred = pd.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
+    fig, ax = plt.subplots()
+    plt_ax = plot_murphy_diagram(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        ax=ax,
+    )
+    assert plt_ax.get_title() == "Murphy Diagram"
+    legend_text = plt_ax.get_legend().get_texts()
+    assert len(legend_text) == 2
+    assert legend_text[0].get_text() == "model_2"
+    assert legend_text[1].get_text() == "model_1"
