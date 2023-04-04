@@ -39,7 +39,7 @@ def test_plot_reliability_diagram_raises_y_obs_multdim():
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
 def test_plot_reliability_diagram(diagram_type, n_bootstrap, weights, ax):
     """Test that plot_reliability_diagram works."""
-    X, y = make_classification(random_state=42)
+    X, y = make_classification(random_state=42, n_classes=2)
     if weights is None:
         X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
         w_train, w_test = None, None
@@ -48,7 +48,7 @@ def test_plot_reliability_diagram(diagram_type, n_bootstrap, weights, ax):
         X_train, X_test, y_train, y_test, w_train, w_test = train_test_split(
             X, y, weights, random_state=0
         )
-    clf = LogisticRegression(solver="lbfgs")
+    clf = LogisticRegression(solver="newton-cholesky")
     clf.fit(X_train, y_train, w_train)
     y_pred = clf.predict_proba(X_test)[:, 1]
     plt_ax = plot_reliability_diagram(
@@ -90,6 +90,7 @@ def test_plot_reliability_diagram_multiple_predictions():
     y_obs = np.arange(n_obs)
     y_obs[::2] = 0
     y_pred = pd.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
+    fig, ax = plt.subplots()
     plt_ax = plot_reliability_diagram(
         y_obs=y_obs,
         y_pred=y_pred,
