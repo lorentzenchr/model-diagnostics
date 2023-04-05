@@ -152,10 +152,30 @@ def test_plot_reliability_diagram_constant_prediction_transform_output():
         plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, n_bootstrap=10)
 
 
+def test_plot_bias_warning_for_with_errorbars():
+    """Test that plot_bias gives warning for when some stderr are Null."""
+    y_obs = np.arange(3).astype(float)
+    y_obs[0] = np.nan
+    y_pred = y_obs + 1
+    feature = ["a", "a", "b"]
+
+    with pytest.warns(
+        UserWarning,
+        match="Some values of 'bias_stderr' are null. Therefore no error bars are",
+    ):
+        plot_bias(
+            y_obs=y_obs,
+            y_pred=y_pred,
+            feature=feature,
+            with_errorbars=True,
+        )
+
+
+@pytest.mark.parametrize("with_null_values", [False, True])
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
 @pytest.mark.parametrize("with_errorbars", [False, True])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
-def test_plot_bias(feature_type, with_errorbars, ax):
+def test_plot_bias(with_null_values, feature_type, with_errorbars, ax):
     """Test that plot_bias works."""
     X, y = make_classification(
         n_samples=100,
@@ -177,30 +197,46 @@ def test_plot_bias(feature_type, with_errorbars, ax):
         bins = np.quantile(feature, [0.2, 0.5, 0.8])
         feature = np.digitize(feature, bins=bins).astype("=U8")
 
-    plt_ax = plot_bias(
-        y_obs=y_test,
-        y_pred=clf.predict_proba(X_test)[:, 1],
-        feature=feature,
-        with_errorbars=with_errorbars,
-        ax=ax,
-    )
+    with pl.StringCache():
+        if with_null_values:
+            if feature_type == "cat":
+                feature = (
+                    pl.Series(feature)
+                    .cast(str)
+                    .set_at_idx(0, None)
+                    .cast(pl.Categorical)
+                )
+            else:
+                feature = pl.Series(feature).set_at_idx(0, None)
 
-    if ax is not None:
-        assert ax is plt_ax
-    if feature_type == "num":
-        assert plt_ax.get_xlabel() == "binned feature"
-    else:
-        assert plt_ax.get_xlabel() == "feature"
-    assert plt_ax.get_ylabel() == "bias"
-    assert plt_ax.get_title() == "Bias Plot"
+        plt_ax = plot_bias(
+            y_obs=y_test,
+            y_pred=clf.predict_proba(X_test)[:, 1],
+            feature=feature,
+            with_errorbars=with_errorbars,
+            ax=ax,
+        )
 
-    plt_ax = plot_bias(
-        y_obs=y_test,
-        y_pred=pd.Series(clf.predict_proba(X_test)[:, 1], name="simple"),
-        feature=feature,
-        with_errorbars=with_errorbars,
-        ax=ax,
-    )
+        if ax is not None:
+            assert ax is plt_ax
+        if feature_type == "num":
+            assert plt_ax.get_xlabel() == "binned feature"
+        else:
+            assert plt_ax.get_xlabel() == "feature"
+        assert plt_ax.get_ylabel() == "bias"
+        assert plt_ax.get_title() == "Bias Plot"
+
+        if with_null_values and feature_type in ["string", "cat"]:
+            xtick_labels = plt_ax.xaxis.get_ticklabels()
+            assert xtick_labels[-1].get_text() == "Null"
+
+        plt_ax = plot_bias(
+            y_obs=y_test,
+            y_pred=pd.Series(clf.predict_proba(X_test)[:, 1], name="simple"),
+            feature=feature,
+            with_errorbars=with_errorbars,
+            ax=ax,
+        )
     assert plt_ax.get_title() == "Bias Plot simple"
 
 
@@ -228,7 +264,8 @@ def test_plot_bias_feature_none():
 
 @pytest.mark.parametrize("with_null", [False, True])
 @pytest.mark.parametrize("feature_type", ["num", "string"])
-def test_plot_bias_multiple_predictions(with_null, feature_type):
+@pytest.mark.parametrize("with_errorbars", [False, True])
+def test_plot_bias_multiple_predictions(with_null, feature_type, with_errorbars):
     """Test that plot_bias works for multiple predictions.
 
     This also tests feature to be a string with many different values
@@ -255,10 +292,13 @@ def test_plot_bias_multiple_predictions(with_null, feature_type):
         y_obs=y_obs,
         y_pred=y_pred,
         feature=feature,
+        with_errorbars=with_errorbars,
     )
     assert ax.get_title() == "Bias Plot"
     legend_text = ax.get_legend().get_texts()
-    assert len(legend_text) == 3
+    assert len(legend_text) == 3 + with_null
     assert legend_text[0].get_text() == "model_1"
     assert legend_text[1].get_text() == "model_3"
     assert legend_text[2].get_text() == "model_2"
+    if with_null:
+        assert legend_text[3].get_text() == "Null values"
