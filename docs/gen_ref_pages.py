@@ -8,8 +8,9 @@ nav = mkdocs_gen_files.Nav()
 
 for path in sorted(
     set(Path("src").rglob("*.py"))
-    - set(Path("src").rglob("*test*.py"))
+    - set(Path("src").rglob("*tests/*.py"))
     - set(Path("src").rglob("_*/*.py"))
+    - set(Path("src/").rglob("__about__.py"))
 ):
     module_path = path.relative_to("src").with_suffix("")
     doc_path = path.relative_to("src").with_suffix(".md")
