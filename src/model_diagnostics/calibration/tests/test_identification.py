@@ -407,7 +407,9 @@ def test_compute_bias_keeps_null_values():
         feature=feature,
         n_bins=1,
     )
-    assert_series_equal(df_bias["feature"], pl.Series("feature", [None]))
+    assert_series_equal(
+        df_bias["feature"], pl.Series("feature", [None], dtype=pl.Float64)
+    )
     assert_series_equal(
         df_bias["bias_count"], pl.Series("bias_count", [2], dtype=pl.UInt32)
     )
