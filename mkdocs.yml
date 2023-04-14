@@ -61,7 +61,7 @@ plugins:
           options:
             docstring_style: "numpy"
             filters:
-              - "!^_"
+              - "!^_[^_]"  # this is the default
             # Headings
             show_root_heading: true
             show_root_full_path: false
