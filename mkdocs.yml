@@ -28,13 +28,16 @@ theme:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.instant
+    - search.highlight
 
 nav:
   - Home:
     - About: index.md
   - Examples:
     - Regression on Workers' Compensation: examples/regression_on_workers_compensation.ipynb
-  - Code Reference: reference/  # defer to gen-files + literate-nav
+  - API Reference: reference/  # defer to gen-files + literate-nav
+  - Development: development.md
+  - Release Notes: https://github.com/lorentzenchr/model-diagnostics/releases
 
 watch:
   - src/model_diagnostics/
@@ -57,6 +60,8 @@ plugins:
             - src
           options:
             docstring_style: "numpy"
+            filters:
+              - "!^_[^_]"  # this is the default
             # Headings
             show_root_heading: true
             show_root_full_path: false
@@ -91,7 +96,8 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg
-  - pymdownx.highlight
+  - pymdownx.highlight:
+      use_pygments: true
   - pymdownx.inlinehilite
   - pymdownx.keys
   - pymdownx.mark

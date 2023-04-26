@@ -21,6 +21,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.9']
+    env:
+      # https://github.com/microsoft/azure-pipelines-tasks/issues/16426
+      # https://github.com/orgs/community/discussions/26434
+      MPLBACKEND: Agg
 
     steps:
     - uses: actions/checkout@v3
@@ -41,5 +45,13 @@ jobs:
       name: Lint
       run: hatch run lint:all
 
+    - if: matrix.python-version == '3.9' && runner.os == 'Linux'
+      name: Build docs
+      run: hatch run docs:build
+
     - name: Run tests
-      run: hatch run cov
+      run: hatch run cov --cov-report=xml
+
+    - if: matrix.python-version == '3.9' && runner.os == 'Linux'
+      name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3

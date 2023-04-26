@@ -1,14 +1,15 @@
-from typing import Optional
+import warnings
+from typing import Optional, Union
 
 import numpy as np
 import numpy.typing as npt
-import pyarrow as pa
-import pyarrow.compute as pc
+import polars as pl
 from scipy import special
 
-from .._utils.array import (
+from model_diagnostics._utils._array import (
     array_name,
     get_second_dimension,
+    get_sorted_array_names,
     length_of_second_dimension,
     validate_2_arrays,
     validate_same_first_dimension,
@@ -43,7 +44,7 @@ def identification_function(
         - `"quantile"`
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
-        It must be `0 <= level <= 1`.
+        It must be `0 < level < 1`.
         `level=0.5` and `functional="expectile"` gives the mean.
         `level=0.5` and `functional="quantile"` gives the median.
 
@@ -59,10 +60,13 @@ def identification_function(
     induces the functional \(T\) as:
 
     \[
-    E[V(Y, z)] = 0\quad \Rightarrow\quad z=T(F) \quad \forall \text{ distributions } F
+    \mathbb{E}[V(Y, z)] = 0\quad \Leftrightarrow\quad z\in T(F) \quad \forall
+    \text{ distributions } F
+    \in \mathcal{F}
     \]
 
-    Functional \(T\) can be the mean, median, an expectile or a quantile.
+    for some class of distribtions \(\mathcal{F}\). Implemented examples of the
+    functional \(T\) are mean, median, expectiles and quantiles.
 
     | functional | strict identification function \(V(y, z)\)           |
     | ---------- | ---------------------------------------------------- |
@@ -75,17 +79,25 @@ def identification_function(
 
     References
     ----------
+    `[Gneiting2011]`
+
+    :   T. Gneiting.
+        "Making and Evaluating Point Forecasts". (2011)
+        [doi:10.1198/jasa.2011.r10138](https://doi.org/10.1198/jasa.2011.r10138)
+        [arxiv:0912.0902](https://arxiv.org/abs/0912.0902)
 
     Examples
     --------
-
+    >>> identification_function(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    array([-1,  1,  0,  1])
     """
     y_o: np.ndarray
     y_p: np.ndarray
     y_o, y_p = validate_2_arrays(y_obs, y_pred)
 
-    if functional in ("expectile", "quantile") and (level < 0 or level > 1):
-        raise ValueError(f"Argument level must fulfil 0 <= level <= 1, got {level}.")
+    if functional in ("expectile", "quantile") and (level <= 0 or level >= 1):
+        msg = f"Argument level must fulfil 0 < level < 1, got {level}."
+        raise ValueError(msg)
 
     if functional == "mean":
         return y_p - y_o
@@ -97,16 +109,18 @@ def identification_function(
         return np.greater_equal(y_p, y_o) - level
     else:
         allowed_functionals = ("mean", "median", "expectile", "quantile")
-        raise ValueError(
+        msg = (
             f"Argument functional must be one of {allowed_functionals}, got "
             f"{functional}."
         )
+        raise ValueError(msg)
 
 
 def compute_bias(
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
-    feature: Optional[npt.ArrayLike] = None,
+    feature: Optional[Union[npt.ArrayLike, pl.Series]] = None,
+    weights: Optional[npt.ArrayLike] = None,
     *,
     functional: str = "mean",
     level: float = 0.5,
@@ -128,9 +142,15 @@ def compute_bias(
         Observed values of the response variable.
         For binary classification, y_obs is expected to be in the interval [0, 1].
     y_pred : array-like of shape (n_obs) or (n_obs, n_models)
-        Predicted values of the conditional expectation of Y, \(E(Y|X)\).
+        Predicted values of the conditional expectation of Y, `E(Y|X)`.
     feature : array-like of shape (n_obs) or None
         Some feature column.
+    weights : array-like of shape (n_obs) or None
+        Case weights. If given, the bias is calculated as weighted average of the
+        identification function with these weights.
+        Note that the standard errors and p-values in the output are based on the
+        assumption that the variance of the bias is inverse proportional to the
+        weights. See the Notes section for details.
     functional : str
         The functional that is induced by the identification function `V`. Options are:
         - `"mean"`. Argument `level` is neglected.
@@ -139,29 +159,55 @@ def compute_bias(
         - `"quantile"`
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
-        It must be `0 <= level <= 1`.
+        It must be `0 < level < 1`.
         `level=0.5` and `functional="expectile"` gives the mean.
         `level=0.5` and `functional="quantile"` gives the median.
     n_bins : int
         The number of bins for numerical features and the maximal number of (most
-        frequent) categories shown for categorical features.
+        frequent) categories shown for categorical features. Due to ties, the effective
+        number of bins might be smaller than `n_bins`. Null values are always included
+        in the output, accounting for one bin. NaN values are treated as null values.
 
     Returns
     -------
-    df : pyarrow Table
+    df : polars.DataFrame
         The result table contains at least the columns:
 
         - `bias_mean`: Mean of the bias
         - `bias_cout`: Number of data rows
+        - `bias_weights`: Sum of weights
         - `bias_stderr`: Standard error, i.e. standard deviation of `bias_mean`
+        - `p_value`: p-value of the 2-sided t-test with null hypothesis:
+          `bias_mean = 0`
 
     Notes
     -----
-    A model \(m(X)\) is conditionally calibrated iff \(E(V(m(X), Y))=0\) a.s. with
-    canonical identification function \(V\). The empirical version, given some data,
-    reads \(\frac{1}{n}\sum_i V(m(x_i), y_i)\).
+    A model \(m(X)\) is conditionally calibrated iff
+    \(\mathbb{E}(V(m(X), Y)|X)=0\) almost surely with canonical identification
+    function \(V\).
+    The empirical version, given some data, reads
+    \(\bar{V} = \frac{1}{n}\sum_i \phi(x_i) V(m(x_i), y_i)\) with a function
+    \(\phi(x_i)\) that projects on the specified feature.
+    For a feature with only two distinct values `"a"` and `"b"`, this becomes
+    \(\bar{V} = \frac{1}{n_a}\sum_{i \text{ with }x_i=a} V(m(a), y_i)\) with
+    \(n_a=\sum_{i \text{ with }x_i=a}\) and the same with `"b"`.
+    With case weights, this reads
+    \(\bar{V} = \frac{1}{\sum_i w_i}\sum_i w_i \phi(x_i) V(m(x_i), y_i)\).
     This generalises the classical residual (up to a minus sign) for target functionals
     other than the mean. See `[FLM2022]`.
+
+    The standard error for \(\bar{V}\) is calculated in the standard way as
+    \(\mathrm{SE} = \sqrt{\operatorname{Var}(\bar{V})} = \frac{\sigma}{\sqrt{n}}\) and
+    the standard variance estimator for \(\sigma^2 = \operatorname{Var}(\phi(x_i)
+    V(m(x_i), y_i))\) with Bessel correction, i.e. division by \(n-1\) instead of
+    \(n\).
+
+    With case weights, the variance estimator becomes \(\operatorname{Var}(\bar{V})
+    = \frac{1}{n-1} \frac{1}{\sum_i w_i} \sum_i w_i (V(m(x_i), y_i) - \bar{V})^2\) with
+    the implied relation \(\operatorname{Var}(V(m(x_i), y_i)) \sim \frac{1}{w_i} \).
+    If your weights are for repeated observations, so-called frequency weights, then
+    the above estimate is conservative because it uses \(n - 1\) instead
+    of \((\sum_i w_i) - 1\).
 
     References
     ----------
@@ -169,146 +215,302 @@ def compute_bias(
 
     :   T. Fissler, C. Lorentzen, and M. Mayer.
         "Model Comparison and Calibration Assessment". (2022)
-        [arxiv:https://arxiv.org/abs/2202.12780](https://arxiv.org/abs/2202.12780).
+        [arxiv:2202.12780](https://arxiv.org/abs/2202.12780).
+
+    Examples
+    --------
+    >>> compute_bias(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    shape: (1, 5)
+    ┌───────────┬────────────┬──────────────┬─────────────┬──────────┐
+    │ bias_mean ┆ bias_count ┆ bias_weights ┆ bias_stderr ┆ p_value  │
+    │ ---       ┆ ---        ┆ ---          ┆ ---         ┆ ---      │
+    │ f64       ┆ u32        ┆ f64          ┆ f64         ┆ f64      │
+    ╞═══════════╪════════════╪══════════════╪═════════════╪══════════╡
+    │ 0.25      ┆ 4          ┆ 4.0          ┆ 0.478714    ┆ 0.637618 │
+    └───────────┴────────────┴──────────────┴─────────────┴──────────┘
+    >>> compute_bias(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2],
+    ... feature=["a", "a", "b", "b"])
+    shape: (2, 6)
+    ┌─────────┬───────────┬────────────┬──────────────┬─────────────┬─────────┐
+    │ feature ┆ bias_mean ┆ bias_count ┆ bias_weights ┆ bias_stderr ┆ p_value │
+    │ ---     ┆ ---       ┆ ---        ┆ ---          ┆ ---         ┆ ---     │
+    │ str     ┆ f64       ┆ u32        ┆ f64          ┆ f64         ┆ f64     │
+    ╞═════════╪═══════════╪════════════╪══════════════╪═════════════╪═════════╡
+    │ a       ┆ 0.0       ┆ 2          ┆ 2.0          ┆ 1.0         ┆ 1.0     │
+    │ b       ┆ 0.5       ┆ 2          ┆ 2.0          ┆ 0.5         ┆ 0.5     │
+    └─────────┴───────────┴────────────┴──────────────┴─────────────┴─────────┘
     """
     validate_same_first_dimension(y_obs, y_pred)
-    if feature is not None:
-        validate_same_first_dimension(y_obs, feature)
     n_pred = length_of_second_dimension(y_pred)
-    if n_pred == 0:
-        pred_names = [""]
+    pred_names, _ = get_sorted_array_names(y_pred)
+
+    if weights is not None:
+        validate_same_first_dimension(weights, y_obs)
+        w = np.asarray(weights)
+        if w.ndim > 1:
+            msg = f"The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
+            raise ValueError(msg)
     else:
-        pred_names = []
-        for i in range(n_pred):
-            x = get_second_dimension(y_pred, i)
-            pred_names.append(array_name(x, default=str(i)))
+        w = np.ones_like(y_obs, dtype=float)
 
     df_list = []
-    for i in range(len(pred_names)):
-        # Loop over columns of y_pred.
-        if n_pred == 0:
-            x = y_pred
-        else:
-            x = get_second_dimension(y_pred, i)
-
-        bias = identification_function(
-            y_obs=y_obs,
-            y_pred=x,
-            functional=functional,
-            level=level,
-        )
+    with pl.StringCache():
+        is_categorical = False
+        is_string = False
 
         if feature is None:
             feature_name = None
-            df = pa.table(
-                {
-                    "bias_mean": [np.mean(bias)],
-                    "bias_count": [bias.shape[0]],
-                    "bias_stddev": [np.std(bias, ddof=1)],
-                }
-            )
         else:
             feature_name = array_name(feature, default="feature")
-            df = pa.table(
-                {
-                    "y_obs": y_obs,
-                    "y_pred": x,
-                    feature_name: feature,
-                    "bias": bias,
-                }
-            )
-
-            is_categorical = False
-            # is_numeric = False
-            is_string = False
-            if pa.types.is_dictionary(df.column(feature_name).type):
+            # The following statement, i.e. possibly the creation of a pl.Categorical,
+            # MUST be under the StringCache context manager!
+            feature = pl.Series(name=feature_name, values=feature)
+            validate_same_first_dimension(y_obs, feature)
+            if feature.dtype is pl.Categorical:
                 is_categorical = True
-            elif pa.types.is_string(df.column(feature_name).type):
+            elif feature.dtype in [pl.Utf8, pl.Object]:
                 # We could convert strings to categoricals.
                 is_string = True
-            # else:
-            #     is_numeric = True
-
-            agg = (
-                ("bias", "mean"),
-                ("bias", "count"),
-                ("bias", "stddev", pc.VarianceOptions(ddof=1)),
-            )
-            if is_categorical or is_string:
-                df = df.group_by([feature_name]).aggregate([*agg])
-                n_bins = min(n_bins, df.num_rows)
-                df = df.sort_by("bias_count").take(np.arange(n_bins))
-                if is_categorical:
-                    # Pyarrow does not yet support sorting dictionary type arrays, see
-                    # https://issues.apache.org/jira/browse/ARROW-14314
-                    # We resort to pandas instead.
-                    df = df.to_pandas().sort_values(feature_name)
-                    df = pa.Table.from_pandas(df)
-                else:
-                    df = df.sort_by(feature_name)
+            elif feature.is_float():
+                # We treat NaN as Null values, numpy will see a Null as a NaN.
+                if feature.is_float():
+                    feature = feature.fill_nan(None)
             else:
-                # binning
-                q = np.quantile(
+                # integers
+                pass
+
+            if is_categorical or is_string:
+                # For categorical and string features, knowing the frequency table in
+                # advance makes life easier in order to make results consistent.
+                # Consider
+                #     feature  counts
+                #         "a"      3
+                #         "b"      2
+                #         "c"      2
+                #         "d"      1
+                # with n_bins = 2. As we want the effective number of bins to be at
+                # most n_bins, we want, in the above case, only "a" in the final
+                # result. Therefore, we need to internally decrease n_bins to 1.
+                if feature.null_count() == 0:
+                    value_count = feature.value_counts(sort=True)
+                    n_bins_ef = n_bins
+                else:
+                    value_count = feature.drop_nulls().value_counts(sort=True)
+                    n_bins_ef = n_bins - 1
+
+                if n_bins_ef >= value_count.shape[0]:
+                    n_bins = value_count.shape[0]
+                else:
+                    n = value_count["counts"][n_bins_ef]
+                    n_bins_tmp = value_count.filter(pl.col("counts") >= n).shape[0]
+                    if n_bins_tmp > n_bins_ef:
+                        n_bins = value_count.filter(pl.col("counts") > n).shape[0]
+                    else:
+                        n_bins = n_bins_tmp
+
+                if feature.null_count() >= 1:
+                    n_bins += 1
+
+                if n_bins == 0:
+                    msg = (
+                        "Due to ties, the effective number of bins is 0. "
+                        f"Consider to increase n_bins>={n_bins_tmp}."
+                    )
+                    warnings.warn(msg, UserWarning)
+            else:
+                # Binning
+                # We use method="inverted_cdf" (same as "lower") instead of the
+                # default "linear" because "linear" produces as many unique values
+                # as before.
+                # If we have Null values, we should reserve one bin for it and reduce
+                # the effective number of bins by 1.
+                n_bins_ef = max(1, n_bins - (feature.null_count() >= 1))
+                q = np.nanquantile(
                     feature,
-                    q=np.linspace(0 + 1 / n_bins, 1 - 1 / n_bins, n_bins - 1),
-                    method="lower",  # "linear" would not reduce with np.unique below
-                )  # type: ignore
-                q = np.unique(q)
-                # bins[i-1] < x <= bins[i]
-                f_binned = np.digitize(feature, bins=q, right=True)  # type: ignore
-                df = df.append_column("bin", pa.array(f_binned))
-                df = (
-                    df.group_by(["bin"])
-                    .aggregate(
+                    # Improved rounding errors by using integers and dividing at the
+                    # end as opposed to np.linspace with 1/n_bins step size.
+                    q=np.arange(1, n_bins_ef) / n_bins_ef,
+                    method="inverted_cdf",
+                )
+                q = np.unique(q)  # Some quantiles might be the same.
+                # We want: bins[i-1] < x <= bins[i]
+                f_binned = np.digitize(feature, bins=q, right=True)
+                # Now, we insert Null values again at the original places.
+                f_binned = (
+                    pl.LazyFrame(
                         [
-                            *agg,
-                            (feature_name, "mean"),
+                            pl.Series("__f_binned", f_binned, dtype=feature.dtype),
+                            feature,
                         ]
                     )
-                    .sort_by("bin")
-                    .drop(["bin"])
+                    .select(
+                        pl.when(pl.col(feature_name).is_null())
+                        .then(None)
+                        .otherwise(pl.col("__f_binned"))
+                        .alias("bin")
+                    )
+                    .collect()
+                    .get_column("bin")
                 )
-                cnames = df.column_names
-                cnames[-1] = feature_name
-                df = df.rename_columns(cnames)
 
-        # Add column standard error.
-        df = df.append_column(
-            "bias_stderr",
-            pc.divide(df.column("bias_stddev"), pc.sqrt(df.column("bias_count"))),
-        )
+        for i in range(len(pred_names)):
+            # Loop over columns of y_pred.
+            x = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
 
-        # Add column with p-value of 2-sided t-test.
-        s_ = df.column("bias_stddev").to_numpy()
-        p_value = np.full_like(s_, fill_value=np.nan)
-        mask: npt.ArrayLike = s_ > 0
-        x = df.column("bias_mean").to_numpy()[mask]
-        n = df.column("bias_count").to_numpy()[mask]
-        s = s_[mask]
-        # t-statistic t (-|t| and factor of 2 because of 2-sided test)
-        p_value[mask] = 2 * special.stdtr(
-            n - 1,  # degrees of freedom
-            -np.abs(x / s * np.sqrt(n)),
-        )
-        df = df.append_column("p_value", pa.array(p_value))
-
-        # Add column "model".
-        if n_pred > 0:
-            if feature_name == "model":
-                model_col_name = "model_"
-            else:
-                model_col_name = "model"
-            df = df.append_column(
-                model_col_name, pa.array([pred_names[i]] * df.num_rows)
+            bias = identification_function(
+                y_obs=y_obs,
+                y_pred=x,
+                functional=functional,
+                level=level,
             )
 
-        # Select the columns in the correct order.
-        col_selection = []
-        if n_pred > 0:
-            col_selection.append(model_col_name)
-        if feature_name is not None and feature_name in df.column_names:
-            col_selection.append(feature_name)
-        col_selection += ["bias_mean", "bias_count", "bias_stderr", "p_value"]
-        df_list.append(df.select(col_selection))
+            if feature is None:
+                bias_mean = np.average(bias, weights=w)
+                bias_weights = np.sum(w)
+                bias_count = bias.shape[0]
+                # Note: with Bessel correction
+                bias_stddev = np.average((bias - bias_mean) ** 2, weights=w) / np.amax(
+                    [1, bias_count - 1]
+                )
+                df = pl.DataFrame(
+                    {
+                        "bias_mean": [bias_mean],
+                        "bias_count": pl.Series([bias_count], dtype=pl.UInt32),
+                        "bias_weights": [bias_weights],
+                        "bias_stderr": [np.sqrt(bias_stddev)],
+                    }
+                )
+            else:
+                df = pl.DataFrame(
+                    {
+                        "y_obs": y_obs,
+                        "y_pred": x,
+                        feature_name: feature,
+                        "bias": bias,
+                        "weights": w,
+                    }
+                )
 
-    return pa.concat_tables(df_list)
+                agg_list = [
+                    pl.col("bias_mean").first(),
+                    pl.count("bias").alias("bias_count"),
+                    pl.col("weights").sum().alias("bias_weights"),
+                    (
+                        (
+                            pl.col("weights")
+                            * ((pl.col("bias") - pl.col("bias_mean")) ** 2)
+                        ).sum()
+                        / pl.col("weights").sum()
+                    ).alias("variance"),
+                ]
+
+                if is_categorical or is_string:
+                    groupby_name = feature_name
+                else:
+                    # See above for the creation of the binned feature f_binned.
+                    df = df.hstack([f_binned])
+                    groupby_name = "bin"
+                    agg_list.append(pl.col(feature_name).mean())
+
+                df = (
+                    df.lazy()
+                    .select(
+                        [
+                            pl.all(),
+                            (
+                                (pl.col("weights") * pl.col("bias"))
+                                .sum()
+                                .over(groupby_name)
+                                / pl.col("weights").sum().over(groupby_name)
+                            ).alias("bias_mean"),
+                        ]
+                    )
+                    .groupby(groupby_name)
+                    .agg(agg_list)
+                    .with_columns(
+                        [
+                            pl.when(pl.col("bias_count") > 1)
+                            .then(pl.col("variance") / (pl.col("bias_count") - 1))
+                            .otherwise(pl.col("variance"))
+                            .sqrt()
+                            .alias("bias_stderr"),
+                        ]
+                    )
+                    # With sort and head alone, we could lose the null value, but we
+                    # want to keep it.
+                    # .sort("bias_count", descending=True)
+                    # .head(n_bins)
+                    .with_columns(
+                        pl.when(pl.col(feature_name).is_null())
+                        .then(pl.max("bias_count") + 1)
+                        .otherwise(pl.col("bias_count"))
+                        .alias("__priority")
+                    )
+                    .sort("__priority", descending=True)
+                    .head(n_bins)
+                    .sort(feature_name, descending=False)
+                )
+
+                df = df.select(
+                    [
+                        pl.col(feature_name),
+                        pl.col("bias_mean"),
+                        pl.col("bias_count"),
+                        pl.col("bias_weights"),
+                        pl.col("bias_stderr"),
+                    ]
+                ).collect()
+
+                # if is_categorical:
+                #     # Pyarrow does not yet support sorting dictionary type arrays,
+                #     # see
+                #     # https://issues.apache.org/jira/browse/ARROW-14314
+                #     # We resort to pandas instead.
+                #     import pyarrow as pa
+                #     df = df.to_pandas().sort_values(feature_name)
+                #     df = pa.Table.from_pandas(df)
+
+            # Add column with p-value of 2-sided t-test.
+            # We explicitly convert "to_numpy", because otherwise we get:
+            #   RuntimeWarning: A builtin ctypes object gave a PEP3118 format string
+            #   that does not match its itemsize, so a best-guess will be made of the
+            #   data type. Newer versions of python may behave correctly.
+            stderr_ = df.get_column("bias_stderr")
+            p_value = np.full_like(stderr_, fill_value=np.nan)
+            n = df.get_column("bias_count")
+            p_value[(n > 1) & (stderr_ == 0)] = 0
+            mask = stderr_ > 0
+            x = df.get_column("bias_mean").filter(mask).to_numpy()
+            n = df.get_column("bias_count").filter(mask).to_numpy()
+            stderr = stderr_.filter(mask).to_numpy()
+            # t-statistic t (-|t| and factor of 2 because of 2-sided test)
+            p_value[mask] = 2 * special.stdtr(
+                n - 1,  # degrees of freedom
+                -np.abs(x / stderr),
+            )
+            df = df.with_columns(pl.Series("p_value", p_value))
+
+            # Add column "model".
+            if n_pred > 0:
+                model_col_name = "model_" if feature_name == "model" else "model"
+                df = df.with_columns(
+                    pl.Series(model_col_name, [pred_names[i]] * df.shape[0])
+                )
+
+            # Select the columns in the correct order.
+            col_selection = []
+            if n_pred > 0:
+                col_selection.append(model_col_name)
+            if feature_name is not None and feature_name in df.columns:
+                col_selection.append(feature_name)
+            col_selection += [
+                "bias_mean",
+                "bias_count",
+                "bias_weights",
+                "bias_stderr",
+                "p_value",
+            ]
+            df_list.append(df.select(col_selection))
+
+        df = pl.concat(df_list)
+    return df
