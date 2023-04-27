@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import numpy.typing as npt
 
@@ -117,7 +119,7 @@ def _pava(
 
 def isotonic_regression(
     y: npt.ArrayLike,
-    weights: npt.ArrayLike | None = None,
+    weights: Optional[npt.ArrayLike] = None,
     *,
     increasing: bool = True,
 ):
