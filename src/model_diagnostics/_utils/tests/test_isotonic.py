@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_almost_equal, assert_array_equal
 
-from model_diagnostics._utils.isotonic import _pava, isotonic_regression
+from model_diagnostics._utils.isotonic import pava, isotonic_regression
 
 
 def test_pava_simple():
@@ -10,18 +10,18 @@ def test_pava_simple():
     # https://doi.org/10.18637/jss.v102.c01
     y = [8, 4, 8, 2, 2, 0, 8]
     w = np.ones_like(y)
-    x, r = _pava(y, w)
+    x, r = pava(y, w)
     assert_array_equal(x, [4, 4, 4, 4, 4, 4, 8])
     assert_array_equal(r, [0, 6, 7])
 
     y = [9, 1, 8, 2, 7, 3, 6]
     w = None
-    x, r = _pava(y, w)
+    x, r = pava(y, w)
     assert_array_equal(x, [5, 5, 5, 5, 5, 5, 6])
     assert_array_equal(r, [0, 6, 7])
 
     y = [9, 1, 8, 4, -2, 8, 6]
-    x, r = _pava(y, w)
+    x, r = pava(y, w)
     assert_array_equal(x, [4, 4, 4, 4, 4, 7, 7])
     assert_array_equal(r, [0, 5, 7])
 
@@ -29,7 +29,7 @@ def test_pava_simple():
 def test_pava_weighted():
     y = [8, 4, 8, 2, 2, 0, 8]
     w = [1, 2, 3, 4, 5, 5, 4]
-    x, r = _pava(y, w)
+    x, r = pava(y, w)
     assert_array_equal(x, [2.9, 2.9, 2.9, 2.9, 2.9, 2.9, 8])
     assert_array_equal(r, [0, 6, 7])
 

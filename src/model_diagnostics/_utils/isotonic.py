@@ -6,7 +6,7 @@ import numpy.typing as npt
 from ._array import validate_2_arrays
 
 
-def _pava(
+def pava(
     y: npt.NDArray,
     w: npt.NDArray,
 ):
@@ -195,7 +195,7 @@ def isotonic_regression(
     x = np.array(y[order], order="C", dtype=np.float64, copy=True)
     wx = np.array(weights[order], order="C", dtype=np.float64, copy=True)
     x.shape[0]
-    x, r = _pava(x, wx)
+    x, r = pava(x, wx)
     if not increasing:
         x = x[::-1]
         r = r[-1] - r[::-1]
