@@ -1,11 +1,53 @@
 import numpy as np
 import pytest
 from numpy.testing import assert_almost_equal, assert_array_equal
+from scipy.optimize import minimize
 
-from model_diagnostics._utils.isotonic import pava, isotonic_regression
+from model_diagnostics._utils.isotonic import gpava, isotonic_regression, pava
+from model_diagnostics.scoring import PinballLoss, SquaredError
 
 
-def test_pava_simple():
+def mean_fun(x, w):
+    return np.average(x, weights=w)
+
+
+mean_fun.functional = SquaredError()
+
+
+def median_lower(x, w=None):
+    return np.quantile(x, q=0.5, method="inverted_cdf")
+
+
+median_lower.loss = PinballLoss(level=0.5)
+
+
+def median_upper(x, w=None):
+    return np.quantile(x, q=0.5, method="higher")
+
+
+median_upper.loss = PinballLoss(level=0.5)
+
+
+def quantile80_lower(x, w=None):
+    return np.quantile(x, q=0.8, method="inverted_cdf")
+
+
+quantile80_lower.loss = PinballLoss(level=0.8)
+
+
+def quantile80_upper(x, w=None):
+    return np.quantile(x, q=0.8, method="higher")
+
+
+quantile80_upper.loss = PinballLoss(level=0.8)
+
+
+def gpava_mean(x, w=None):
+    return gpava(mean_fun, x, w)
+
+
+@pytest.mark.parametrize("pava", [pava, gpava_mean])
+def test_pava_simple(pava):
     # Test case of Busing 2020
     # https://doi.org/10.18637/jss.v102.c01
     y = [8, 4, 8, 2, 2, 0, 8]
@@ -26,12 +68,137 @@ def test_pava_simple():
     assert_array_equal(r, [0, 5, 7])
 
 
-def test_pava_weighted():
+@pytest.mark.parametrize("pava", [pava, gpava_mean])
+def test_pava_weighted(pava):
     y = [8, 4, 8, 2, 2, 0, 8]
     w = [1, 2, 3, 4, 5, 5, 4]
     x, r = pava(y, w)
     assert_array_equal(x, [2.9, 2.9, 2.9, 2.9, 2.9, 2.9, 8])
     assert_array_equal(r, [0, 6, 7])
+
+
+@pytest.mark.parametrize(
+    ("y", "fun_lower", "x_lower", "fun_upper", "x_upper"),
+    [
+        (
+            [8, 4, 8, 2, 2, 0, 8],
+            median_lower,
+            [2, 2, 2, 2, 2, 2, 8],
+            median_upper,
+            [4, 4, 4, 4, 4, 4, 8],
+        ),
+        (
+            [9, 1, 8, 2, 7, 3, 6],
+            median_lower,
+            [1, 1, 2, 2, 3, 3, 6],
+            median_upper,
+            [6, 6, 6, 6, 6, 6, 6],
+        ),
+        (
+            [9, 1, 8, 4, -2, 8, 6],
+            median_lower,
+            [1, 1, 4, 4, 4, 6, 6],
+            median_upper,
+            [4, 4, 4, 4, 4, 8, 8],
+        ),
+        (
+            [8, 4, 8, 2, 2, 0, 8],
+            quantile80_lower,
+            [8, 8, 8, 8, 8, 8, 8],
+            quantile80_upper,
+            [8, 8, 8, 8, 8, 8, 8],
+        ),
+        (
+            [9, 1, 8, 2, 7, 3, 6],
+            quantile80_lower,
+            [8, 8, 8, 8, 8, 8, 8],
+            quantile80_upper,
+            [8, 8, 8, 8, 8, 8, 8],
+        ),
+        (
+            [9, 1, 8, 4, -2, 8, 6],
+            quantile80_lower,
+            [8, 8, 8, 8, 8, 8, 8],
+            quantile80_upper,
+            [8, 8, 8, 8, 8, 8, 8],
+        ),
+        (
+            [8, 4, 4, 4, 0, 8, 2, 2, 2, 0, 8],
+            median_lower,
+            [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 8],
+            median_upper,
+            [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 8],
+        ),
+    ],
+)
+def test_gpava_simple(y, fun_lower, x_lower, fun_upper, x_upper):
+    w = np.ones_like(y)
+    xl, rl = gpava(fun_lower, y, w)
+    xu, ru = gpava(fun_upper, y, w)
+    for i in range(len(xl) - 1):
+        # Eq. 10 of Jordan et al. https://doi.org/10.1007/s10463-021-00808-0
+        assert xl[i] <= xu[i + 1]
+
+    # Check manually precomputed values.
+    assert_array_equal(xl, x_lower)
+    assert_array_equal(xu, x_upper)
+
+    # Check that it is a minimum.
+    loss_lower = fun_lower.loss(y_obs=y, y_pred=xl)
+    loss_upper = fun_lower.loss(y_obs=y, y_pred=xu)
+    assert loss_lower == pytest.approx(loss_upper)
+
+    def objective(y_pred, y_obs):
+        return fun_lower.loss(y_obs=y_obs, y_pred=y_pred)
+
+    def constraint(y_pred, y_obs):
+        # This is for a monotonically increasing regression.
+        return np.diff(y_pred)
+
+    result = minimize(
+        fun=objective,
+        x0=y,
+        args=(y,),
+        constraints=[{"type": "ineq", "fun": lambda x: constraint(x, y)}],
+        tol=1e-10,
+    )
+
+    assert result.fun == pytest.approx(loss_lower)
+
+    # Check that is is the boundary of solutions.
+    eps = 1e-10 * np.mean(xl)
+    for i in range(len(xl)):
+        x = np.array(xl, copy=True, dtype=float)
+        if i == 0 or x[i] > x[i - 1]:
+            x[i] -= eps
+            assert fun_lower.loss(y_obs=y, y_pred=x) > loss_lower
+
+        x = np.array(xu, copy=True, dtype=float)
+        if i == len(xl) - 1 or x[i] < x[i + 1]:
+            x[i] += eps
+            assert fun_upper.loss(y_obs=y, y_pred=x) > loss_upper
+
+
+@pytest.mark.parametrize(
+    ("functional", "level", "msg"),
+    [
+        ("no good functional", 0.5, "Argument functional must be one of"),
+        ("quantile", 0, "Argument level must fulfil 0 < level < 1"),
+        ("quantile", 1, "Argument level must fulfil 0 < level < 1"),
+        ("quantile", 1.1, "Argument level must fulfil 0 < level < 1"),
+    ],
+)
+def test_isotonic_regression_raises(functional, level, msg):
+    y, w = np.arange(5), np.arange(5)
+    with pytest.raises(ValueError, match=msg):
+        isotonic_regression(y=y, weights=w, functional=functional, level=level)
+
+
+def test_isotonic_regression_raises_weighted_quantile():
+    y, w = np.arange(5), np.arange(5)
+    msg = "Weighted quantile"
+    with pytest.raises(NotImplementedError, match=msg):
+        isotonic_regression(y=y, weights=w, functional="quantile", level=0.5)
 
 
 @pytest.mark.parametrize("w", [None, np.ones(7)])
@@ -43,6 +210,25 @@ def test_simple_isotonic_regression(w):
     assert_almost_equal(x, [4, 4, 4, 4, 4, 4, 8])
     assert_almost_equal(np.add.reduceat(np.ones_like(y), r[:-1]), [6, 1])
     assert_almost_equal(r, [0, 6, 7])
+    # Assert that y was not overwritten
+    assert_array_equal(y, np.array([8, 4, 8, 2, 2, 0, 8], dtype=np.float64))
+
+
+@pytest.mark.parametrize(
+    ("functional", "level", "x_res", "r_res"),
+    [
+        ("mean", None, [4, 4, 4, 4, 4, 4, 8], [0, 6, 7]),
+        ("quantile", 0.5, [3, 3, 3, 3, 3, 3, 8], [0, 6, 7]),
+        ("quantile", 0.8, [8, 8, 8, 8, 8, 8, 8], [0, 7]),
+    ],
+)
+def test_simple_isotonic_regression_functionals(functional, level, x_res, r_res):
+    # Test case of Busing 2020
+    # https://doi.org/10.18637/jss.v102.c01
+    y = np.array([8, 4, 8, 2, 2, 0, 8], dtype=np.float64)
+    x, r = isotonic_regression(y, functional=functional, level=level)
+    assert_almost_equal(x, x_res)
+    assert_almost_equal(r, r_res)
     # Assert that y was not overwritten
     assert_array_equal(y, np.array([8, 4, 8, 2, 2, 0, 8], dtype=np.float64))
 
