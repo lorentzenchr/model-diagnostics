@@ -234,6 +234,8 @@ def test_simple_isotonic_regression(w):
         ("mean", None, [4, 4, 4, 4, 4, 4, 8], [0, 6, 7]),
         ("quantile", 0.5, [3, 3, 3, 3, 3, 3, 8], [0, 6, 7]),
         ("quantile", 0.8, [8, 8, 8, 8, 8, 8, 8], [0, 7]),
+        ("expectile", 0.5, [4, 4, 4, 4, 4, 4, 8], [0, 6, 7]),
+        ("expectile", 0.8, [6, 6, 6, 6, 6, 6, 8], [0, 6, 7]),
     ],
 )
 def test_simple_isotonic_regression_functionals(functional, level, x_res, r_res):
