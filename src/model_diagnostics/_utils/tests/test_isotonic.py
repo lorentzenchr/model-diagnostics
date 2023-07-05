@@ -201,6 +201,20 @@ def test_isotonic_regression_raises_weighted_quantile():
         isotonic_regression(y=y, weights=w, functional="quantile", level=0.5)
 
 
+@pytest.mark.parametrize(
+    ("weights", "msg"),
+    [
+        ([0, 1, 2], "Input arrays y and w must have one dimension of equal length."),
+        ([0, -1], "Weights w must be strictly positive."),
+    ],
+)
+def test_isotonic_regression_raises_weight_array_validation(weights, msg):
+    """Test input validation of weight array."""
+    y = [0, 1]
+    with pytest.raises(ValueError, match=msg):
+        isotonic_regression(y=y, weights=weights)
+
+
 @pytest.mark.parametrize("w", [None, np.ones(7)])
 def test_simple_isotonic_regression(w):
     # Test case of Busing 2020
