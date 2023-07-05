@@ -11,35 +11,35 @@ def mean_fun(x, w):
     return np.average(x, weights=w)
 
 
-mean_fun.functional = SquaredError()
+mean_fun.loss = SquaredError()  # type: ignore
 
 
 def median_lower(x, w=None):
     return np.quantile(x, q=0.5, method="inverted_cdf")
 
 
-median_lower.loss = PinballLoss(level=0.5)
+median_lower.loss = PinballLoss(level=0.5)  # type: ignore
 
 
 def median_upper(x, w=None):
     return np.quantile(x, q=0.5, method="higher")
 
 
-median_upper.loss = PinballLoss(level=0.5)
+median_upper.loss = PinballLoss(level=0.5)  # type: ignore
 
 
 def quantile80_lower(x, w=None):
     return np.quantile(x, q=0.8, method="inverted_cdf")
 
 
-quantile80_lower.loss = PinballLoss(level=0.8)
+quantile80_lower.loss = PinballLoss(level=0.8)  # type: ignore
 
 
 def quantile80_upper(x, w=None):
     return np.quantile(x, q=0.8, method="higher")
 
 
-quantile80_upper.loss = PinballLoss(level=0.8)
+quantile80_upper.loss = PinballLoss(level=0.8)  # type: ignore
 
 
 def gpava_mean(x, w=None):
