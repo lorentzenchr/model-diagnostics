@@ -8,7 +8,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 from scipy.stats import bootstrap
-from sklearn.isotonic import IsotonicRegression
+from sklearn.isotonic import IsotonicRegression as IsotonicRegression_skl
 
 from model_diagnostics._utils._array import (
     array_name,
@@ -17,6 +17,7 @@ from model_diagnostics._utils._array import (
     get_sorted_array_names,
     length_of_second_dimension,
 )
+from model_diagnostics._utils.isotonic import IsotonicRegression
 
 from .identification import compute_bias
 
@@ -26,6 +27,8 @@ def plot_reliability_diagram(
     y_pred: npt.ArrayLike,
     weights: Optional[npt.ArrayLike] = None,
     *,
+    functional: str = "mean",
+    level: float = 0.5,
     n_bootstrap: Optional[str] = None,
     confidence_level: float = 0.9,
     diagram_type: str = "reliability",
@@ -49,6 +52,17 @@ def plot_reliability_diagram(
         Predicted values of the conditional expectation of Y, `E(Y|X)`.
     weights : array-like of shape (n_obs) or None
         Case weights.
+    functional : str
+        The functional that is induced by the identification function `V`. Options are:
+        - `"mean"`. Argument `level` is neglected.
+        - `"median"`. Argument `level` is neglected.
+        - `"expectile"`
+        - `"quantile"`
+    level : float
+        The level of the expectile or quantile. (Often called \(\alpha\).)
+        It must be `0 <= level <= 1`.
+        `level=0.5` and `functional="expectile"` gives the mean.
+        `level=0.5` and `functional="quantile"` gives the median.
     n_bootstrap : int or None
         If not `None`, then `scipy.stats.bootstrap` with `n_resamples=n_bootstrap`
         is used to calculate confidence intervals at level `confidence_level`.
@@ -117,14 +131,23 @@ def plot_reliability_diagram(
         ax.hlines(0, xmin=y_min, xmax=y_max, color="k", linestyle="dotted")
 
     if n_bootstrap is not None:
+        if functional == "mean":
 
-        def iso_statistic(y_obs, y_pred, weights=None, x_values=None):
-            iso_b = (
-                IsotonicRegression(out_of_bounds="clip")
-                .set_output(transform="default")
-                .fit(y_pred, y_obs, sample_weight=weights)
-            )
-            return iso_b.predict(x_values)
+            def iso_statistic(y_obs, y_pred, weights=None, x_values=None):
+                iso_b = (
+                    IsotonicRegression_skl(out_of_bounds="clip")
+                    .set_output(transform="default")
+                    .fit(y_pred, y_obs, sample_weight=weights)
+                )
+                return iso_b.predict(x_values)
+
+        else:
+
+            def iso_statistic(y_obs, y_pred, weights=None, x_values=None):
+                iso_b = IsotonicRegression(functional=functional, level=level).fit(
+                    y_pred, y_obs, sample_weight=weights
+                )
+                return iso_b.predict(x_values)
 
     n_pred = length_of_second_dimension(y_pred)
     pred_names, _ = get_sorted_array_names(y_pred)
@@ -132,11 +155,16 @@ def plot_reliability_diagram(
     for i in range(len(pred_names)):
         y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
 
-        iso = (
-            IsotonicRegression()
-            .set_output(transform="default")
-            .fit(y_pred_i, y_obs, sample_weight=weights)
-        )
+        if functional == "mean":
+            iso = (
+                IsotonicRegression_skl()
+                .set_output(transform="default")
+                .fit(y_pred_i, y_obs, sample_weight=weights)
+            )
+        else:
+            iso = IsotonicRegression(functional=functional, level=level).fit(
+                y_pred_i, y_obs, sample_weight=weights
+            )
 
         # confidence intervals
         if n_bootstrap is not None:
@@ -229,20 +257,20 @@ def plot_bias(
         Predicted values of the conditional expectation of Y, `E(Y|X)`.
     feature : array-like of shape (n_obs) or None
         Some feature column.
-    functional : str
-        The functional that is induced by the identification function `V`. Options are:
-        - `"mean"`. Argument `level` is neglected.
-        - `"median"`. Argument `level` is neglected.
-        - `"expectile"`
-        - `"quantile"`
     weights : array-like of shape (n_obs) or None
         Case weights. If given, the bias is calculated as weighted average of the
         identification function with these weights.
         Note that the standard errors and p-values in the output are based on the
         assumption that the variance of the bias is inverse proportional to the
         weights. See the Notes section for details.
+    functional : str
+        The functional that is induced by the identification function `V`. Options are:
+        - `"mean"`. Argument `level` is neglected.
+        - `"median"`. Argument `level` is neglected.
+        - `"expectile"`
+        - `"quantile"`
     level : float
-        The level of the expectile of quantile. (Often called \(\alpha\).)
+        The level of the expectile or quantile. (Often called \(\alpha\).)
         It must be `0 <= level <= 1`.
         `level=0.5` and `functional="expectile"` gives the mean.
         `level=0.5` and `functional="quantile"` gives the median.
