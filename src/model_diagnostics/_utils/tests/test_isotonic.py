@@ -1,9 +1,15 @@
 import numpy as np
 import pytest
-from numpy.testing import assert_almost_equal, assert_array_equal
+from numpy.testing import assert_allclose, assert_array_equal
 from scipy.optimize import minimize
+from sklearn.isotonic import IsotonicRegression as skl_IsotonicRegression
 
-from model_diagnostics._utils.isotonic import gpava, isotonic_regression, pava
+from model_diagnostics._utils.isotonic import (
+    IsotonicRegression,
+    gpava,
+    isotonic_regression,
+    pava,
+)
 from model_diagnostics.scoring import PinballLoss, SquaredError
 
 
@@ -221,9 +227,9 @@ def test_simple_isotonic_regression(w):
     # https://doi.org/10.18637/jss.v102.c01
     y = np.array([8, 4, 8, 2, 2, 0, 8], dtype=np.float64)
     x, r = isotonic_regression(y, w)
-    assert_almost_equal(x, [4, 4, 4, 4, 4, 4, 8])
-    assert_almost_equal(np.add.reduceat(np.ones_like(y), r[:-1]), [6, 1])
-    assert_almost_equal(r, [0, 6, 7])
+    assert_allclose(x, [4, 4, 4, 4, 4, 4, 8])
+    assert_allclose(np.add.reduceat(np.ones_like(y), r[:-1]), [6, 1])
+    assert_allclose(r, [0, 6, 7])
     # Assert that y was not overwritten
     assert_array_equal(y, np.array([8, 4, 8, 2, 2, 0, 8], dtype=np.float64))
 
@@ -243,8 +249,8 @@ def test_simple_isotonic_regression_functionals(functional, level, x_res, r_res)
     # https://doi.org/10.18637/jss.v102.c01
     y = np.array([8, 4, 8, 2, 2, 0, 8], dtype=np.float64)
     x, r = isotonic_regression(y, functional=functional, level=level)
-    assert_almost_equal(x, x_res)
-    assert_almost_equal(r, r_res)
+    assert_allclose(x, x_res)
+    assert_allclose(r, r_res)
     # Assert that y was not overwritten
     assert_array_equal(y, np.array([8, 4, 8, 2, 2, 0, 8], dtype=np.float64))
 
@@ -254,7 +260,7 @@ def test_linspace(increasing):
     n = 10
     y = np.linspace(0, 1, n) if increasing else np.linspace(1, 0, n)
     x, r = isotonic_regression(y, increasing=increasing)
-    assert_almost_equal(x, y)
+    assert_allclose(x, y)
     assert_array_equal(r, np.arange(n + 1))
 
 
@@ -262,8 +268,8 @@ def test_weights():
     w = np.array([1, 2, 5, 0.5, 0.5, 0.5, 1, 3])
     y = np.array([3, 2, 1, 10, 9, 8, 20, 10])
     x, r = isotonic_regression(y, w)
-    assert_almost_equal(x, [12 / 8, 12 / 8, 12 / 8, 9, 9, 9, 50 / 4, 50 / 4])
-    assert_almost_equal(np.add.reduceat(w, r[:-1]), [8, 1.5, 4])
+    assert_allclose(x, [12 / 8, 12 / 8, 12 / 8, 9, 9, 9, 50 / 4, 50 / 4])
+    assert_allclose(np.add.reduceat(w, r[:-1]), [8, 1.5, 4])
     assert_array_equal(r, [0, 3, 6, 8])
 
     # weights are like repeated observations, we repeat the 3rd element 5
@@ -271,9 +277,9 @@ def test_weights():
     w2 = np.array([1, 2, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5, 1, 3])
     y2 = np.array([3, 2, 1, 1, 1, 1, 1, 10, 9, 8, 20, 10])
     x2, r2 = isotonic_regression(y2, w2)
-    assert_almost_equal(np.diff(x2[0:7]), 0)
-    assert_almost_equal(x2[4:], x)
-    assert_almost_equal(np.add.reduceat(w2, r2[:-1]), np.add.reduceat(w, r[:-1]))
+    assert_allclose(np.diff(x2[0:7]), 0)
+    assert_allclose(x2[4:], x)
+    assert_allclose(np.add.reduceat(w2, r2[:-1]), np.add.reduceat(w, r[:-1]))
     assert_array_equal(r2 - [0, 4, 4, 4], r)
 
 
@@ -296,7 +302,7 @@ def test_against_R_monotone():
         6.6666667,
         6.6666667,
     ]
-    assert_almost_equal(x, res)
+    assert_allclose(x, res)
     assert_array_equal(r, [0, 1, 7, 10])
 
     n = 100
@@ -409,15 +415,56 @@ def test_against_R_monotone():
         4.8656413,
         4.8656413,
     ]
-    assert_almost_equal(x, res)
+    assert_allclose(x, res, rtol=2e-7)
 
     # Test increasing
     assert np.all(np.diff(x) >= 0)
 
     # Test balance property: sum(y) == sum(x)
-    assert_almost_equal(np.sum(x), np.sum(y))
+    assert_allclose(np.sum(x), np.sum(y))
 
     # Reverse order
     x, rinv = isotonic_regression(-y, increasing=False)
-    assert_almost_equal(-x, res)
+    assert_allclose(-x, res, rtol=2e-7)
     assert_array_equal(rinv, r)
+
+
+@pytest.mark.parametrize("increasing", [True, False])
+def test_isotonic_regression_class(increasing):
+    """Test that IsotonicRegression gives the same as the scikit-learn version."""
+    X = [0, 2, 4, -1, -2, 3, 2, 2, 1, 4]
+    y = np.arange(10)
+    m_skl = skl_IsotonicRegression(increasing=increasing, out_of_bounds="clip").fit(
+        X, y
+    )
+    m = IsotonicRegression(increasing=increasing).fit(X, y)
+
+    assert_allclose(m.X_thresholds_, m_skl.X_thresholds_)
+    assert_allclose(m.y_thresholds_, m_skl.y_thresholds_)
+
+    assert m.X_thresholds_[0] == m_skl.X_min_
+    assert m.X_thresholds_[-1] == m_skl.X_max_
+
+    X_pred = [-10, -2, 1, 2.5, 10]
+    assert_allclose(m.predict(X_pred), m_skl.predict(X_pred))
+
+    m_exp = IsotonicRegression(increasing=increasing, functional="expectile").fit(X, y)
+    assert_allclose(m.X_thresholds_, m_exp.X_thresholds_)
+    assert_allclose(m.y_thresholds_, m_exp.y_thresholds_)
+    assert_allclose(m.predict(X_pred), m_exp.predict(X_pred))
+
+
+def test_isotonic_regression_class_median():
+    """Test IsotonicRegression for median regression."""
+    rng = np.random.default_rng(42)
+    # Test case of Busing 2020
+    # https://doi.org/10.18637/jss.v102.c01
+    y = np.array([8, 4, 8, 2, 2, 0, 8], dtype=np.float64)
+    y_iso = np.array([3, 3, 3, 3, 3, 3, 8])
+    X = np.arange(len(y))
+    idx = rng.permutation(X)
+
+    m = IsotonicRegression(functional="quantile", level=0.5).fit(X[idx], y[idx])
+    assert_allclose(m.X_thresholds_, [0, 5, 6])
+    assert_allclose(m.y_thresholds_, [3, 3, 8])
+    assert_allclose(m.predict(X), y_iso)

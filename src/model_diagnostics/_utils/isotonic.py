@@ -2,9 +2,11 @@ from typing import Callable, Optional
 
 import numpy as np
 import numpy.typing as npt
+import polars as pl
+from scipy.interpolate import interp1d
 from scipy.stats import expectile
 
-from ._array import validate_2_arrays
+from ._array import length_of_second_dimension, validate_2_arrays
 
 
 def pava(
@@ -300,7 +302,7 @@ def isotonic_regression(
     x : (n_obs,) ndarray
         Isotonic regression solution, i.e. an increasing (or decresing) array
         of the same length than y.
-    r : (n_blokcs+1,) ndarray
+    r : (n_blocks+1,) ndarray
         Array of indices with the start position of each block / pool B.
         For the j-th block, all values of `x[r[j]:r[j+1]]` are the same.
 
@@ -395,3 +397,144 @@ def isotonic_regression(
         x = x[::-1]
         r = r[-1] - r[::-1]
     return x, r
+
+
+class IsotonicRegression:
+    """Isotonic regression model.
+
+    Parameters
+    ----------
+    increasing : bool or 'auto', default=True
+        Determines whether the predictions should be constrained to increase
+        or decrease with `X`. 'auto' will decide based on the Spearman
+        correlation estimate's sign.
+    functional : str
+        The functional that is induced by the identification function `V`. Options are:
+        - `"mean"`. Argument `level` is neglected.
+        - `"median"`. Argument `level` is neglected.
+        - `"expectile"`
+        - `"quantile"`
+    level : float
+        The level of the expectile or quantile. (Often called \\(\alpha\\).)
+        It must be `0 <= level <= 1`.
+        `level=0.5` and `functional="expectile"` gives the mean.
+        `level=0.5` and `functional="quantile"` gives the median.
+
+    Attributes
+    ----------
+    X_thresholds_ : ndarray of shape (n_thresholds,)
+        Unique ascending `X` values used to interpolate
+        the y = f(X) monotonic function.
+
+    y_thresholds_ : ndarray of shape (n_thresholds,)
+        De-duplicated `y` values suitable to interpolate the y = f(X)
+        monotonic function.
+
+    f_ : function
+        The stepwise interpolating function that covers the input domain ``X``.
+
+    increasing_ : bool
+        Inferred value for ``increasing``.
+    """
+
+    def __init__(
+        self,
+        *,
+        increasing: bool = True,
+        functional: str = "mean",
+        level: float = 0.5,
+    ):
+        self.increasing = increasing
+        self.functional = functional
+        self.level = level
+
+    def fit(
+        self,
+        X: npt.ArrayLike,
+        y: npt.ArrayLike,
+        sample_weight: Optional[npt.ArrayLike] = None,
+    ):
+        """Fit the model using X, y as training data.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples,) or (n_samples, 1)
+            Training data.
+
+        y : array-like of shape (n_samples,)
+            Training target.
+
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights. If set to None, all weights will be set to 1 (equal
+            weights).
+
+        Returns
+        -------
+        self : object
+            Returns an instance of self.
+        """
+        if (n_cols := length_of_second_dimension(X)) >= 2:
+            msg = f"X must have only one colume, got X.shape[1] = {n_cols}."
+            raise ValueError(msg)
+        if n_cols == 1:
+            X = np.asarray(X)[:, 0]
+        df = pl.DataFrame({"_X": X, "_target_y": y})
+        if sample_weight is not None:
+            df = df.hstack([pl.Series(name="_weights", values=sample_weight)])
+        # We deal with duplicate values in X by also sorting y.
+        df = df.sort(by=["_X", "_target_y"], descending=[False, self.increasing])
+        yy = df["_target_y"].to_numpy()
+        wy = df["_weights"].to_numpy() if sample_weight is not None else None
+
+        y_iso, r = isotonic_regression(
+            y=yy,
+            weights=wy,
+            increasing=self.increasing,
+            functional=self.functional,
+            level=self.level,
+        )
+
+        X_sorted = df.get_column("_X")
+        idx_list = [r[0]]
+        for i in range(1, len(r) - 1):
+            # Check previous block has more than one element.
+            if r[i] - 1 - r[i - 1] >= 1:
+                idx_list.append(r[i] - 1)
+            idx_list.append(r[i])
+        # FIXME: Older versions of polars don't allow numpy integers as indices.
+        if (X_sorted[int(r[-1] - 1)] != X_sorted[int(r[-2])]) and (
+            y_iso[0] == y_iso[-1] or r[-1] - 1 - r[-2] >= 1
+        ):
+            # In case all y values are the same, we include this index.
+            idx_list.append(r[-1] - 1)
+        idx = np.asarray(idx_list)
+
+        # Almost the same, might have some duplicates:
+        # idx = np.sort(np.r_[r[:-1], r[1:] - 1])
+
+        self.X_thresholds_, self.y_thresholds_ = X_sorted[idx].to_numpy(), y_iso[idx]
+
+        # Build the interpolation function
+        self.f_ = interp1d(
+            self.X_thresholds_,
+            self.y_thresholds_,
+            kind="linear",
+            bounds_error=False,
+            fill_value=(self.y_thresholds_[0], self.y_thresholds_[-1]),
+        )
+        return self
+
+    def predict(self, X):
+        """Predict new data by linear interpolation.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples,) or (n_samples, 1)
+            Data to predict.
+
+        Returns
+        -------
+        y_pred : ndarray of shape (n_samples,)
+            Transformed data.
+        """
+        return self.f_(X)
