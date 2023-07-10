@@ -28,11 +28,10 @@ def plot_murphy_diagram(
 ):
     r"""Plot a Murphy diagram.
 
-    A reliability diagram or calibration curve assesses auto-calibration. It plots the
-    conditional expectation given the predictions `E(y_obs|y_pred)` (y-axis) vs the
-    predictions `y_pred` (x-axis).
-    The conditional expectation is estimated via isotonic regression (PAV algorithm)
-    of `y_obs` on `y_pred`.
+    A Murphy diagram plots the scores of elementary scoring functions `ElementaryScore`
+    over a range of their free parameter `eta`. This shows, if a model dominates all
+    others over a wide class of scoring functions or if the ranking is very much
+    dependent on the choice of scoring function.
     See Notes for further details.
 
     Parameters
@@ -67,16 +66,7 @@ def plot_murphy_diagram(
 
     Notes
     -----
-    The expectation conditional on the predictions is \(E(Y|y_{pred})\). This object is
-    estimated by the pool-adjacent violator (PAV) algorithm, which has very desirable
-    properties:
-
-        - It is non-parametric without any tuning parameter. Thus, the results are
-          easily reproducible.
-        - Optimal selection of bins
-        - Statistical consistent estimator
-
-    For details, refer to [Dimitriadis2021].
+    For details, refer to [Ehm2015].
 
     References
     ----------
