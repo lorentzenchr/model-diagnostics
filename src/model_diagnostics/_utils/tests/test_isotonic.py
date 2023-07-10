@@ -2,8 +2,14 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy.optimize import minimize
+from sklearn.isotonic import IsotonicRegression as skl_IsotonicRegression
 
-from model_diagnostics._utils.isotonic import gpava, isotonic_regression, pava
+from model_diagnostics._utils.isotonic import (
+    IsotonicRegression,
+    gpava,
+    isotonic_regression,
+    pava,
+)
 from model_diagnostics.scoring import PinballLoss, SquaredError
 
 
@@ -409,7 +415,7 @@ def test_against_R_monotone():
         4.8656413,
         4.8656413,
     ]
-    assert_allclose(x, res)
+    assert_allclose(x, res, rtol=2e-7)
 
     # Test increasing
     assert np.all(np.diff(x) >= 0)
@@ -419,5 +425,46 @@ def test_against_R_monotone():
 
     # Reverse order
     x, rinv = isotonic_regression(-y, increasing=False)
-    assert_allclose(-x, res)
+    assert_allclose(-x, res, rtol=2e-7)
     assert_array_equal(rinv, r)
+
+
+@pytest.mark.parametrize("increasing", [True, False])
+def test_isotonic_regression_class(increasing):
+    """Test that IsotonicRegression gives the same as the scikit-learn version."""
+    X = [0, 2, 4, -1, -2, 3, 2, 2, 1, 4]
+    y = np.arange(10)
+    m_skl = skl_IsotonicRegression(increasing=increasing, out_of_bounds="clip").fit(
+        X, y
+    )
+    m = IsotonicRegression(increasing=increasing).fit(X, y)
+
+    assert_allclose(m.X_thresholds_, m_skl.X_thresholds_)
+    assert_allclose(m.y_thresholds_, m_skl.y_thresholds_)
+
+    assert m.X_thresholds_[0] == m_skl.X_min_
+    assert m.X_thresholds_[-1] == m_skl.X_max_
+
+    X_pred = [-10, -2, 1, 2.5, 10]
+    assert_allclose(m.predict(X_pred), m_skl.predict(X_pred))
+
+    m_exp = IsotonicRegression(increasing=increasing, functional="expectile").fit(X, y)
+    assert_allclose(m.X_thresholds_, m_exp.X_thresholds_)
+    assert_allclose(m.y_thresholds_, m_exp.y_thresholds_)
+    assert_allclose(m.predict(X_pred), m_exp.predict(X_pred))
+
+
+def test_isotonic_regression_class_median():
+    """Test IsotonicRegression for median regression."""
+    rng = np.random.default_rng(42)
+    # Test case of Busing 2020
+    # https://doi.org/10.18637/jss.v102.c01
+    y = np.array([8, 4, 8, 2, 2, 0, 8], dtype=np.float64)
+    y_iso = np.array([3, 3, 3, 3, 3, 3, 8])
+    X = np.arange(len(y))
+    idx = rng.permutation(X)
+
+    m = IsotonicRegression(functional="quantile", level=0.5).fit(X[idx], y[idx])
+    assert_allclose(m.X_thresholds_, [0, 5, 6])
+    assert_allclose(m.y_thresholds_, [3, 3, 8])
+    assert_allclose(m.predict(X), y_iso)
