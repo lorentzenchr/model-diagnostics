@@ -282,7 +282,7 @@ class MockSFFunctional:
     functional = "XXX"
     level = 0.2
 
-    def __call__(self, y_obs, y_pred, weights=None):
+    def __call__(self, y_obs, y_pred, weights=None):  # pragma: no cover
         return y_obs
 
 
@@ -290,7 +290,7 @@ class MockSFLevel:
     functional = "quantile"
     level = 99
 
-    def __call__(self, y_obs, y_pred, weights=None):
+    def __call__(self, y_obs, y_pred, weights=None):  # pragma: no cover
         return y_obs
 
 
@@ -298,6 +298,8 @@ class MockSFLevel:
     ("sf", "functional", "level", "msg"),
     [
         (SquaredError(), None, None, None),
+        (HES(level=0.1), None, None, None),
+        (HQS(degree=1, level=0.1), None, None, None),
         (PinballLoss(), None, 99, "The level must fulfil 0 < level < 1, got 99."),
         (
             lambda y, z, w: np.mean((y - z) ** 2),
@@ -339,6 +341,18 @@ def test_decompose_raises(sf, functional, level, msg):
                 functional=functional,
                 level=level,
             )
+
+
+@pytest.mark.parametrize("weights", ["not an array", [1]])
+def test_decompose_raises_for_wrong_weights(weights):
+    msg = "The two array-like objects don't have the same lengt"
+    with pytest.raises(ValueError, match=msg):
+        decompose(
+            scoring_function=SquaredError(),
+            y_obs=[0, 1],
+            y_pred=[1, 2],
+            weights=weights,
+        )
 
 
 def test_decompose_with_numbers():
