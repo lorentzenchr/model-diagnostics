@@ -378,14 +378,24 @@ def isotonic_regression(
         x, r = gpava(expectile_fun, x, wx)
     elif functional == "quantile":
 
-        def quantile_lower(x, wx):
+        def quantile_lower(x, wx=None):
             return np.quantile(x, level, method="inverted_cdf")
 
-        def quantile_upper(x, wx):
-            return np.quantile(x, level, method="higher")
+        def quantile_upper(x, wx=None):
+            # np.quantile(x, level, method="higher") is not the same as
+            return -np.quantile(-x, 1 - level, method="inverted_cdf")
 
         xl, rl = gpava(quantile_lower, x, wx)
-        xu, ru = gpava(quantile_upper, x, wx)
+        # Applying gpava on fun=np.quantile(x, level, method="higher") does not work
+        # for unknown reasons. What works is to calculate the upper quantile on the
+        # blocks given by rl from the lower quantile.
+        q = np.fromiter(
+            (quantile_upper(x[rl[i] : rl[i + 1]]) for i in range(len(rl) - 1)),
+            dtype=xl.dtype,
+        )
+        # Take mininum from the right.
+        q = np.minimum.accumulate(q[::-1])[::-1]
+        xu = np.repeat(q, np.diff(rl))
         # We are free to use any value in the interval [xl, xu], as long as it is
         # increasing. We choose the midpoint.
         x = 0.5 * (xl + xu)
@@ -481,7 +491,8 @@ class IsotonicRegression:
         df = pl.DataFrame({"_X": X, "_target_y": y})
         if sample_weight is not None:
             df = df.hstack([pl.Series(name="_weights", values=sample_weight)])
-        # We deal with duplicate values in X by also sorting y.
+        # We deal with duplicate values in X, aka ties, by also sorting y, but in
+        # reverse order.
         df = df.sort(by=["_X", "_target_y"], descending=[False, self.increasing])
         yy = df["_target_y"].to_numpy()
         wy = df["_weights"].to_numpy() if sample_weight is not None else None
