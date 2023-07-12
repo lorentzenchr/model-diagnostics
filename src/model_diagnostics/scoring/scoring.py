@@ -9,12 +9,14 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 from scipy import special
-from sklearn.isotonic import IsotonicRegression
+from scipy.stats import expectile
+from sklearn.isotonic import IsotonicRegression as IsotonicRegression_skl
 
 from model_diagnostics._utils._array import (
     validate_2_arrays,
     validate_same_first_dimension,
 )
+from model_diagnostics._utils.isotonic import IsotonicRegression
 from model_diagnostics.calibration import identification_function
 
 
@@ -787,8 +789,16 @@ def decompose(
                     "level."
                 )
                 raise ValueError(msg)
-    if not (functional == "mean" or (functional == "expectile" and level == 0.5)):
-        msg = f"The given {functional=} and {level=} are not supported (yet)."
+
+    allowed_functionals = ("mean", "median", "expectile", "quantile")
+    if functional not in allowed_functionals:
+        msg = (
+            f"The functional must be one of {allowed_functionals}, got "
+            f"{functional}."
+        )
+        raise ValueError(msg)
+    if functional in ("expectile", "quantile") and (level <= 0 or level >= 1):
+        msg = f"The level must fulfil 0 < level < 1, got {level}."
         raise ValueError(msg)
 
     y: np.ndarray
@@ -800,9 +810,20 @@ def decompose(
         validate_same_first_dimension(weights, y)
         w = np.asarray(weights)  # needed to satisfy mypy
 
-    iso = IsotonicRegression(y_min=None, y_max=None).fit(z, y, sample_weight=w)
+    if functional == "mean":
+        iso = IsotonicRegression_skl(y_min=None, y_max=None).fit(z, y, sample_weight=w)
+        marginal = np.average(y, weights=w)
+    else:
+        iso = IsotonicRegression(functional=functional, level=level).fit(
+            z, y, sample_weight=w
+        )
+        if functional == "expectile":
+            marginal = expectile(y, alpha=level, weights=w)
+        elif functional == "quantile":
+            marginal = np.quantile(y, q=level, method="inverted_cdf")
+
+    marginal = np.full(shape=y.shape, fill_value=marginal)
     recalibrated = np.squeeze(iso.predict(z))
-    marginal = np.full(shape=y.shape, fill_value=np.average(y, weights=w))
 
     score = scoring_function(y, z, w)
     score_recalibrated = scoring_function(y, recalibrated, w)
