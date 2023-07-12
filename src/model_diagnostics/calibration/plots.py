@@ -320,7 +320,7 @@ def plot_bias(
             "shown for that y_pred/model, despite the fact that with_errorbars was "
             "set to True."
         )
-        warnings.warn(msg, UserWarning)
+        warnings.warn(msg, UserWarning, stacklevel=2)
 
     if "model_" in df.columns:
         col_model = "model_"
