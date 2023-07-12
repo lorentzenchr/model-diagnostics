@@ -316,7 +316,7 @@ def compute_bias(
                         "Due to ties, the effective number of bins is 0. "
                         f"Consider to increase n_bins>={n_bins_tmp}."
                     )
-                    warnings.warn(msg, UserWarning)
+                    warnings.warn(msg, UserWarning, stacklevel=2)
             else:
                 # Binning
                 # We use method="inverted_cdf" (same as "lower") instead of the
