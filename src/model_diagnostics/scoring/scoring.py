@@ -778,11 +778,10 @@ def decompose(
             )
             raise ValueError(msg)
     if level is None:
-        if functional == "mean":
-            level = 0.5
-        elif functional in ("expectile", "quantile"):
+        level = 0.5
+        if functional in ("expectile", "quantile"):
             if hasattr(scoring_function, "level"):
-                level = scoring_function.level
+                level = float(scoring_function.level)
             else:
                 msg = (
                     "You set level=None, but scoring_function has no attribute "
