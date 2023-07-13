@@ -28,7 +28,7 @@ median_lower.loss = PinballLoss(level=0.5)  # type: ignore
 
 
 def median_upper(x, w=None):
-    return np.quantile(x, q=0.5, method="higher")
+    return -np.quantile(-np.asarray(x), q=0.5, method="inverted_cdf")
 
 
 median_upper.loss = PinballLoss(level=0.5)  # type: ignore
@@ -42,10 +42,24 @@ quantile80_lower.loss = PinballLoss(level=0.8)  # type: ignore
 
 
 def quantile80_upper(x, w=None):
-    return np.quantile(x, q=0.8, method="higher")
+    return -np.quantile(-np.asarray(x), q=1 - 0.8, method="inverted_cdf")
 
 
 quantile80_upper.loss = PinballLoss(level=0.8)  # type: ignore
+
+
+def quantile10_lower(x, w=None):
+    return np.quantile(x, q=0.1, method="inverted_cdf")
+
+
+quantile10_lower.loss = PinballLoss(level=0.1)  # type: ignore
+
+
+def quantile10_upper(x, w=None):
+    return -np.quantile(-np.asarray(x), q=1 - 0.1, method="inverted_cdf")
+
+
+quantile10_upper.loss = PinballLoss(level=0.1)  # type: ignore
 
 
 def gpava_mean(x, w=None):
@@ -135,12 +149,65 @@ def test_pava_weighted(pava):
             median_upper,
             [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 8],
         ),
+        (
+            [
+                -3.444949308,
+                -2.854784791,
+                -3.071818855,
+                -1.164616209,
+                -3.947223934,
+                -2.644162705,
+                -2.609553073,
+                -0.270605801,
+                -3.208354459,
+                -2.012322283,
+                -1.059124491,
+                -2.199654113,
+                -1.906487545,
+                -2.681030502,
+                -1.553997732,
+                -3.489485619,
+                -1.672190775,
+                -2.863511214,
+                -0.491263988,
+                0.169577379,
+            ],
+            quantile10_lower,
+            # from R package isotonic, function
+            # gpava(1:20, y, solver = weighted.fractile, p=0.1, ties = "secondary")$x
+            np.repeat(
+                [-3.947223934, -3.208354459, -2.863511214, -0.491263988, 0.169577379],
+                [5, 11, 2, 1, 1],
+            ),
+            quantile10_upper,
+            np.repeat(
+                [-3.947223934, -3.208354459, -2.863511214, -0.491263988, 0.169577379],
+                [5, 11, 2, 1, 1],
+            ),
+        ),
     ],
 )
 def test_gpava_simple(y, fun_lower, x_lower, fun_upper, x_upper):
     w = np.ones_like(y)
     xl, rl = gpava(fun_lower, y, w)
-    xu, ru = gpava(fun_upper, y, w)
+    # The distinction of lower and upper only applies to set-valued functionals like
+    # quantiles.
+    # Applying gpava on fun=np.quantile(x, level, method="higher") does not work
+    # for unknown reasons. What works is to calculate the upper quantile on the
+    # block given by rl.
+    upper_values = np.fromiter(
+        (fun_upper(y[rl[i] : rl[i + 1]]) for i in range(len(rl) - 1)), dtype=xl.dtype
+    )
+    # Take mininum from the right.
+    upper_values = np.minimum.accumulate(upper_values[::-1])[::-1]
+    xu = np.repeat(upper_values, np.diff(rl))
+
+    # Check that isotonic_regression gives midpoint.
+    functional = fun_lower.loss.functional
+    level = getattr(fun_lower.loss, "level", 0.5)
+    x_iso, _ = isotonic_regression(y=y, functional=functional, level=level)
+    assert_allclose(0.5 * (xl + xu), x_iso)
+
     for i in range(len(xl) - 1):
         # Eq. 10 of Jordan et al. https://doi.org/10.1007/s10463-021-00808-0
         assert xl[i] <= xu[i + 1]
@@ -166,13 +233,13 @@ def test_gpava_simple(y, fun_lower, x_lower, fun_upper, x_upper):
         x0=y,
         args=(y,),
         constraints=[{"type": "ineq", "fun": lambda x: constraint(x, y)}],
-        tol=1e-10,
+        tol=1e-12,
     )
 
-    assert result.fun == pytest.approx(loss_lower)
+    assert result.fun == pytest.approx(loss_lower, rel=1e-8)
 
-    # Check that is is the boundary of solutions.
-    eps = 1e-10 * np.mean(xl)
+    # Check that it is the boundary of solutions.
+    eps = 1e-8 * np.mean(np.abs(xl))
     for i in range(len(xl)):
         x = np.array(xl, copy=True, dtype=float)
         if i == 0 or x[i] > x[i - 1]:
