@@ -1,0 +1,51 @@
+name: test
+
+on:
+  schedule:
+   # 5 pm every first day of a month
+    - cron: '0 5 1 * *'
+
+env:
+  PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  run-test-suite:
+    name: Python ${{ matrix.python-version }} on ${{ startsWith(matrix.os, 'macos-') && 'macOS' || startsWith(matrix.os, 'windows-') && 'Windows' || 'Linux' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9']
+    env:
+      # https://github.com/microsoft/azure-pipelines-tasks/issues/16426
+      # https://github.com/orgs/community/discussions/26434
+      MPLBACKEND: Agg
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Ensure latest pip
+      run: python -m pip install --upgrade pip
+
+    - name: Install hatch
+      run: |
+        pip install hatch
+
+    - if: matrix.python-version == '3.9' && runner.os == 'Linux'
+      name: Lint
+      run: hatch run lint:all
+
+    - if: matrix.python-version == '3.9' && runner.os == 'Linux'
+      name: Build docs
+      run: hatch run docs:build
+
+    - name: Run test matrix
+      run: hatch -e test run pytest
+
