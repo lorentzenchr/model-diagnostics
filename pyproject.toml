@@ -21,9 +21,11 @@ classifiers = [
 ]
 keywords = ["machine learning", "model diagnostics", "calibration"]
 dependencies = [
-  "polars >= 0.17.2",
-  "matplotlib >= 3.6.1",
-  "scikit-learn >=1.2.0",  # We rely on the set_output API.
+  "matplotlib>=3.6.1",
+  "numpy>=1.22",  # type annotations and method arg in quantile
+  "polars>=0.17.3",
+  "scikit-learn>=1.2.0",  # We rely on the set_output API.
+  "scipy>=1.10",  # scipy.stats.expectile
 ]
 dynamic = ["version"]
 
@@ -151,7 +153,6 @@ dependencies = [
   "pytest",
   "pytest-cov",
   "pytest-xdist",
-  "scipy>=1.10",
 ]
 
 [tool.hatch.envs.default.scripts]
@@ -177,7 +178,7 @@ ci-build = "mkdocs gh-deploy --force {args}"
 [tool.hatch.envs.jupyter]
 extra-dependencies = [
   "jupyterlab>=3.6",
-  "scikit-learn>=1.2.0",  # TODO: Increa so 1.3.0 as soon as released.
+  "scikit-learn>=1.3.0",
 ]
 
 [tool.hatch.envs.jupyter.scripts]
@@ -188,7 +189,6 @@ detached = true
 dependencies = [
   "black>=22.8.0",
   "mypy>=0.971",
-  "numpy>=1.22",
   "ruff==0.0.278",
 ]
 
@@ -209,8 +209,18 @@ all = [
   "typing",
 ]
 
+[tool.hatch.envs.test]
+# minimum versions, partially inherited from scikit-learn 1.2.0
+extra-dependencies = ["numpy==1.22", "polars==0.17.3", "scipy==1.10"]
+
 [[tool.hatch.envs.test.matrix]]
-python = ["39", "310", "311"]
+python = ["3.9", "3.10", "3.11"]
+
+[tool.hatch.envs.test.overrides]
+# latest versions
+name."py3.11".set-extra-dependencies = ["numpy", "polars", "scipy"]
+# To check correct versions, you can run
+# hatch -e test run pip freeze | grep polars
 
 [tool.hatch.version]
 path = "src/model_diagnostics/__about__.py"
