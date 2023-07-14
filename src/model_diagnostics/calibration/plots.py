@@ -281,7 +281,7 @@ def plot_bias(
         number of bins might be smaller than `n_bins`.
     confidence_level : float
         Confidence level for error bars. If 0, no error bars are plotted. Value must
-        fulfill `0 <= confidence_level < 1`.
+        fulfil `0 <= confidence_level < 1`.
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.
 
@@ -305,7 +305,7 @@ def plot_bias(
     """
     if not (0 <= confidence_level < 1):
         msg = (
-            f"Argument confidence_level must fulfill 0 <= level < 1, got "
+            f"Argument confidence_level must fulfil 0 <= level < 1, got "
             f"{confidence_level}."
         )
         raise ValueError(msg)

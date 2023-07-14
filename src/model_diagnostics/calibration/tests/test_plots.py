@@ -167,7 +167,7 @@ def test_plot_reliability_diagram_constant_prediction_transform_output():
 @pytest.mark.parametrize(
     ("param", "value", "msg"),
     [
-        ("confidence_level", 1, "Argument confidence_level must fulfill 0 <= level < 1, got 1"),
+        ("confidence_level", 1, "Argument confidence_level must fulfil 0 <= level < 1, got 1"),
     ],
 )
 def test_plot_bias_raises(param, value, msg):
