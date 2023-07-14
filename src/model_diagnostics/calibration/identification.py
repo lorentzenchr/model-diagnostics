@@ -186,11 +186,11 @@ def compute_bias(
     \(\mathbb{E}(V(m(X), Y)|X)=0\) almost surely with canonical identification
     function \(V\).
     The empirical version, given some data, reads
-    \(\bar{V} = \frac{1}{n}\sum_i \phi(x_i) V(m(x_i), y_i)\) with a function
+    \(\bar{V} = \frac{1}{n}\sum_i \phi(x_i) V(m(x_i), y_i)\) with a test function
     \(\phi(x_i)\) that projects on the specified feature.
     For a feature with only two distinct values `"a"` and `"b"`, this becomes
     \(\bar{V} = \frac{1}{n_a}\sum_{i \text{ with }x_i=a} V(m(a), y_i)\) with
-    \(n_a=\sum_{i \text{ with }x_i=a}\) and the same with `"b"`.
+    \(n_a=\sum_{i \text{ with }x_i=a}\) and similar for `"b"`.
     With case weights, this reads
     \(\bar{V} = \frac{1}{\sum_i w_i}\sum_i w_i \phi(x_i) V(m(x_i), y_i)\).
     This generalises the classical residual (up to a minus sign) for target functionals
