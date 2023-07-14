@@ -309,7 +309,7 @@ def plot_bias(
             f"{confidence_level}."
         )
         raise ValueError(msg)
-    with_errorbars = (confidence_level > 0)
+    with_errorbars = confidence_level > 0
     if ax is None:
         ax = plt.gca()
 
@@ -380,16 +380,18 @@ def plot_bias(
             with_errorbars_i = False
         else:
             with_errorbars_i = with_errorbars
-        
+
         if with_errorbars_i:
             # We scale bias_stderr by the corresponding value of the t-distribution
             # to get our desired confidence level.
             n = df_i["bias_count"].to_numpy()
             conf_level_fct = special.stdtrit(
                 np.maximum(n - 1, 1),  # degrees of freedom, if n=0 => bias_stderr=0.
-                1 - (1 - confidence_level)/2,
+                1 - (1 - confidence_level) / 2,
             )
-            df_i = df_i.with_columns([(pl.col("bias_stderr") * conf_level_fct).alias("bias_stderr")])
+            df_i = df_i.with_columns(
+                [(pl.col("bias_stderr") * conf_level_fct).alias("bias_stderr")]
+            )
 
         if is_string or is_categorical:
             df_ii = df_i.filter(pl.col(feature_name).is_not_null())
