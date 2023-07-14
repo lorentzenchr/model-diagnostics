@@ -180,8 +180,6 @@ def test_plot_bias_raises(param, value, msg):
     y_pred = [-1, 1, 1]
     feature = ["a", "a", "b"]
     d = {param: value}
-    if "functional" not in d.keys():
-        d["functional"] = "quantile"  # as a default
     with pytest.raises(ValueError, match=msg):
         plot_bias(y_obs=y_obs, y_pred=y_pred, feature=feature, **d)
 
