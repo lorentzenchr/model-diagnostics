@@ -314,7 +314,7 @@ class MockSFLevel:
             None,
             "You set level=None, but scoring_function has no attribute level.",
         ),
-        (lambda y, z, w: np.mean((y - z) ** 2), "mean", None, None),
+        (lambda y, z, w: np.mean(np.subtract(y, z) ** 2), "mean", None, None),
         (MockSFFunctional(), None, None, "The functional must be one of.*, got XXX."),
         (MockSFLevel(), None, None, "The level must fulfil 0 < level < 1, got 99"),
     ],
@@ -326,32 +326,41 @@ def test_decompose_raises(sf, functional, level, msg):
     if msg is None:
         # no error
         decompose(
-            scoring_function=sf,
             y_obs=y_obs,
             y_pred=y_pred,
+            scoring_function=sf,
             functional=functional,
             level=level,
         )
     else:
         with pytest.raises(ValueError, match=msg):
             decompose(
-                scoring_function=sf,
                 y_obs=y_obs,
                 y_pred=y_pred,
+                scoring_function=sf,
                 functional=functional,
                 level=level,
             )
 
 
-@pytest.mark.parametrize("weights", ["not an array", [1]])
-def test_decompose_raises_for_wrong_weights(weights):
-    msg = "The two array-like objects don't have the same lengt"
+@pytest.mark.parametrize(
+    ("weights", "msg"),
+    [
+        ("not an array", "The two array-like objects don't have the same length"),
+        ([1], "The two array-like objects don't have the same length"),
+        (
+            np.arange(2)[:, None],
+            "The array weights must be 1-dimensional, got weights.ndim=2.",
+        ),
+    ],
+)
+def test_decompose_raises_for_wrong_weights(weights, msg):
     with pytest.raises(ValueError, match=msg):
         decompose(
-            scoring_function=SquaredError(),
             y_obs=[0, 1],
             y_pred=[1, 2],
             weights=weights,
+            scoring_function=SquaredError(),
         )
 
 
@@ -371,9 +380,9 @@ def test_decompose_with_numbers():
     y = [0, 0, 0, 1, 1, 1]
     z = [0.4, 0.3, 0.2, 0.1, 0.5, 0.9]
     df = decompose(
-        scoring_function=SquaredError(),
         y_obs=y,
         y_pred=z,
+        scoring_function=SquaredError(),
     )
     assert (df["miscalibration"] - df["discrimination"] + df["uncertainty"])[
         0
@@ -401,9 +410,9 @@ def test_decompose_with_numbers():
     #   <chr>         <dbl>          <dbl>          <dbl>       <dbl>
     # 1 pred          0.699          0.324          0.318       0.693
     df = decompose(
-        scoring_function=LogLoss(),
         y_obs=y,
         y_pred=z,
+        scoring_function=LogLoss(),
     )
     assert (df["miscalibration"] - df["discrimination"] + df["uncertainty"])[
         0
@@ -642,7 +651,54 @@ def test_decompose_vs_gneiting_resin():
     assert pbl(y_obs=df["_target_y"], y_pred=xl) == pytest.approx(score_recalibrated)
 
     # And decompose should have the same loss, too.
-    df = decompose(scoring_function=pbl, y_obs=y_obs, y_pred=y_unfocused)
+    df = decompose(y_obs=y_obs, y_pred=y_unfocused, scoring_function=pbl)
     assert df.get_column("miscalibration")[0] == pytest.approx(0.5 * mcb)
     assert df.get_column("discrimination")[0] == pytest.approx(0.5 * dsc)
     assert df.get_column("uncertainty")[0] == pytest.approx(0.5 * unc)
+
+
+@pytest.mark.parametrize(
+    "sf", [SquaredError(), HES(degree=2, level=0.2), PinballLoss(level=0.8)]
+)
+def test_decompose_multiple_predictions(sf):
+    """Test decompose for multiple predictions."""
+    n_obs = 10
+    y_obs = np.arange(n_obs)
+    y_pred = pl.DataFrame({"model_1": y_obs, "model_2": 3 * y_obs})
+    # isotonic regr aka recalibrated = y_obs
+
+    df_decomp = decompose(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        scoring_function=sf,
+    )
+    if sf.functional == "mean":
+        marginal = np.average(y_obs)
+    elif sf.functional == "expectile":
+        marginal = scipy.stats.expectile(y_obs, alpha=sf.level)
+    elif sf.functional == "quantile":
+        marginal = np.quantile(y_obs, q=sf.level, method="inverted_cdf")
+    marginal = np.full_like(y_obs, fill_value=marginal, dtype=float)
+
+    score_m1 = sf(y_obs, y_pred["model_1"])
+    score_m2 = sf(y_obs, y_pred["model_2"])
+    score_marginal = sf(y_obs, marginal)
+    df_expected = pl.DataFrame(
+        {
+            "model": ["model_1", "model_2"],
+            "miscalibration": [score_m1, score_m2],
+            "discrimination": [score_marginal] * 2,
+            "uncertainty": [score_marginal] * 2,
+            "score": [score_m1, score_m2],
+        }
+    )
+    assert_frame_equal(df_decomp, df_expected, check_exact=False)
+
+    # Same for pure numpy input.
+    df_decomp = decompose(
+        y_obs=y_obs,
+        y_pred=y_pred.to_numpy(),
+        scoring_function=sf,
+    )
+    df_expected = df_expected.replace("model", pl.Series(["0", "1"]))
+    assert_frame_equal(df_decomp, df_expected, check_exact=False)
