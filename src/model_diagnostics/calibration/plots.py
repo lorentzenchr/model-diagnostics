@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from scipy import special
 from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression as IsotonicRegression_skl
 
@@ -233,7 +234,7 @@ def plot_bias(
     functional: str = "mean",
     level: float = 0.5,
     n_bins: int = 10,
-    with_errorbars: bool = True,
+    confidence_level: float = 0.95,
     ax: Optional[mpl.axes.Axes] = None,
 ):
     r"""Plot model bias conditional on a feature.
@@ -278,8 +279,9 @@ def plot_bias(
         The number of bins for numerical features and the maximal number of (most
         frequent) categories shown for categorical features. Due to ties, the effective
         number of bins might be smaller than `n_bins`.
-    with_errorbars : bool
-        Whether or not to plot error bars.
+    confidence_level : float
+        Confidence level for error bars. If 0, no error bars are plotted. Value must
+        fulfill `0 <= confidence_level < 1`.
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.
 
@@ -301,6 +303,13 @@ def plot_bias(
         "Model Comparison and Calibration Assessment". (2022)
         [arxiv:2202.12780](https://arxiv.org/abs/2202.12780).
     """
+    if not (0 <= confidence_level < 1):
+        msg = (
+            f"Argument confidence_level must fulfill 0 <= level < 1, got "
+            f"{confidence_level}."
+        )
+        raise ValueError(msg)
+    with_errorbars = (confidence_level > 0)
     if ax is None:
         ax = plt.gca()
 
@@ -317,8 +326,8 @@ def plot_bias(
     if df["bias_stderr"].fill_nan(None).null_count() > 0 and with_errorbars:
         msg = (
             "Some values of 'bias_stderr' are null. Therefore no error bars are "
-            "shown for that y_pred/model, despite the fact that with_errorbars was "
-            "set to True."
+            "shown for that y_pred/model, despite the fact that confidence_level>0 "
+            "was set to True."
         )
         warnings.warn(msg, UserWarning, stacklevel=2)
 
@@ -371,6 +380,16 @@ def plot_bias(
             with_errorbars_i = False
         else:
             with_errorbars_i = with_errorbars
+        
+        if with_errorbars_i:
+            # We scale bias_stderr by the corresponding value of the t-distribution
+            # to get our desired confidence level.
+            n = df_i["bias_count"].to_numpy()
+            conf_level_fct = special.stdtr(
+                np.maximum(n - 1, 1),  # degrees of freedom, if n=0 => bias_stderr=0.
+                1 - (1 - confidence_level)/2,
+            )
+            df_i = df_i.with_columns([(pl.col("bias_stderr") * conf_level_fct).alias("bias_stderr")])
 
         if is_string or is_categorical:
             df_ii = df_i.filter(pl.col(feature_name).is_not_null())

@@ -164,7 +164,25 @@ def test_plot_reliability_diagram_constant_prediction_transform_output():
         plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, n_bootstrap=10)
 
 
-def test_plot_bias_warning_for_with_errorbars():
+@pytest.mark.parametrize(
+    ("param", "value", "msg"),
+    [
+        ("confidence_level", 1, "Argument confidence_level must fulfill 0 <= level < 1, got 1"),
+    ],
+)
+def test_plot_bias_raises(param, value, msg):
+    """Test that plot_bias raises errors."""
+    y_obs = [0, 1, 2]
+    y_pred = [-1, 1, 1]
+    feature = ["a", "a", "b"]
+    d = {param: value}
+    if "functional" not in d.keys():
+        d["functional"] = "quantile"  # as a default
+    with pytest.raises(ValueError, match=msg):
+        plot_bias(y_obs=y_obs, y_pred=y_pred, feature=feature, **d)
+
+
+def test_plot_bias_warning_for_null_stderr():
     """Test that plot_bias gives warning for when some stderr are Null."""
     y_obs = np.arange(3).astype(float)
     y_obs[0] = np.nan
@@ -179,15 +197,15 @@ def test_plot_bias_warning_for_with_errorbars():
             y_obs=y_obs,
             y_pred=y_pred,
             feature=feature,
-            with_errorbars=True,
+            confidence_level=0.95,
         )
 
 
 @pytest.mark.parametrize("with_null_values", [False, True])
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
-@pytest.mark.parametrize("with_errorbars", [False, True])
+@pytest.mark.parametrize("confidence_level", [0, 0.95])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
-def test_plot_bias(with_null_values, feature_type, with_errorbars, ax):
+def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
     """Test that plot_bias works."""
     X, y = make_classification(
         n_samples=100,
@@ -225,7 +243,7 @@ def test_plot_bias(with_null_values, feature_type, with_errorbars, ax):
             y_obs=y_test,
             y_pred=clf.predict_proba(X_test)[:, 1],
             feature=feature,
-            with_errorbars=with_errorbars,
+            confidence_level=confidence_level,
             ax=ax,
         )
 
@@ -246,7 +264,7 @@ def test_plot_bias(with_null_values, feature_type, with_errorbars, ax):
             y_obs=y_test,
             y_pred=pd.Series(clf.predict_proba(X_test)[:, 1], name="simple"),
             feature=feature,
-            with_errorbars=with_errorbars,
+            confidence_level=confidence_level,
             ax=ax,
         )
     assert plt_ax.get_title() == "Bias Plot simple"
@@ -276,8 +294,8 @@ def test_plot_bias_feature_none():
 
 @pytest.mark.parametrize("with_null", [False, True])
 @pytest.mark.parametrize("feature_type", ["num", "string"])
-@pytest.mark.parametrize("with_errorbars", [False, True])
-def test_plot_bias_multiple_predictions(with_null, feature_type, with_errorbars):
+@pytest.mark.parametrize("confidence_level", [0, 0.95])
+def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_level):
     """Test that plot_bias works for multiple predictions.
 
     This also tests feature to be a string with many different values
@@ -304,7 +322,7 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, with_errorbars)
         y_obs=y_obs,
         y_pred=y_pred,
         feature=feature,
-        with_errorbars=with_errorbars,
+        confidence_level=confidence_level,
     )
     assert ax.get_title() == "Bias Plot"
     legend_text = ax.get_legend().get_texts()
