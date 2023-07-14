@@ -13,6 +13,9 @@ from scipy.stats import expectile
 from sklearn.isotonic import IsotonicRegression as IsotonicRegression_skl
 
 from model_diagnostics._utils._array import (
+    get_second_dimension,
+    get_sorted_array_names,
+    length_of_second_dimension,
     validate_2_arrays,
     validate_same_first_dimension,
 )
@@ -684,10 +687,11 @@ class ElementaryScore(_BaseScoringFunction):
 
 
 def decompose(
-    scoring_function: Callable[..., Any],  # TODO: make type hint stricter
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
     weights: Optional[npt.ArrayLike] = None,
+    *,
+    scoring_function: Callable[..., Any],  # TODO: make type hint stricter
     functional: Optional[str] = None,
     level: Optional[float] = None,
 ) -> pl.DataFrame:
@@ -698,9 +702,6 @@ def decompose(
 
     Parameters
     ----------
-    scoring_function : callable
-        A scoring function with signature roughly
-        `fun(y_obs, y_pred, weights) -> float`.
     y_obs : array-like of shape (n_obs)
         Observed values of the response variable.
     y_pred : array-like of shape (n_obs)
@@ -708,6 +709,9 @@ def decompose(
         expectation of the response, `E(Y|X)`.
     weights : array-like of shape (n_obs) or None
         Case weights.
+    scoring_function : callable
+        A scoring function with signature roughly
+        `fun(y_obs, y_pred, weights) -> float`.
     functional : str or None
         The target functional which `y_pred` aims to predict.
         If `None`, then it will be inferred from `scoring_function.functional`.
@@ -724,6 +728,11 @@ def decompose(
         - `discrimination`
         - `uncertainty`
         - `score`: the average score
+
+    If `y_pred` contains several predictions, i.e. it is 2-dimension with shape
+    `(n_obs, n_pred)` and `n_pred >1`, then there is the additional column:
+
+        - `model`
 
     Notes
     -----
@@ -758,7 +767,8 @@ def decompose(
 
     Examples
     --------
-    >>> decompose(SquaredError(), y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2])
+    >>> decompose(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2],
+    ... scoring_function=SquaredError())
     shape: (1, 4)
     ┌────────────────┬────────────────┬─────────────┬───────┐
     │ miscalibration ┆ discrimination ┆ uncertainty ┆ score │
@@ -800,41 +810,58 @@ def decompose(
         msg = f"The level must fulfil 0 < level < 1, got {level}."
         raise ValueError(msg)
 
-    y: np.ndarray
-    z: np.ndarray
-    y, z = validate_2_arrays(y_obs, y_pred)
+    validate_same_first_dimension(y_obs, y_pred)
+    n_pred = length_of_second_dimension(y_pred)
+    pred_names, _ = get_sorted_array_names(y_pred)
+    y_o = np.asarray(y_obs)
+
     if weights is None:
         w = None
     else:
-        validate_same_first_dimension(weights, y)
+        validate_same_first_dimension(weights, y_obs)
         w = np.asarray(weights)  # needed to satisfy mypy
+        if w.ndim > 1:
+            msg = f"The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
+            raise ValueError(msg)
 
     if functional == "mean":
-        iso = IsotonicRegression_skl(y_min=None, y_max=None).fit(z, y, sample_weight=w)
-        marginal = np.average(y, weights=w)
+        iso = IsotonicRegression_skl(y_min=None, y_max=None)
+        marginal = np.average(y_o, weights=w)
     else:
-        iso = IsotonicRegression(functional=functional, level=level).fit(
-            z, y, sample_weight=w
-        )
+        iso = IsotonicRegression(functional=functional, level=level)
         if functional == "expectile":
-            marginal = expectile(y, alpha=level, weights=w)
+            marginal = expectile(y_o, alpha=level, weights=w)
         elif functional == "quantile":
-            marginal = np.quantile(y, q=level, method="inverted_cdf")
+            marginal = np.quantile(y_o, q=level, method="inverted_cdf")
 
-    marginal = np.full(shape=y.shape, fill_value=marginal)
-    recalibrated = np.squeeze(iso.predict(z))
+    df_list = []
+    for i in range(len(pred_names)):
+        # Loop over columns of y_pred.
+        x = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
+        iso.fit(x, y_o, sample_weight=w)
 
-    score = scoring_function(y, z, w)
-    score_recalibrated = scoring_function(y, recalibrated, w)
-    score_marginal = scoring_function(y, marginal, w)
+        marginal = np.full_like(y_o, fill_value=marginal, dtype=float)
+        recalibrated = np.squeeze(iso.predict(x))
 
-    df = pl.DataFrame(
-        {
-            "miscalibration": score - score_recalibrated,
-            "discrimination": score_marginal - score_recalibrated,
-            "uncertainty": score_marginal,
-            "score": score,
-        }
-    )
+        score = scoring_function(y_obs, x, w)
+        score_recalibrated = scoring_function(y_obs, recalibrated, w)
+        score_marginal = scoring_function(y_obs, marginal, w)
+
+        df = pl.DataFrame(
+            {
+                "model": pred_names[i],
+                "miscalibration": score - score_recalibrated,
+                "discrimination": score_marginal - score_recalibrated,
+                "uncertainty": score_marginal,
+                "score": score,
+            }
+        )
+        df_list.append(df)
+
+    df = pl.concat(df_list)
+
+    # Remove column "model" for a single model.
+    if n_pred <= 1:
+        df = df.drop(columns="model")
 
     return df

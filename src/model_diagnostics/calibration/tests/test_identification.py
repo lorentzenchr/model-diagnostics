@@ -271,7 +271,7 @@ def test_compute_n_bins_string_feature():
 
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
 def test_compute_bias_multiple_predictions(feature_type):
-    """test compute_bias for multiple predictions."""
+    """Test compute_bias for multiple predictions."""
     with pl.StringCache():
         n_obs = 10
         y_obs = np.ones(n_obs)
