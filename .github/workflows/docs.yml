@@ -1,10 +1,14 @@
 name: ci 
 
 on:
-  push:
-    branches:
-      - master 
-      - main
+  # We could deploy docs on every push.
+  # push:
+  #   branches:
+  #     - master 
+  #     - main
+  # But we only deploy with a release.
+  release:
+    types: [published]
 
 env:
   FORCE_COLOR: "1"
