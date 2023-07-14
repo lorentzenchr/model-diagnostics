@@ -194,7 +194,10 @@ dependencies = [
 
 [tool.hatch.envs.lint.scripts]
 # typing = "mypy --install-types --non-interactive {args:backend/src/hatchling src/hatch tests}"
-typing = "mypy --install-types --non-interactive {args:src/model_diagnostics}"
+typing = [
+  "python -c 'from pathlib import Path; Path(\".mypy_cache\").mkdir(parents=True, exist_ok=True)'",
+  "mypy --install-types --non-interactive {args:src/model_diagnostics}"
+]
 style = [
   "ruff {args:.}",
   "black --check --diff {args:.}",
