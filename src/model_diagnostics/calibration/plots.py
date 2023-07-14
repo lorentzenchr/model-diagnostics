@@ -385,7 +385,7 @@ def plot_bias(
             # We scale bias_stderr by the corresponding value of the t-distribution
             # to get our desired confidence level.
             n = df_i["bias_count"].to_numpy()
-            conf_level_fct = special.stdtr(
+            conf_level_fct = special.stdtrit(
                 np.maximum(n - 1, 1),  # degrees of freedom, if n=0 => bias_stderr=0.
                 1 - (1 - confidence_level)/2,
             )
