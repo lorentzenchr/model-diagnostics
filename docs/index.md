@@ -11,6 +11,7 @@
 
 Highlights:
 
+- All common point predictions covered: mean, median, quantiles, expectiles.
 - Assess model calibration with [identification functions][model_diagnostics.calibration.identification.identification_function] (generalized residuals).
 - Assess calibration and bias graphically
     - [reliability diagrams][model_diagnostics.calibration.plots.plot_reliability_diagram] for auto-calibration
@@ -18,6 +19,8 @@ Highlights:
 - Assess the predictive performance of models
     - strictly consistent, homogeneous scoring functions
     - [score decomposition][model_diagnostics.scoring.decompose] into miscalibration, discrimination and uncertainty
+
+:rocket: To our knowledge, this is the first python package to offer reliability diagrams for quantiles and expectiles made available by an internal implementation of isotonic quantile/expectile regression. :rocket:
 
 This package relies on the giant shoulders of, among others, [polars](https://pola.rs/), [matplotlib](https://matplotlib.org), [scipy](https://scipy.org) and [scikit-learn](https://scikit-learn.org).
 
