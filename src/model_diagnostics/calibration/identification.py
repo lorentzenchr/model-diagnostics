@@ -25,8 +25,8 @@ def identification_function(
 ) -> np.ndarray:
     r"""Canonical identification function.
 
-    Identification functions act as generalised residuals. See Notes for further
-    details.
+    Identification functions act as generalised residuals. See [Notes](#notes) for
+    further details.
 
     Parameters
     ----------

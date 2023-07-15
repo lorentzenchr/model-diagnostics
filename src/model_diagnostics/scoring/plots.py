@@ -32,7 +32,7 @@ def plot_murphy_diagram(
     over a range of their free parameter `eta`. This shows, if a model dominates all
     others over a wide class of scoring functions or if the ranking is very much
     dependent on the choice of scoring function.
-    See Notes for further details.
+    See [Notes](#notes) for further details.
 
     Parameters
     ----------
@@ -66,7 +66,7 @@ def plot_murphy_diagram(
 
     Notes
     -----
-    For details, refer to [Ehm2015].
+    For details, refer to `[Ehm2015]`.
 
     References
     ----------

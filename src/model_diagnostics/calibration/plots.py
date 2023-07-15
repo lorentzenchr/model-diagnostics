@@ -42,7 +42,7 @@ def plot_reliability_diagram(
     predictions `y_pred` (x-axis).
     The conditional expectation is estimated via isotonic regression (PAV algorithm)
     of `y_obs` on `y_pred`.
-    See Notes for further details.
+    See [Notes](#notes) for further details.
 
     Parameters
     ----------
