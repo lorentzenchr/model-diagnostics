@@ -1,4 +1,5 @@
-"""The scoring module provides scoring functions and the score decomposition.
+"""The scoring module provides scoring functions, also known as loss functions,
+and a score decomposition.
 Each scoring function is implemented as a class that needs to be instantiated
 before calling the `__call__` methode, e.g. `SquaredError()(y_obs=[1], y_pred=[2])`.
 """
@@ -576,7 +577,7 @@ class ElementaryScore(_BaseScoringFunction):
 
     The elementary scoring function is consistent for the specified `functional` for
     all values of `eta` and is the main ingredient for Murphy diagrams.
-    See Notes for further details.
+    See [Notes](#notes) for further details.
 
     Parameters
     ----------
@@ -599,7 +600,7 @@ class ElementaryScore(_BaseScoringFunction):
     The elementary scoring or loss function is given by
 
     \[
-    S_\eta^h(y, z) = (\mathbf{1}\{\eta \le z\} - \mathbf{1}\{\eta \le y\})
+    S_\eta(y, z) = (\mathbf{1}\{\eta \le z\} - \mathbf{1}\{\eta \le y\})
     V(y, \eta)
     \]
 
