@@ -1,4 +1,4 @@
-name: ci 
+name: deploy_docs 
 
 on:
   # We could deploy docs on every push.
@@ -9,6 +9,9 @@ on:
   # But we only deploy with a release.
   release:
     types: [published]
+
+  # To enable to manually trigger this action.
+  workflow_dispatch:
 
 env:
   FORCE_COLOR: "1"
