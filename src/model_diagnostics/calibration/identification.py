@@ -40,6 +40,7 @@ def identification_function(
         the response, `E(Y|X)`.
     functional : str
         The functional that is induced by the identification function `V`. Options are:
+
         - `"mean"`. Argument `level` is neglected.
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
@@ -155,6 +156,7 @@ def compute_bias(
         weights. See the Notes section for details.
     functional : str
         The functional that is induced by the identification function `V`. Options are:
+
         - `"mean"`. Argument `level` is neglected.
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`

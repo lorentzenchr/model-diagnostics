@@ -287,6 +287,7 @@ def isotonic_regression(
         If False, fit a monotonic decreasing, i.e. antitonic, regression.
     functional : str
         The functional that is induced by the identification function `V`. Options are:
+
         - `"mean"`. Argument `level` is neglected.
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
@@ -420,6 +421,7 @@ class IsotonicRegression:
         correlation estimate's sign.
     functional : str
         The functional that is induced by the identification function `V`. Options are:
+
         - `"mean"`. Argument `level` is neglected.
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`

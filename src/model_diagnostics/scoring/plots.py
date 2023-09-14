@@ -48,6 +48,7 @@ def plot_murphy_diagram(
         generater. If an array-like is given, those points are used.
     functional : str
         The functional that is induced by the identification function `V`. Options are:
+
         - `"mean"`. Argument `level` is neglected.
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`

@@ -585,6 +585,7 @@ class ElementaryScore(_BaseScoringFunction):
         Free parameter.
     functional : str
         The functional that is induced by the identification function `V`. Options are:
+
         - `"mean"`. Argument `level` is neglected.
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
@@ -716,6 +717,12 @@ def decompose(
     functional : str or None
         The target functional which `y_pred` aims to predict.
         If `None`, then it will be inferred from `scoring_function.functional`.
+        Options are:
+
+        - `"mean"`. Argument `level` is neglected.
+        - `"median"`. Argument `level` is neglected.
+        - `"expectile"`
+        - `"quantile"`
     level : float or None
         Functionals like expectiles and quantiles have a level (often called alpha).
         If `None`, then it will be inferred from `scoring_function.level`.
