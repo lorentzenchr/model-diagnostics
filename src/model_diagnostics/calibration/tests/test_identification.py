@@ -260,8 +260,8 @@ def test_compute_n_bins_string_feature():
         }
     )
     for _i in range(10):
-        # The default args in polars groupby(..., maintain_order=False) does not does
-        # return non-deterministic ordering which compute_bias should take care of such
+        # The default args in polars group_by(..., maintain_order=False) returns
+        # non-deterministic ordering which compute_bias should take care of such
         # that compute_bias is deterministic.
         df = compute_bias(y_obs=y_obs, y_pred=y_pred, feature=feature, n_bins=n_bins)
         assert_frame_equal(
