@@ -4,8 +4,10 @@ from typing import Optional, Union
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from packaging.version import Version
 from scipy import special
 
+from model_diagnostics import polars_version
 from model_diagnostics._utils._array import (
     array_name,
     get_second_dimension,
@@ -412,21 +414,24 @@ def compute_bias(
                     groupby_name = "bin"
                     agg_list.append(pl.col(feature_name).mean())
 
+                df = df.lazy().select(
+                    [
+                        pl.all(),
+                        (
+                            (pl.col("weights") * pl.col("bias"))
+                            .sum()
+                            .over(groupby_name)
+                            / pl.col("weights").sum().over(groupby_name)
+                        ).alias("bias_mean"),
+                    ]
+                )
+                # FIXME: polars >= 0.19
+                if polars_version >= Version("0.19.0"):
+                    df = df.group_by(groupby_name)
+                else:
+                    df = df.groupby(groupby_name)
                 df = (
-                    df.lazy()
-                    .select(
-                        [
-                            pl.all(),
-                            (
-                                (pl.col("weights") * pl.col("bias"))
-                                .sum()
-                                .over(groupby_name)
-                                / pl.col("weights").sum().over(groupby_name)
-                            ).alias("bias_mean"),
-                        ]
-                    )
-                    .groupby(groupby_name)
-                    .agg(agg_list)
+                    df.agg(agg_list)
                     .with_columns(
                         [
                             pl.when(pl.col("bias_count") > 1)

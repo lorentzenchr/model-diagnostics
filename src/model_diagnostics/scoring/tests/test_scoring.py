@@ -700,5 +700,5 @@ def test_decompose_multiple_predictions(sf):
         y_pred=y_pred.to_numpy(),
         scoring_function=sf,
     )
-    df_expected = df_expected.replace("model", pl.Series(["0", "1"]))
+    df_expected = df_expected.with_columns(pl.Series(["0", "1"]).alias("model"))
     assert_frame_equal(df_decomp, df_expected, check_exact=False)
