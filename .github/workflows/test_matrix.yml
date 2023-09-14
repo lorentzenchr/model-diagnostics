@@ -2,8 +2,10 @@ name: test
 
 on:
   schedule:
-   # 5 pm every first day of a month
+    # 5 pm every first day of a month
     - cron: '0 5 1 * *'
+    # 5 pm every 15th day of a month
+    - cron: '0 5 15 * *'
 
 env:
   PYTHONUNBUFFERED: "1"
