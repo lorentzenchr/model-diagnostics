@@ -585,6 +585,7 @@ class ElementaryScore(_BaseScoringFunction):
         Free parameter.
     functional : str
         The functional that is induced by the identification function `V`. Options are:
+
         - `"mean"`. Argument `level` is neglected.
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
@@ -705,7 +706,7 @@ def decompose(
     ----------
     y_obs : array-like of shape (n_obs)
         Observed values of the response variable.
-    y_pred : array-like of shape (n_obs)
+    y_pred : array-like of shape (n_obs) or (n_obs, n_models)
         Predicted values of the `functional` of interest, e.g. the conditional
         expectation of the response, `E(Y|X)`.
     weights : array-like of shape (n_obs) or None
@@ -716,6 +717,12 @@ def decompose(
     functional : str or None
         The target functional which `y_pred` aims to predict.
         If `None`, then it will be inferred from `scoring_function.functional`.
+        Options are:
+
+        - `"mean"`. Argument `level` is neglected.
+        - `"median"`. Argument `level` is neglected.
+        - `"expectile"`
+        - `"quantile"`
     level : float or None
         Functionals like expectiles and quantiles have a level (often called alpha).
         If `None`, then it will be inferred from `scoring_function.level`.
@@ -834,6 +841,20 @@ def decompose(
             marginal = expectile(y_o, alpha=level, weights=w)
         elif functional == "quantile":
             marginal = np.quantile(y_o, q=level, method="inverted_cdf")
+
+    if y_o[0] == marginal == y_o[-1]:
+        # y_o is constant. We need to check if y_o is allowed as argument to y_pred.
+        # For instance for the poisson deviance, y_o = 0 is allowed. But 0 is forbidden
+        # as a prediction.
+        try:
+            scoring_function(y_o[0], marginal)
+        except ValueError as exc:
+            msg = (
+                "Your y_obs is constant and lies outside the allowed range of y_pred"
+                "of your scoring function. Therefore, the score decomposition cannot"
+                "be applied."
+            )
+            raise ValueError(msg) from exc
 
     df_list = []
     for i in range(len(pred_names)):

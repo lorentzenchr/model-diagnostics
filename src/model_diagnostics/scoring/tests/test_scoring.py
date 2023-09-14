@@ -702,3 +702,24 @@ def test_decompose_multiple_predictions(sf):
     )
     df_expected = df_expected.with_columns(pl.Series(["0", "1"]).alias("model"))
     assert_frame_equal(df_decomp, df_expected, check_exact=False)
+
+
+@pytest.mark.parametrize(
+    ("y", "sf"),
+    [(0, PoissonDeviance()), (0, HomogeneousExpectileScore(degree=0.1, level=0.9))],
+)
+def test_decompose_constant_0_y_obs(y, sf):
+    """Test decompose for y_obs = 0.
+
+    This is a problem if y_pred = y_obs = 0 is not allowed like for Poisson deciance.
+    """
+    n = 4
+    y_obs = np.full(n, fill_value=y)
+    y_pred = np.ones(n)
+
+    with pytest.raises(ValueError, match="Your y_obs is constant"):
+        decompose(
+            y_obs=y_obs,
+            y_pred=y_pred,
+            scoring_function=sf,
+        )
