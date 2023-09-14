@@ -16,6 +16,7 @@ Apart from the default environment are `docs`, `jupyter`, `lint` and `test`
 (for a test matrix). Some useful commands are:
 
 - `hatch run cov` or `hatch run pytest` to run tests
+- `hatch -e test run pytest` to run test matrix for multiple versions of python and packages
 - `hatch run lint:fmt` to apply black and `isort`
 - `hatch run lint:all` to check linting, typing, style and security
 - `hatch run docs:serve` to run a local server under [localhost:8000](localhost:8000)
