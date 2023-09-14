@@ -173,18 +173,14 @@ def test_compute_bias_feature_none():
         feature=None,
     )
     # V = [0.5, -2/3, -4/3]
-    df_expected = (
-        df_expected.replace("bias_count", pl.Series(values=[3], dtype=pl.UInt32))
-        .replace(
-            # SE = sqrt((2 * 0.9**2 + 1.5 * 0.8**2/9 + 1.5 * 2.8**2/9) / 5 / (3-1))
-            #    = sqrt(91 / 300)
-            "bias_stderr",
-            pl.Series(values=[np.sqrt(91 / 300)]),
-        )
-        .replace(
-            "p_value",
-            pl.Series(values=[2 * stdtr(3 - 1, -np.abs(-0.4 / np.sqrt(91 / 300)))]),
-        )
+    df_expected = df_expected.with_columns(
+        pl.Series(values=[3], dtype=pl.UInt32).alias("bias_count"),
+        # SE = sqrt((2 * 0.9**2 + 1.5 * 0.8**2/9 + 1.5 * 2.8**2/9) / 5 / (3-1))
+        #    = sqrt(91 / 300)
+        pl.Series(values=[np.sqrt(91 / 300)]).alias("bias_stderr"),
+        pl.Series(values=[2 * stdtr(3 - 1, -np.abs(-0.4 / np.sqrt(91 / 300)))]).alias(
+            "p_value"
+        ),
     )
     assert_frame_equal(df_bias, df_expected, check_exact=False)
 
@@ -306,13 +302,15 @@ def test_compute_bias_multiple_predictions(feature_type):
         )
 
         if feature_type == "cat":
-            df_expected = df_expected.replace(
-                "nice_feature",
-                df_expected["nice_feature"].cast(pl.Utf8).cast(pl.Categorical),
+            df_expected = df_expected.with_columns(
+                df_expected["nice_feature"]
+                .cast(pl.Utf8)
+                .cast(pl.Categorical)
+                .alias("nice_feature"),
             )
         elif feature_type == "string":
-            df_expected = df_expected.replace(
-                "nice_feature", df_expected["nice_feature"].cast(pl.Utf8)
+            df_expected = df_expected.with_columns(
+                df_expected["nice_feature"].cast(pl.Utf8).alias("nice_feature")
             )
         assert_frame_equal(df_bias, df_expected, check_exact=False)
 
@@ -328,7 +326,9 @@ def test_compute_bias_multiple_predictions(feature_type):
             y_pred=y_pred.to_numpy(),
             feature=feature_np,
         )
-        df_expected = df_expected.replace("model", pl.Series(["0", "0", "1", "1"]))
+        df_expected = df_expected.with_columns(
+            pl.Series(["0", "0", "1", "1"]).alias("model")
+        )
         df_expected = df_expected.rename({"nice_feature": "feature"})
         assert_frame_equal(df_bias, df_expected, check_exact=False)
 
@@ -340,8 +340,8 @@ def test_compute_bias_multiple_predictions(feature_type):
             feature=feature,
         )
         df_expected = df_expected.rename({"model": "model_", "feature": "model"})
-        df_expected = df_expected.replace(
-            "model_", pl.Series(["model_1", "model_1", "model_2", "model_2"])
+        df_expected = df_expected.with_columns(
+            pl.Series(["model_1", "model_1", "model_2", "model_2"]).alias("model_")
         )
         assert_frame_equal(df_bias, df_expected, check_exact=False)
 
