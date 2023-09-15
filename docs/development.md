@@ -33,13 +33,15 @@ This will require credentials for <https://test.pypi.org> and <https://pypi.org>
 - Create a new pull request (PR) and set the new `version` in `__about__.py`.
 - Merge the PR on github and sync locally
   - `git checkout main`
-  - `git pull origin main` (origin might be upstream)
+  - `git pull origin main` (`origin` might be `upstream`)
 - Create annotated git tag on branch main for the current commit (not needed for release candidates):
   `git tag -a v1.4.0 -m "Release v1.4.0"`
 - Push the annotated tag: `git push origin <tag_name>`.
   Note that `origin` might be to be replaced by `upstream` depending on your setup.
 - Run `hatch build`.
-- (Optional) Create a github release with the new tag and upload the build artifacts.
+- Create a github release with the new tag and upload the build artifacts.
+  This triggers to build and deploy the website via github pages.
+  (The github action `deploy_docs` can also be triggered manually for convenience.)
 - Publish build artifacts on test.pypi: `hatch publish -r test`
 - Verify the release on test.pypi (best done in some virtual environment):
   `python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps model-diagnostics`
