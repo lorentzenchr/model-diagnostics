@@ -267,11 +267,12 @@ def test_isotonic_regression_raises(functional, level, msg):
         isotonic_regression(y=y, weights=w, functional=functional, level=level)
 
 
-def test_isotonic_regression_raises_weighted_quantile():
+@pytest.mark.parametrize("functional", ["quantile", "median"])
+def test_isotonic_regression_raises_weighted_quantile(functional):
     y, w = np.arange(5), np.arange(5)
     msg = "Weighted quantile"
     with pytest.raises(NotImplementedError, match=msg):
-        isotonic_regression(y=y, weights=w, functional="quantile", level=0.5)
+        isotonic_regression(y=y, weights=w, functional=functional, level=0.5)
 
 
 @pytest.mark.parametrize(
@@ -305,6 +306,7 @@ def test_simple_isotonic_regression(w):
     ("functional", "level", "x_res", "r_res"),
     [
         ("mean", None, [4, 4, 4, 4, 4, 4, 8], [0, 6, 7]),
+        ("median", None, [3, 3, 3, 3, 3, 3, 8], [0, 6, 7]),
         ("quantile", 0.5, [3, 3, 3, 3, 3, 3, 8], [0, 6, 7]),
         ("quantile", 0.8, [8, 8, 8, 8, 8, 8, 8], [0, 7]),
         ("expectile", 0.5, [4, 4, 4, 4, 4, 4, 8], [0, 6, 7]),
