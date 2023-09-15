@@ -826,7 +826,7 @@ def decompose(
     if weights is None:
         w = None
     else:
-        validate_same_first_dimension(weights, y_obs)
+        validate_same_first_dimension(weights, y_o)
         w = np.asarray(weights)  # needed to satisfy mypy
         if w.ndim > 1:
             msg = f"The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
@@ -856,18 +856,17 @@ def decompose(
             )
             raise ValueError(msg) from exc
 
+    marginal = np.full_like(y_o, fill_value=marginal, dtype=float)
+    score_marginal = scoring_function(y_o, marginal, w)
+
     df_list = []
     for i in range(len(pred_names)):
         # Loop over columns of y_pred.
         x = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
         iso.fit(x, y_o, sample_weight=w)
-
-        marginal = np.full_like(y_o, fill_value=marginal, dtype=float)
         recalibrated = np.squeeze(iso.predict(x))
-
-        score = scoring_function(y_obs, x, w)
-        score_recalibrated = scoring_function(y_obs, recalibrated, w)
-        score_marginal = scoring_function(y_obs, marginal, w)
+        score = scoring_function(y_o, x, w)
+        score_recalibrated = scoring_function(y_o, recalibrated, w)
 
         df = pl.DataFrame(
             {
