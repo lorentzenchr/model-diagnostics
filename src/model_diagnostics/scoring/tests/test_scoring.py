@@ -1,3 +1,4 @@
+from decimal import Decimal
 from inspect import isclass
 
 import numpy as np
@@ -615,7 +616,9 @@ def test_decompose_vs_gneiting_resin():
         return np.quantile(x, level, method="inverted_cdf")
 
     def quantile_upper(x, wx=None):
-        return -np.quantile(-np.asarray(x), 1 - level, method="higher")
+        return -np.quantile(
+            -np.asarray(x), float(1 - Decimal(str(level))), method="higher"
+        )
 
     xl, rl = gpava(quantile_lower, df["_target_y"])
     # Applying gpava on fun=np.quantile(x, level, method="higher") does not work

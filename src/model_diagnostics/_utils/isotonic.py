@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Callable, Optional
 
 import numpy as np
@@ -143,7 +144,7 @@ def gpava(
         or, to get the upper bound
         ````
         def median(x, w=None):
-            return np.quantile(x, 0.5, method="higher")
+            return -np.quantile(-x, 0.5, method="inverted_cdf")
         ```
     y : ndarray of shape (n_obs)
         Observed values of the response variable, already ordered according to some
@@ -347,12 +348,15 @@ def isotonic_regression(
     if functional in ("expectile", "quantile") and (level <= 0 or level >= 1):
         msg = f"Argument level must fulfil 0 < level < 1, got {level}."
         raise ValueError(msg)
+    if functional == "median":
+        functional = "quantile"
+        level = 0.5
 
     y = np.asarray(y)
     if weights is None:
         weights = np.ones_like(y)
     else:
-        if functional == "quantile":
+        if functional in "quantile":
             msg = "Weighted quantiles are not yet implemented."
             raise NotImplementedError(msg)
         weights = np.asarray(weights)
@@ -383,7 +387,12 @@ def isotonic_regression(
 
         def quantile_upper(x, wx=None):
             # np.quantile(x, level, method="higher") is not the same as
-            return -np.quantile(-x, 1 - level, method="inverted_cdf")
+            # -np.quantile(-x, 1 - level, method="inverted_cdf")
+            # Also note that 1 - level can have a loss of precision, e.g. 1 - 0.1
+            # = 0.09999999999999998 but 0.1 would be right.
+            return -np.quantile(
+                -x, float(1 - Decimal(str(level))), method="inverted_cdf"
+            )
 
         xl, rl = gpava(quantile_lower, x, wx)
         # Applying gpava on fun=np.quantile(x, level, method="higher") does not work
