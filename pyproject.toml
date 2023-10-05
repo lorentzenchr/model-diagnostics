@@ -27,6 +27,7 @@ dependencies = [
   "polars>=0.17.3",
   "scikit-learn>=1.2.0",  # We rely on the set_output API.
   "scipy>=1.10",  # scipy.stats.expectile
+  "pyarrow>=11.0.0",
 ]
 dynamic = ["version"]
 
