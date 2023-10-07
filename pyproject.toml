@@ -218,17 +218,46 @@ all = [
 ]
 
 [tool.hatch.envs.test]
-# minimum versions, partially inherited from scikit-learn 1.2.0
-extra-dependencies = ["numpy==1.22", "polars==0.17.3", "scipy==1.10"]
+# We do not want to inherit from envs.default because we explicitely want to have test
+# matrix entries with minimal dependencies, e.g. without pandas or pyarrow.
+# Dependencies only contain what we need for testing.
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "pytest-xdist",
+]
 
 [[tool.hatch.envs.test.matrix]]
 python = ["3.9", "3.10", "3.11"]
 
 [tool.hatch.envs.test.overrides]
+# Minimal versions (partially inherited from scikit-learn 1.2.0)
+# but including pandas and pyarrow
+name."py3.9".set-extra-dependencies = [
+  "numpy==1.22",
+  "polars==0.17.3",
+  "scipy==1.10",
+  "pandas==1.5.*",
+  "pyarrow==11.0.*"
+]
+# Minimal versions without pandas and pyarrow 
+name."py3.10".set-extra-dependencies = [
+  "numpy==1.22",
+  "polars==0.17.3",
+  "scipy==1.10",
+]
 # latest versions
-name."py3.11".set-extra-dependencies = ["numpy", "polars", "scipy"]
+name."py3.11".set-extra-dependencies = [
+  "numpy",
+  "polars",
+  "scipy",
+  "pandas",
+  "pyarrow",
+]
 # To check correct versions, you can run
 # hatch -e test run pip freeze | grep polars
+[tool.hatch.envs.test.scripts]
+versions = ["pip freeze | grep -E 'numpy|polars|scipy|pandas|pyarrow'"]
 
 [tool.hatch.version]
 path = "src/model_diagnostics/__about__.py"
