@@ -850,8 +850,8 @@ def decompose(
             scoring_function(y_o[0], marginal)
         except ValueError as exc:
             msg = (
-                "Your y_obs is constant and lies outside the allowed range of y_pred"
-                "of your scoring function. Therefore, the score decomposition cannot"
+                "Your y_obs is constant and lies outside the allowed range of y_pred "
+                "of your scoring function. Therefore, the score decomposition cannot "
                 "be applied."
             )
             raise ValueError(msg) from exc
@@ -866,7 +866,15 @@ def decompose(
         iso.fit(x, y_o, sample_weight=w)
         recalibrated = np.squeeze(iso.predict(x))
         score = scoring_function(y_o, x, w)
-        score_recalibrated = scoring_function(y_o, recalibrated, w)
+        try:
+            score_recalibrated = scoring_function(y_o, recalibrated, w)
+        except ValueError as exc:
+            msg = (
+                "The recalibrated predictions obtained from isotonic regression are "
+                "very likely outside the allowed range of y_pred of your scoring "
+                "function. Therefore, the score decomposition cannot be applied."
+            )
+            raise ValueError(msg) from exc
 
         df = pl.DataFrame(
             {

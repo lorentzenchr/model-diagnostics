@@ -726,3 +726,16 @@ def test_decompose_constant_0_y_obs(y, sf):
             y_pred=y_pred,
             scoring_function=sf,
         )
+
+
+def test_decompose_isotonic_outside_range():
+    """Test that decompose works if isotonic regression is outside calid domain."""
+    y_obs = np.array([0.0, 1.0])
+    y_pred = np.array([0.01, 1.5])
+
+    with pytest.raises(ValueError, match="The recalibrated predictions obtained"):
+        decompose(
+            y_obs=y_obs,
+            y_pred=y_pred,
+            scoring_function=PoissonDeviance(),
+        )
