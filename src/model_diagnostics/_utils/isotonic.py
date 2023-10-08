@@ -1,4 +1,5 @@
 from decimal import Decimal
+from functools import partial
 from typing import Callable, Optional
 
 import numpy as np
@@ -8,6 +9,18 @@ from scipy.interpolate import interp1d
 from scipy.stats import expectile
 
 from ._array import length_of_second_dimension, validate_2_arrays
+
+
+def quantile_lower(x, wx=None, level=0.5):
+    return np.quantile(x, level, method="inverted_cdf")
+
+
+def quantile_upper(x, wx=None, level=0.5):
+    # np.quantile(x, level, method="higher") is not the same as
+    # -np.quantile(-x, 1 - level, method="inverted_cdf")
+    # Also note that 1 - level can have a loss of precision, e.g. 1 - 0.1
+    # = 0.09999999999999998 but 0.1 would be right.
+    return -np.quantile(-x, float(1 - Decimal(str(level))), method="inverted_cdf")
 
 
 def pava(
@@ -382,25 +395,15 @@ def isotonic_regression(
 
         x, r = gpava(expectile_fun, x, wx)
     elif functional == "quantile":
-
-        def quantile_lower(x, wx=None):
-            return np.quantile(x, level, method="inverted_cdf")
-
-        def quantile_upper(x, wx=None):
-            # np.quantile(x, level, method="higher") is not the same as
-            # -np.quantile(-x, 1 - level, method="inverted_cdf")
-            # Also note that 1 - level can have a loss of precision, e.g. 1 - 0.1
-            # = 0.09999999999999998 but 0.1 would be right.
-            return -np.quantile(
-                -x, float(1 - Decimal(str(level))), method="inverted_cdf"
-            )
-
-        xl, rl = gpava(quantile_lower, x, wx)
+        xl, rl = gpava(partial(quantile_lower, level=level), x, wx)
         # Applying gpava on fun=np.quantile(x, level, method="higher") does not work
         # for unknown reasons. What works is to calculate the upper quantile on the
         # blocks given by rl from the lower quantile.
         q = np.fromiter(
-            (quantile_upper(x[rl[i] : rl[i + 1]]) for i in range(len(rl) - 1)),
+            (
+                partial(quantile_upper, level=level)(x[rl[i] : rl[i + 1]])
+                for i in range(len(rl) - 1)
+            ),
             dtype=xl.dtype,
         )
         # Take mininum from the right.

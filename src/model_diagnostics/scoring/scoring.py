@@ -20,7 +20,11 @@ from model_diagnostics._utils._array import (
     validate_2_arrays,
     validate_same_first_dimension,
 )
-from model_diagnostics._utils.isotonic import IsotonicRegression
+from model_diagnostics._utils.isotonic import (
+    IsotonicRegression,
+    quantile_lower,
+    quantile_upper,
+)
 from model_diagnostics.calibration import identification_function
 
 
@@ -840,7 +844,9 @@ def decompose(
         if functional == "expectile":
             marginal = expectile(y_o, alpha=level, weights=w)
         elif functional == "quantile":
-            marginal = np.quantile(y_o, q=level, method="inverted_cdf")
+            marginal = 0.5 * (
+                quantile_lower(y_o, level=level) + quantile_upper(y_o, level=level)
+            )
 
     if y_o[0] == marginal == y_o[-1]:
         # y_o is constant. We need to check if y_o is allowed as argument to y_pred.
@@ -856,6 +862,16 @@ def decompose(
             )
             raise ValueError(msg) from exc
 
+    # The recalibrated versions, further down, could contain min(y_obs) and that could
+    # be outside of the valid domain, e.g. y_pred = 0 for the Poisson deviance where
+    # y_obs=0 is allowed. We detect that here:
+    y_min = np.amin(y_o)
+    y_min_allowed = True
+    try:
+        scoring_function(y_o[:1], np.array([y_min]), None if w is None else w[:1])
+    except ValueError:
+        y_min_allowed = False
+
     marginal = np.full_like(y_o, fill_value=marginal, dtype=float)
     score_marginal = scoring_function(y_o, marginal, w)
 
@@ -865,6 +881,30 @@ def decompose(
         x = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
         iso.fit(x, y_o, sample_weight=w)
         recalibrated = np.squeeze(iso.predict(x))
+        if not y_min_allowed and recalibrated[0] <= y_min:
+            # Oh dear, this needs quite some extra work:
+            # First index of value greater than y_min
+            idx1 = np.argmax(recalibrated > y_min)
+            val1 = recalibrated[idx1]
+            # First index of value greater than the value at idx1.
+            idx2 = np.argmax(recalibrated > val1)
+            # Note that val1 may already be the largest value of the array => idx2 = 0.
+            if idx2 == 0:
+                idx2 = recalibrated.shape[0]
+            # We merge the first 2 blocks of the isotonic regression as it violates
+            # our domain requirements.
+            re2 = recalibrated[:idx2]
+            w2 = None if w is None else w[:idx2]
+            if functional == "mean":
+                recalibrated[:idx2] = np.average(re2, weights=w2)
+            elif functional == "expectile":
+                recalibrated[:idx2] = expectile(re2, alpha=level, weights=w2)
+            elif functional == "quantile":
+                # Note, no scoring function known that could end up here.
+                lower = quantile_lower(re2, level=level)
+                upper = quantile_upper(re2, level=level)
+                recalibrated[:idx2] = 0.5 * (lower + upper)
+
         score = scoring_function(y_o, x, w)
         try:
             score_recalibrated = scoring_function(y_o, recalibrated, w)
