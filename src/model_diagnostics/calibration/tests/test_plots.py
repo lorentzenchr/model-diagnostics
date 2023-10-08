@@ -6,14 +6,14 @@ from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
-from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
-from model_diagnostics.tests import (
+from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
     pa_table,
     pd_available,
     pd_Series,
 )
+from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
 
 
 @pytest.mark.parametrize(

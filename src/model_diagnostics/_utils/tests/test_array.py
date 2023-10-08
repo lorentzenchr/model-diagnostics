@@ -13,7 +13,7 @@ from model_diagnostics._utils._array import (
     validate_2_arrays,
     validate_same_first_dimension,
 )
-from model_diagnostics.tests import (
+from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
     pa_float64,

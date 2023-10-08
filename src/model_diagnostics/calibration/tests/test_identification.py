@@ -7,13 +7,13 @@ from polars.testing import assert_frame_equal, assert_series_equal
 from scipy.special import stdtr
 from scipy.stats import expectile, ttest_1samp
 
-from model_diagnostics.calibration import compute_bias, identification_function
-from model_diagnostics.tests import (
+from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
     pa_DictionaryArray_from_arrays,
     pd_Series,
 )
+from model_diagnostics.calibration import compute_bias, identification_function
 
 
 @pytest.mark.parametrize(
