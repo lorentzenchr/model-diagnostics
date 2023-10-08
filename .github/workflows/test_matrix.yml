@@ -48,6 +48,9 @@ jobs:
       name: Build docs
       run: hatch run docs:build
 
-    - name: Run test matrix
-      run: hatch -e test run pytest
+    - if: matrix.python-version == '3.9' && runner.os == 'Linux'
+      name: Run test matrix
+      run: |
+        hatch -e test run versions
+        hatch -e test run pytest
 
