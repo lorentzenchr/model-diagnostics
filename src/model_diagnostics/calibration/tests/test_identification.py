@@ -1,15 +1,19 @@
 from functools import partial
 
 import numpy as np
-import pandas as pd
 import polars as pl
-import pyarrow as pa
 import pytest
 from polars.testing import assert_frame_equal, assert_series_equal
 from scipy.special import stdtr
 from scipy.stats import expectile, ttest_1samp
 
 from model_diagnostics.calibration import compute_bias, identification_function
+from model_diagnostics.tests import (
+    SkipContainer,
+    pa_array,
+    pa_DictionaryArray_from_arrays,
+    pd_Series,
+)
 
 
 @pytest.mark.parametrize(
@@ -54,34 +58,52 @@ def test_identification_function_raises(functional, level, msg):
     ("feature", "f_grouped"),
     [
         (
-            pa.DictionaryArray.from_arrays([0, 0, 1, 1, 1], ["b", "a"]),
-            pa.DictionaryArray.from_arrays(np.array([0, 1], dtype=np.int8), ["b", "a"]),
+            pl.Series(["a", "a", "b", "b", "b"]),
+            pl.Series(["a", "b"]),
         ),
         (
-            pa.array(["a", "a", "b", "b", "b"]),
-            pa.array(["a", "b"]),
+            pl.Series([0.1, 0.1, 0.9, 0.9, 0.9]),
+            pl.Series([0.1, 0.9]),
         ),
         (
-            pa.array([0.1, 0.1, 0.9, 0.9, 0.9]),
-            pa.array([0.1, 0.9]),
+            pl.Series([None, np.nan, 1.0, 1, 1]),
+            pl.Series([None, 1.0]),
         ),
         (
-            pa.array([None, np.nan, 1.0, 1, 1]),
-            pa.array([None, 1.0]),
+            pl.Series(["a", "a", None, None, None]),
+            pl.Series(["a", None]),
         ),
         (
-            pa.array(["a", "a", None, None, None]),
-            pa.array(["a", None]),
+            pa_array(["a", "a", "b", "b", "b"]),
+            pa_array(["a", "b"]),
+        ),
+        (
+            pa_array([0.1, 0.1, 0.9, 0.9, 0.9]),
+            pa_array([0.1, 0.9]),
+        ),
+        (
+            pa_array([None, np.nan, 1.0, 1, 1]),
+            pa_array([None, 1.0]),
+        ),
+        (
+            pa_array(["a", "a", None, None, None]),
+            pa_array(["a", None]),
+        ),
+        (
+            pa_DictionaryArray_from_arrays([0, 0, 1, 1, 1], ["b", "a"]),
+            pa_DictionaryArray_from_arrays(np.array([0, 1], dtype=np.int8), ["b", "a"]),
         ),
     ],
 )
 def test_compute_bias(feature, f_grouped):
     """Test compute_bias on simple data."""
+    if isinstance(feature, SkipContainer):
+        pytest.skip("Module for data container not imported.")
     with pl.StringCache():
         # The string cache is needed to avoid the following error message:
         # exceptions.ComputeError: Cannot compare categoricals originating from
         # different sources. Consider setting a global string cache.
-        df = pa.table(
+        df = pl.DataFrame(
             {
                 "y_obs": [0, 1, 2, 4, 3],
                 "y_pred": [1, 1, 2, 2, 2],
@@ -90,9 +112,9 @@ def test_compute_bias(feature, f_grouped):
         )
         # V = [1, 0, 0, -2, -1]
         df_bias = compute_bias(
-            y_obs=df.column("y_obs"),
-            y_pred=df.column("y_pred"),
-            feature=df.column("feature"),
+            y_obs=df.get_column("y_obs"),
+            y_pred=df.get_column("y_pred"),
+            feature=df.get_column("feature"),
         )
         df_expected = pl.DataFrame(
             {
@@ -139,7 +161,7 @@ def test_compute_bias(feature, f_grouped):
 
 def test_compute_bias_feature_none():
     """Test compute_bias for feature = None."""
-    df = pa.table(
+    df = pl.DataFrame(
         {
             "y_obs": [0, 1, 2, 4, 3],
             "y_pred": [1, 1, 2, 2, 2],
@@ -147,8 +169,8 @@ def test_compute_bias_feature_none():
     )
     # V = [1, 0, 0, -2, -1]
     df_bias = compute_bias(
-        y_obs=df.column("y_obs"),
-        y_pred=df.column("y_pred"),
+        y_obs=df.get_column("y_obs"),
+        y_pred=df.get_column("y_pred"),
         feature=None,
     )
     df_expected = pl.DataFrame(
@@ -272,17 +294,21 @@ def test_compute_bias_multiple_predictions(feature_type):
         n_obs = 10
         y_obs = np.ones(n_obs)
         y_obs[: 10 // 2] = 2
-        y_pred = pd.DataFrame(
+        y_pred = pl.DataFrame(
             {"model_1": np.ones(n_obs), "model_2": 3 * np.ones(n_obs)}
         )
         if feature_type == "cat":
-            feature = pd.Series(
+            feature = pd_Series(
                 y_obs.astype("=U8"), dtype="category", name="nice_feature"
             )
         elif feature_type == "string":
-            feature = pd.Series(y_obs.astype("=U8"), name="nice_feature")
+            feature = pd_Series(y_obs.astype("=U8"), name="nice_feature")
         else:
-            feature = pd.Series(y_obs, name="nice_feature")
+            feature = pl.Series(values=y_obs, name="nice_feature")
+
+        if isinstance(feature, SkipContainer):
+            pytest.skip("Module for data container not imported.")
+
         df_bias = compute_bias(
             y_obs=y_obs,
             y_pred=y_pred,
@@ -318,7 +344,7 @@ def test_compute_bias_multiple_predictions(feature_type):
         feature_np = feature.to_numpy()
         if feature_type == "cat":
             # convert object to pd.Categorical
-            feature_np = pd.Series(feature_np, dtype="category")
+            feature_np = pd_Series(feature_np, dtype="category")
         elif feature_type == "string":
             feature_np = feature_np.astype("=U8")  # to_numpy gives dtype=object
         df_bias = compute_bias(
@@ -469,7 +495,7 @@ def test_compute_bias_raises_weights_shape():
 
 @pytest.mark.parametrize(
     "list2array",
-    [lambda x: x, np.asarray, pa.array, pd.Series, pl.Series],
+    [lambda x: x, np.asarray, pa_array, pd_Series, pl.Series],
 )
 def test_compute_bias_1d_array_like(list2array):
     """Test that plot_reliability_diagram workds for 1d array-likes."""
@@ -477,6 +503,8 @@ def test_compute_bias_1d_array_like(list2array):
     y_pred = list2array([-1, 1, 0, 2])
     feature = list2array([0, 1, 0, 1])
     weights = list2array([1, 1, 1, 1])
+    if isinstance(y_pred, SkipContainer):
+        pytest.skip("Module for data container not imported.")
     df_bias = compute_bias(y_obs=y_obs, y_pred=y_pred, weights=weights, feature=feature)
     df_expected = pl.DataFrame(
         {
