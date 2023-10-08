@@ -12,7 +12,6 @@ from model_diagnostics.tests import (
     SkipContainer,
     pa_array,
     pa_DictionaryArray_from_arrays,
-    pa_table,
     pd_Series,
 )
 
@@ -59,8 +58,20 @@ def test_identification_function_raises(functional, level, msg):
     ("feature", "f_grouped"),
     [
         (
-            pa_DictionaryArray_from_arrays([0, 0, 1, 1, 1], ["b", "a"]),
-            pa_DictionaryArray_from_arrays(np.array([0, 1], dtype=np.int8), ["b", "a"]),
+            pl.Series(["a", "a", "b", "b", "b"]),
+            pl.Series(["a", "b"]),
+        ),
+        (
+            pl.Series([0.1, 0.1, 0.9, 0.9, 0.9]),
+            pl.Series([0.1, 0.9]),
+        ),
+        (
+            pl.Series([None, np.nan, 1.0, 1, 1]),
+            pl.Series([None, 1.0]),
+        ),
+        (
+            pl.Series(["a", "a", None, None, None]),
+            pl.Series(["a", None]),
         ),
         (
             pa_array(["a", "a", "b", "b", "b"]),
@@ -78,15 +89,21 @@ def test_identification_function_raises(functional, level, msg):
             pa_array(["a", "a", None, None, None]),
             pa_array(["a", None]),
         ),
+        (
+            pa_DictionaryArray_from_arrays([0, 0, 1, 1, 1], ["b", "a"]),
+            pa_DictionaryArray_from_arrays(np.array([0, 1], dtype=np.int8), ["b", "a"]),
+        ),
     ],
 )
 def test_compute_bias(feature, f_grouped):
     """Test compute_bias on simple data."""
+    if isinstance(feature, SkipContainer):
+        pytest.skip("Module for data container not imported.")
     with pl.StringCache():
         # The string cache is needed to avoid the following error message:
         # exceptions.ComputeError: Cannot compare categoricals originating from
         # different sources. Consider setting a global string cache.
-        df = pa_table(
+        df = pl.DataFrame(
             {
                 "y_obs": [0, 1, 2, 4, 3],
                 "y_pred": [1, 1, 2, 2, 2],
@@ -95,9 +112,9 @@ def test_compute_bias(feature, f_grouped):
         )
         # V = [1, 0, 0, -2, -1]
         df_bias = compute_bias(
-            y_obs=df.column("y_obs"),
-            y_pred=df.column("y_pred"),
-            feature=df.column("feature"),
+            y_obs=df.get_column("y_obs"),
+            y_pred=df.get_column("y_pred"),
+            feature=df.get_column("feature"),
         )
         df_expected = pl.DataFrame(
             {
@@ -144,7 +161,7 @@ def test_compute_bias(feature, f_grouped):
 
 def test_compute_bias_feature_none():
     """Test compute_bias for feature = None."""
-    df = pa_table(
+    df = pl.DataFrame(
         {
             "y_obs": [0, 1, 2, 4, 3],
             "y_pred": [1, 1, 2, 2, 2],
@@ -152,8 +169,8 @@ def test_compute_bias_feature_none():
     )
     # V = [1, 0, 0, -2, -1]
     df_bias = compute_bias(
-        y_obs=df.column("y_obs"),
-        y_pred=df.column("y_pred"),
+        y_obs=df.get_column("y_obs"),
+        y_pred=df.get_column("y_pred"),
         feature=None,
     )
     df_expected = pl.DataFrame(
@@ -486,6 +503,8 @@ def test_compute_bias_1d_array_like(list2array):
     y_pred = list2array([-1, 1, 0, 2])
     feature = list2array([0, 1, 0, 1])
     weights = list2array([1, 1, 1, 1])
+    if isinstance(y_pred, SkipContainer):
+        pytest.skip("Module for data container not imported.")
     df_bias = compute_bias(y_obs=y_obs, y_pred=y_pred, weights=weights, feature=feature)
     df_expected = pl.DataFrame(
         {

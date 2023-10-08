@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
@@ -81,7 +81,7 @@ def test_plot_murphy_diagram(functional, level, etas, weights, ax):
 
     plt_ax = plot_murphy_diagram(
         y_obs=y_test,
-        y_pred=pd.Series(y_pred, name="simple"),
+        y_pred=pl.Series(values=y_pred, name="simple"),
         weights=w_test,
         etas=etas,
         functional=functional,
@@ -96,7 +96,7 @@ def test_plot_murphy_diagram_multiple_predictions():
     n_obs = 10
     y_obs = np.arange(n_obs)
     y_obs[::2] = 0
-    y_pred = pd.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
+    y_pred = pl.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
     fig, ax = plt.subplots()
     plt_ax = plot_murphy_diagram(
         y_obs=y_obs,
