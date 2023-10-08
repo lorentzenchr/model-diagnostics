@@ -485,13 +485,13 @@ def compute_bias(
             stderr_ = df.get_column("bias_stderr")
             p_value = np.full_like(stderr_, fill_value=np.nan)
             n = df.get_column("bias_count")
-            p_value[(n > 1) & (stderr_ == 0)] = 0
+            p_value[np.asarray((n > 1) & (stderr_ == 0), dtype=bool)] = 0
             mask = stderr_ > 0
             x = df.get_column("bias_mean").filter(mask).to_numpy()
             n = df.get_column("bias_count").filter(mask).to_numpy()
             stderr = stderr_.filter(mask).to_numpy()
             # t-statistic t (-|t| and factor of 2 because of 2-sided test)
-            p_value[mask] = 2 * special.stdtr(
+            p_value[np.asarray(mask, dtype=bool)] = 2 * special.stdtr(
                 n - 1,  # degrees of freedom
                 -np.abs(x / stderr),
             )
