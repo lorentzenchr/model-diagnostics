@@ -275,10 +275,13 @@ def compute_bias(
             elif feature.dtype in [pl.Utf8, pl.Object]:
                 # We could convert strings to categoricals.
                 is_string = True
-            elif feature.is_float():
+            # FIXME: polars >= 0.19.14
+            # Then, just use Series.dtype.is_float()
+            elif (hasattr(feature.dtype, "is_float") and feature.dtype.is_float()) or (
+                not hasattr(feature.dtype, "is_float") and feature.is_float()
+            ):
                 # We treat NaN as Null values, numpy will see a Null as a NaN.
-                if feature.is_float():
-                    feature = feature.fill_nan(None)
+                feature = feature.fill_nan(None)
             else:
                 # integers
                 pass

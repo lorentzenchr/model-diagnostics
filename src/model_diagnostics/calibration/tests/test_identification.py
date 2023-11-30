@@ -3,10 +3,12 @@ from functools import partial
 import numpy as np
 import polars as pl
 import pytest
+from packaging.version import Version
 from polars.testing import assert_frame_equal, assert_series_equal
 from scipy.special import stdtr
 from scipy.stats import expectile, ttest_1samp
 
+from model_diagnostics import polars_version
 from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
@@ -133,13 +135,17 @@ def test_compute_bias(feature, f_grouped):
         assert_frame_equal(df_bias, df_expected, check_exact=False)
 
         # Same with weights.
-        feature = pl.Series(values=feature)
+        # FIXME: polars >= 0.19.14
+        if polars_version >= Version("0.19.14"):
+            feature = pl.Series(values=feature).gather([0, 4, 4]).alias("feature")
+        else:
+            feature = pl.Series(values=feature).take([0, 4, 4]).alias("feature")
         df_bias = compute_bias(
             # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
             y_obs=[0.5, 8 / 3, 10 / 3],
             y_pred=[1, 2, 2],
             weights=[2, 1.5, 1.5],
-            feature=feature.take([0, 4, 4]).alias("feature"),
+            feature=feature,
         )
         # V = [0.5, -2/3, -4/3]
         df_expected = pl.DataFrame(
