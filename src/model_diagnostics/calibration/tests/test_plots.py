@@ -2,10 +2,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import pytest
+from packaging.version import Version
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
+from model_diagnostics import polars_version
 from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
@@ -245,14 +247,27 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
     with pl.StringCache():
         if with_null_values:
             if feature_type == "cat":
-                feature = (
-                    pl.Series(feature)
-                    .cast(str)
-                    .set_at_idx(0, None)
-                    .cast(pl.Categorical)
-                )
+                # FIXME: polars >= 0.19.14
+                if polars_version >= Version("0.19.14"):
+                    feature = (
+                        pl.Series(feature)
+                        .cast(str)
+                        .scatter(0, None)
+                        .cast(pl.Categorical)
+                    )
+                else:
+                    feature = (
+                        pl.Series(feature)
+                        .cast(str)
+                        .set_at_idx(0, None)
+                        .cast(pl.Categorical)
+                    )
             else:
-                feature = pl.Series(feature).set_at_idx(0, None)
+                # FIXME: polars >= 0.19.14
+                if polars_version >= Version("0.19.14"):  # noqa: PLR5501
+                    feature = pl.Series(feature).scatter(0, None)
+                else:
+                    feature = pl.Series(feature).set_at_idx(0, None)
 
         plt_ax = plot_bias(
             y_obs=y_test,
@@ -330,7 +345,11 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_leve
         feature = feature.astype(str)
 
     if with_null:
-        feature = pl.Series(feature).set_at_idx([0, 5], None)
+        # FIXME: polars >= 0.19.14
+        if polars_version >= Version("0.19.14"):
+            feature = pl.Series(feature).scatter([0, 5], None)
+        else:
+            feature = pl.Series(feature).set_at_idx([0, 5], None)
 
     fig, ax = plt.subplots()
     ax = plot_bias(
