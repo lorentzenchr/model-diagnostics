@@ -36,6 +36,7 @@ nav:
   - Examples:
     - Regression on Workers' Compensation: examples/regression_on_workers_compensation.ipynb
     - Quantile Regression: examples/quantile_regression.ipynb
+    - Classification: examples/classification.ipynb
   - API Reference: reference/  # defer to gen-files + literate-nav
   - Development: development.md
   - Release Notes: https://github.com/lorentzenchr/model-diagnostics/releases
