@@ -726,3 +726,34 @@ def test_decompose_constant_0_y_obs(y, sf):
             y_pred=y_pred,
             scoring_function=sf,
         )
+
+
+@pytest.mark.parametrize(
+    ("y_obs", "y_pred", "sf", "recalibrated"),
+    [
+        ([0, 1], [0.25, 0.75], PoissonDeviance(), [0.5] * 2),
+        ([0, 0, 1, 1], [0.3, 0.2, 0.8, 0.7], PoissonDeviance(), [0.5] * 4),
+        (
+            [0, 0, 1, 1, 2],
+            [0.3, 0.2, 0.8, 0.7, 7],
+            PoissonDeviance(),
+            [0.5, 0.5, 0.5, 0.5, 2],
+        ),
+        (
+            [0, 0, 1, 1, 2],
+            [0.3, 0.2, 0.8, 0.7, 7],
+            HomogeneousExpectileScore(degree=1, level=0.25),
+            [0.25, 0.25, 0.25, 0.25, 2],
+        ),
+    ],
+)
+def test_decompose_isotonic_outside_range(y_obs, y_pred, sf, recalibrated):
+    """Test that decompose works if isotonic regression is outside calid domain."""
+    df = decompose(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        scoring_function=sf,
+    )
+    score = sf(y_obs=y_obs, y_pred=y_pred)
+    score_recalibrated = sf(y_obs=y_obs, y_pred=recalibrated)
+    assert score - score_recalibrated == pytest.approx(df["miscalibration"][0])

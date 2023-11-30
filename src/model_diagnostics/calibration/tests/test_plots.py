@@ -1,13 +1,20 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import polars as pl
-import pyarrow as pa
 import pytest
+from packaging.version import Version
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
+from model_diagnostics import polars_version
+from model_diagnostics._utils.test_helper import (
+    SkipContainer,
+    pa_array,
+    pa_table,
+    pd_available,
+    pd_Series,
+)
 from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
 
 
@@ -84,7 +91,7 @@ def test_plot_reliability_diagram(diagram_type, functional, n_bootstrap, weights
 
     plt_ax = plot_reliability_diagram(
         y_obs=y_test,
-        y_pred=pd.Series(y_pred, name="simple"),
+        y_pred=pl.Series(values=y_pred, name="simple"),
         weights=w_test,
         ax=ax,
         n_bootstrap=n_bootstrap,
@@ -101,7 +108,7 @@ def test_plot_reliability_diagram_multiple_predictions():
     n_obs = 10
     y_obs = np.arange(n_obs)
     y_obs[::2] = 0
-    y_pred = pd.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
+    y_pred = pl.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
     fig, ax = plt.subplots()
     plt_ax = plot_reliability_diagram(
         y_obs=y_obs,
@@ -116,12 +123,14 @@ def test_plot_reliability_diagram_multiple_predictions():
 
 @pytest.mark.parametrize(
     "list2array",
-    [lambda x: x, np.asarray, pa.array, pd.Series, pl.Series],
+    [lambda x: x, np.asarray, pa_array, pd_Series, pl.Series],
 )
 def test_plot_reliability_diagram_1d_array_like(list2array):
     """Test that plot_reliability_diagram workds for 1d array-likes."""
     y_obs = list2array([0, 1, 2])
     y_pred = list2array([-1, 1, 0])
+    if isinstance(y_pred, SkipContainer):
+        pytest.skip("Module for data container not imported.")
     plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
 
 
@@ -130,7 +139,7 @@ def test_plot_reliability_diagram_1d_array_like(list2array):
     [
         lambda x: x,
         np.asarray,
-        lambda x: pa.table(x, names=["0", "1", "2"]),
+        lambda x: pa_table(x, names=["0", "1", "2"]),
         lambda x: pl.DataFrame(x, schema=["0", "1", "2"], orient="row"),
     ],
 )
@@ -138,6 +147,8 @@ def test_plot_reliability_diagram_2d_array_like(list2array):
     """Test that plot_reliability_diagram workds for 2d array-likes."""
     y_obs = [0, 1, 2]
     y_pred = list2array([[-1, 1, 0], [1, 2, 3], [-3, -2, -1]])
+    if isinstance(y_pred, SkipContainer):
+        pytest.skip("Module for data container not imported.")
     plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred)
 
 
@@ -151,17 +162,18 @@ def test_plot_reliability_diagram_constant_prediction_transform_output():
     np.random.default_rng(42)
     y_obs = np.arange(n_obs)
     y_pred = np.full_like(y_obs, 14.1516)  # a constant prediction
-    y_obs = pd.Series(y_obs, name="y")
-    y_pred = pd.Series(y_pred, name="z")
+    y_obs = pl.Series(values=y_obs, name="y")
+    y_pred = pl.Series(values=y_pred, name="z")
 
     plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, n_bootstrap=10)
 
-    import sklearn
+    if pd_available:
+        import sklearn
 
-    with sklearn.config_context(transform_output="pandas"):
-        # Without our internal code setting set_output(transform="default"),
-        # this test will error.
-        plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, n_bootstrap=10)
+        with sklearn.config_context(transform_output="pandas"):
+            # Without our internal code setting set_output(transform="default"),
+            # this test will error.
+            plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, n_bootstrap=10)
 
 
 @pytest.mark.parametrize(
@@ -185,7 +197,7 @@ def test_plot_bias_raises(param, value, msg):
 
 
 def test_plot_bias_warning_for_null_stderr():
-    """Test that plot_bias gives warning for when some stderr are Null."""
+    """Test that plot_bias gives warning when some stderr are Null."""
     y_obs = np.arange(3).astype(float)
     y_obs[0] = np.nan
     y_pred = y_obs + 1
@@ -222,24 +234,40 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
         # We first convert to string as polars does not like pandas.categorical with
         # non-string values.
         bins = np.quantile(feature, [0.2, 0.5, 0.8])
-        feature = pd.Series(
+        feature = pd_Series(
             np.digitize(feature, bins=bins).astype("=U8"), dtype="category"
         )
     elif feature_type == "string":
         bins = np.quantile(feature, [0.2, 0.5, 0.8])
         feature = np.digitize(feature, bins=bins).astype("=U8")
 
+    if isinstance(feature, SkipContainer):
+        pytest.skip("Module for data container not imported.")
+
     with pl.StringCache():
         if with_null_values:
             if feature_type == "cat":
-                feature = (
-                    pl.Series(feature)
-                    .cast(str)
-                    .set_at_idx(0, None)
-                    .cast(pl.Categorical)
-                )
+                # FIXME: polars >= 0.19.14
+                if polars_version >= Version("0.19.14"):
+                    feature = (
+                        pl.Series(feature)
+                        .cast(str)
+                        .scatter(0, None)
+                        .cast(pl.Categorical)
+                    )
+                else:
+                    feature = (
+                        pl.Series(feature)
+                        .cast(str)
+                        .set_at_idx(0, None)
+                        .cast(pl.Categorical)
+                    )
             else:
-                feature = pl.Series(feature).set_at_idx(0, None)
+                # FIXME: polars >= 0.19.14
+                if polars_version >= Version("0.19.14"):  # noqa: PLR5501
+                    feature = pl.Series(feature).scatter(0, None)
+                else:
+                    feature = pl.Series(feature).set_at_idx(0, None)
 
         plt_ax = plot_bias(
             y_obs=y_test,
@@ -264,7 +292,7 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
 
         plt_ax = plot_bias(
             y_obs=y_test,
-            y_pred=pd.Series(clf.predict_proba(X_test)[:, 1], name="simple"),
+            y_pred=pl.Series(values=clf.predict_proba(X_test)[:, 1], name="simple"),
             feature=feature,
             confidence_level=confidence_level,
             ax=ax,
@@ -275,7 +303,7 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
 def test_plot_bias_feature_none():
     """Test that plot_bias works."""
     y_obs = np.arange(10)
-    y_pred = pd.DataFrame(
+    y_pred = pl.DataFrame(
         {
             "model_1": np.arange(10) + 0.5,
             "model_3": (y_obs - 5) ** 2,
@@ -317,7 +345,11 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_leve
         feature = feature.astype(str)
 
     if with_null:
-        feature = pl.Series(feature).set_at_idx([0, 5], None)
+        # FIXME: polars >= 0.19.14
+        if polars_version >= Version("0.19.14"):
+            feature = pl.Series(feature).scatter([0, 5], None)
+        else:
+            feature = pl.Series(feature).set_at_idx([0, 5], None)
 
     fig, ax = plt.subplots()
     ax = plot_bias(
