@@ -99,7 +99,10 @@ def test_plot_reliability_diagram(diagram_type, functional, n_bootstrap, weights
         assert plt_ax.get_ylabel() == f"estimated {ylabels_mapping[functional]}"
         assert plt_ax.get_title() == "Reliability Diagram"
     else:
-        assert plt_ax.get_ylabel() == f"prediction - estimated {ylabels_mapping[functional]}"
+        assert (
+            plt_ax.get_ylabel()
+            == f"prediction - estimated {ylabels_mapping[functional]}"
+        )
         assert plt_ax.get_title() == "Bias Reliability Diagram"
 
     plt_ax = plot_reliability_diagram(
