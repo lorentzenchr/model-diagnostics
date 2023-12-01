@@ -79,14 +79,27 @@ def test_plot_reliability_diagram(diagram_type, functional, n_bootstrap, weights
         diagram_type=diagram_type,
     )
 
+    xlabels_mapping = {
+        "mean": "E(Y|X)",
+        "median": "median(Y|X)",
+        "expectile": "0.8-expectile(Y|X)",
+        "quantile": "0.8-quantile(Y|X)",
+    }
+    ylabels_mapping = {
+        "mean": "E(Y|prediction)",
+        "median": "median(Y|prediction)",
+        "expectile": "0.8-expectile(Y|prediction)",
+        "quantile": "0.8-quantile(Y|prediction)",
+    }
+
     if ax is not None:
         assert ax is plt_ax
-    assert plt_ax.get_xlabel() == "prediction for E(Y|X)"
+    assert plt_ax.get_xlabel() == f"prediction for {xlabels_mapping[functional]}"
     if diagram_type == "reliability":
-        assert plt_ax.get_ylabel() == "estimated E(Y|prediction)"
+        assert plt_ax.get_ylabel() == f"estimated {ylabels_mapping[functional]}"
         assert plt_ax.get_title() == "Reliability Diagram"
     else:
-        assert plt_ax.get_ylabel() == "prediction - estimated E(Y|prediction)"
+        assert plt_ax.get_ylabel() == f"prediction - estimated {ylabels_mapping[functional]}"
         assert plt_ax.get_title() == "Bias Reliability Diagram"
 
     plt_ax = plot_reliability_diagram(
