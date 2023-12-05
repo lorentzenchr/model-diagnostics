@@ -205,13 +205,26 @@ def plot_reliability_diagram(
         )
         ax.plot(iso.X_thresholds_, y_plot, label=label)
 
+    xlabel_mapping = {
+        "mean": "E(Y|X)",
+        "median": "median(Y|X)",
+        "expectile": f"{level}-expectile(Y|X)",
+        "quantile": f"{level}-quantile(Y|X)",
+    }
+    ylabel_mapping = {
+        "mean": "E(Y|prediction)",
+        "median": "median(Y|prediction)",
+        "expectile": f"{level}-expectile(Y|prediction)",
+        "quantile": f"{level}-quantile(Y|prediction)",
+    }
+    xlabel = "prediction for " + xlabel_mapping[functional]
     if diagram_type == "reliability":
-        ylabel = "estimated E(Y|prediction)"
+        ylabel = "estimated " + ylabel_mapping[functional]
         title = "Reliability Diagram"
     else:
-        ylabel = "prediction - estimated E(Y|prediction)"
+        ylabel = "prediction - estimated " + ylabel_mapping[functional]
         title = "Bias Reliability Diagram"
-    ax.set(xlabel="prediction for E(Y|X)", ylabel=ylabel)
+    ax.set(xlabel=xlabel, ylabel=ylabel)
 
     if n_pred >= 2:
         ax.set_title(title)
