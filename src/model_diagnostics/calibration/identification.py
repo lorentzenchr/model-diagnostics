@@ -270,7 +270,10 @@ def compute_bias(
             # MUST be under the StringCache context manager!
             feature = pl.Series(name=feature_name, values=feature)
             validate_same_first_dimension(y_obs, feature)
-            if feature.dtype is pl.Categorical:
+            if (feature.dtype == pl.Categorical) or (
+                polars_version >= Version("0.20.0") and feature.dtype == pl.Enum
+            ):
+                # FIXME: polars >= 0.20.0
                 is_categorical = True
             elif feature.dtype in [pl.Utf8, pl.Object]:
                 # We could convert strings to categoricals.
@@ -290,7 +293,7 @@ def compute_bias(
                 # For categorical and string features, knowing the frequency table in
                 # advance makes life easier in order to make results consistent.
                 # Consider
-                #     feature  counts
+                #     feature  count
                 #         "a"      3
                 #         "b"      2
                 #         "c"      2
@@ -308,10 +311,15 @@ def compute_bias(
                 if n_bins_ef >= value_count.shape[0]:
                     n_bins = value_count.shape[0]
                 else:
-                    n = value_count["counts"][n_bins_ef]
-                    n_bins_tmp = value_count.filter(pl.col("counts") >= n).shape[0]
+                    # FIXME: polars >= 0.20
+                    if polars_version >= Version("0.20.0"):
+                        count_name = "count"
+                    else:
+                        count_name = "counts"
+                    n = value_count[count_name][n_bins_ef]
+                    n_bins_tmp = value_count.filter(pl.col(count_name) >= n).shape[0]
                     if n_bins_tmp > n_bins_ef:
-                        n_bins = value_count.filter(pl.col("counts") > n).shape[0]
+                        n_bins = value_count.filter(pl.col(count_name) > n).shape[0]
                     else:
                         n_bins = n_bins_tmp
 

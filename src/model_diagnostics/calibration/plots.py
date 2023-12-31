@@ -7,10 +7,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from packaging.version import Version
 from scipy import special
 from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression as IsotonicRegression_skl
 
+from model_diagnostics import polars_version
 from model_diagnostics._utils._array import (
     array_name,
     get_array_min_max,
@@ -363,9 +365,12 @@ def plot_bias(
 
     is_categorical = False
     is_string = False
-    if df.get_column(feature_name).dtype is pl.Categorical:
+    feature_dtype = df.get_column(feature_name).dtype
+    if (feature_dtype == pl.Categorical) or (
+        polars_version >= Version("0.20.0") and feature_dtype == pl.Enum
+    ):
         is_categorical = True
-    elif df.get_column(feature_name).dtype in [pl.Utf8, pl.Object]:
+    elif feature_dtype in [pl.Utf8, pl.Object]:
         is_string = True
 
     n_x = df[feature_name].n_unique()
