@@ -68,7 +68,7 @@ def identification_function(
     \in \mathcal{F}
     \]
 
-    for some class of distribtions \(\mathcal{F}\). Implemented examples of the
+    for some class of distributions \(\mathcal{F}\). Implemented examples of the
     functional \(T\) are mean, median, expectiles and quantiles.
 
     | functional | strict identification function \(V(y, z)\)           |
