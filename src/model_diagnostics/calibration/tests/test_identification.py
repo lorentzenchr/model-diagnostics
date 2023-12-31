@@ -231,7 +231,9 @@ def test_compute_bias_numerical_feature():
         feature=df.get_column("feature"),
         n_bins=n_bins,
     )
-    bias = (df.get_column("y_pred") - df.get_column("y_obs")).to_numpy()
+    # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
+    # of numpy array. Therefore, we add the np.asarray().
+    bias = np.asarray((df.get_column("y_pred") - df.get_column("y_obs")).to_numpy())
     df_expected = pl.DataFrame(
         {
             "feature": 0.045 + 0.1 * np.arange(10),
@@ -268,29 +270,51 @@ def test_compute_bias_n_bins_numerical_feature(n_bins):
     assert df_bias["bias_count"].sum() == n_obs
 
 
-def test_compute_n_bins_string_feature():
+@pytest.mark.parametrize("feature_type", ["cat", "cat_physical", "enum", "string"])
+def test_compute_n_bins_string_like_feature(feature_type):
     """Test compute_bias returns right number of bins and sorted for string feature."""
-    n_bins = 3
-    n_obs = 6
-    y_obs = np.arange(n_obs)
-    y_pred = pl.Series("model", np.arange(n_obs) + 0.5)
-    feature = pl.Series("feature", ["a", "a", None, "b", "b", "c"])
+    if feature_type == "cat":
+        dtype = pl.Categorical
+    elif feature_type == "cat_physical":
+        if polars_version >= Version("0.20.0"):
+            dtype = pl.Categorical(ordering="physical")
+        else:
+            pytest.skip("Test needs polars >= 0.20.0")
+    elif feature_type == "enum":
+        if polars_version >= Version("0.20.0"):
+            dtype = pl.Enum(categories=["b", "a", "c"])
+        else:
+            pytest.skip("Test needs polars >= 0.20.0")
+    else:
+        dtype = pl.Utf8
 
-    df_expected = pl.DataFrame(
-        {
-            "feature": [None, "a", "b"],
-            "bias_mean": 0.5,
-            "bias_count": pl.Series([1, 2, 2], dtype=pl.UInt32),
-        }
-    )
-    for _i in range(10):
-        # The default args in polars group_by(..., maintain_order=False) returns
-        # non-deterministic ordering which compute_bias should take care of such
-        # that compute_bias is deterministic.
-        df = compute_bias(y_obs=y_obs, y_pred=y_pred, feature=feature, n_bins=n_bins)
-        assert_frame_equal(
-            df.select(["feature", "bias_mean", "bias_count"]), df_expected
+    with pl.StringCache():
+        n_bins = 3
+        n_obs = 6
+        y_obs = np.arange(n_obs)
+        y_pred = pl.Series("model", np.arange(n_obs) + 0.5)
+        feature = pl.Series("feature", ["a", "a", None, "b", "b", "c"], dtype=dtype)
+
+        df_expected = pl.DataFrame(
+            {
+                "feature": pl.Series(
+                    [None, "b", "a"] if feature_type == "enum" else [None, "a", "b"],
+                    dtype=dtype,
+                ),
+                "bias_mean": 0.5,
+                "bias_count": pl.Series([1, 2, 2], dtype=pl.UInt32),
+            }
         )
+        for _i in range(10):
+            # The default args in polars group_by(..., maintain_order=False) returns
+            # non-deterministic ordering which compute_bias should take care of such
+            # that compute_bias is deterministic.
+            df = compute_bias(
+                y_obs=y_obs, y_pred=y_pred, feature=feature, n_bins=n_bins
+            )
+            assert_frame_equal(
+                df.select(["feature", "bias_mean", "bias_count"]), df_expected
+            )
 
 
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])

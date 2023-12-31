@@ -232,11 +232,15 @@ def test_plot_bias_warning_for_null_stderr():
 
 
 @pytest.mark.parametrize("with_null_values", [False, True])
-@pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
+@pytest.mark.parametrize(
+    "feature_type", ["cat", "cat_pandas", "cat_physical", "enum", "num", "string"]
+)
 @pytest.mark.parametrize("confidence_level", [0, 0.95])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
 def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
     """Test that plot_bias works."""
+    if feature_type in ["cat_physical", "enum"] and polars_version < Version("0.20.0"):
+        pytest.skip("Test needs polars >= 0.20.0")
     X, y = make_classification(
         n_samples=100,
         n_features=10,
@@ -246,37 +250,40 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
     clf = LogisticRegression(solver="lbfgs")
     clf.fit(X_train, y_train)
     feature = X_test[:, 0]
-    if feature_type == "cat":
-        # We first convert to string as polars does not like pandas.categorical with
-        # non-string values.
-        bins = np.quantile(feature, [0.2, 0.5, 0.8])
-        feature = pd_Series(
-            np.digitize(feature, bins=bins).astype("=U8"), dtype="category"
-        )
-    elif feature_type == "string":
+    if feature_type != "num":
         bins = np.quantile(feature, [0.2, 0.5, 0.8])
         feature = np.digitize(feature, bins=bins).astype("=U8")
+        if feature_type == "cat_pandas":
+            # Note that feature is already converted to string as polars does not like
+            # pandas.categorical with non-string values.
+            feature = pd_Series(feature, dtype="category")
+            dtype = pl.Categorical
+        elif feature_type == "cat":
+            dtype = pl.Categorical
+        elif feature_type == "cat_physical":
+            dtype = pl.Categorical(ordering="physical")
+        elif feature_type == "enum":
+            dtype = pl.Enum(categories=np.unique(feature))
+        else:
+            dtype = pl.Utf8
+
+        if feature_type in ["cat", "cat_physical", "enum"]:
+            feature = pl.Series(feature, dtype=dtype)
 
     if isinstance(feature, SkipContainer):
         pytest.skip("Module for data container not imported.")
 
     with pl.StringCache():
         if with_null_values:
-            if feature_type == "cat":
+            if feature_type == "cat_pandas":
+                feature[0] = None
+            elif feature_type in ["cat", "cat_physical", "enum"]:
                 # FIXME: polars >= 0.19.14
                 if polars_version >= Version("0.19.14"):
-                    feature = (
-                        pl.Series(feature)
-                        .cast(str)
-                        .scatter(0, None)
-                        .cast(pl.Categorical)
-                    )
+                    feature = pl.Series(feature).cast(str).scatter(0, None).cast(dtype)
                 else:
                     feature = (
-                        pl.Series(feature)
-                        .cast(str)
-                        .set_at_idx(0, None)
-                        .cast(pl.Categorical)
+                        pl.Series(feature).cast(str).set_at_idx(0, None).cast(dtype)
                     )
             else:
                 # FIXME: polars >= 0.19.14
@@ -302,7 +309,13 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
         assert plt_ax.get_ylabel() == "bias"
         assert plt_ax.get_title() == "Bias Plot"
 
-        if with_null_values and feature_type in ["string", "cat"]:
+        if with_null_values and feature_type in [
+            "cat",
+            "cat_pandas",
+            "cat_physical",
+            "enum",
+            "string",
+        ]:
             xtick_labels = plt_ax.xaxis.get_ticklabels()
             assert xtick_labels[-1].get_text() == "Null"
 
