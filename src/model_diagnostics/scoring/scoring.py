@@ -931,6 +931,6 @@ def decompose(
 
     # Remove column "model" for a single model.
     if n_pred <= 1:
-        df = df.drop(columns="model")
+        df = df.drop("model")
 
     return df
