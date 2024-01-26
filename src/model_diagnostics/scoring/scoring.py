@@ -3,6 +3,7 @@ and a score decomposition.
 Each scoring function is implemented as a class that needs to be instantiated
 before calling the `__call__` methode, e.g. `SquaredError()(y_obs=[1], y_pred=[2])`.
 """
+
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional
 
