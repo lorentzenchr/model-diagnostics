@@ -306,6 +306,7 @@ def isotonic_regression(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
         It must be `0 < level < 1`.
@@ -438,6 +439,7 @@ class IsotonicRegression:
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+
     level : float
         The level of the expectile or quantile. (Often called \\(\alpha\\).)
         It must be `0 <= level <= 1`.

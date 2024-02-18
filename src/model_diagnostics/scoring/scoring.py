@@ -595,6 +595,7 @@ class ElementaryScore(_BaseScoringFunction):
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
         It must be `0 < level < 1`.
@@ -728,6 +729,7 @@ def decompose(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+
     level : float or None
         Functionals like expectiles and quantiles have a level (often called alpha).
         If `None`, then it will be inferred from `scoring_function.level`.
