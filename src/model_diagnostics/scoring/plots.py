@@ -53,6 +53,7 @@ def plot_murphy_diagram(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
         It must be `0 < level < 1`.
