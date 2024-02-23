@@ -49,8 +49,12 @@ jobs:
       name: Build docs
       run: hatch run docs:build
 
-    - name: Run tests
-      run: hatch run cov --cov-report=xml
+    - name: Run tests with coverage report
+      # run: hatch run cov --cov-report=xml
+      # Run coverage with hatch test matrix and cov-append.
+      run: |
+        hatch run cov-erase
+        hatch run test:cov --cov-report=xml
 
     - if: matrix.python-version == '3.9' && runner.os == 'Linux'
       name: Upload coverage reports to Codecov
