@@ -184,6 +184,7 @@ ci-build = "mkdocs gh-deploy --force {args}"
 extra-dependencies = [
   "jupyterlab>=4.0.4",
   "scikit-learn>=1.3.0",
+  "plotly>=5.11.0",
 ]
 
 [tool.hatch.envs.jupyter.scripts]
@@ -247,12 +248,13 @@ name."py3.10".set-extra-dependencies = [
   "polars==0.19.19",
   "scipy==1.10",
 ]
-# latest versions
+# latest versions, with plotly
 name."py3.11".set-extra-dependencies = [
   "numpy",
   "polars",
   "scipy",
   "pandas",
+  "plotly",
   "pyarrow",
 ]
 # To check correct versions, you can run

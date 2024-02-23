@@ -1,3 +1,4 @@
+import sys
 import warnings
 from functools import partial
 from typing import Optional
@@ -25,6 +26,29 @@ from model_diagnostics._utils.isotonic import IsotonicRegression
 from .identification import compute_bias
 
 
+def _is_plotly_figure(x):
+    """Return True if the x is a plotly figure."""
+    try:
+        plotly = sys.modules["plotly"]
+    except KeyError:
+        return False
+    return isinstance(x, plotly.graph_objects.Figure)
+
+
+def _get_plotly_color(i):
+    try:
+        sys.modules["plotly"]
+        # Sometimes, those turn out to be the same as matplotlib default.
+        # colors = plotly.colors.DEFAULT_PLOTLY_COLORS
+        # Those are the plotly color default color palette in hex.
+        import plotly.express as px
+
+        colors = px.colors.qualitative.Plotly
+        return colors[i % len(colors)]
+    except KeyError:
+        return False
+
+
 def plot_reliability_diagram(
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
@@ -36,6 +60,7 @@ def plot_reliability_diagram(
     confidence_level: float = 0.9,
     diagram_type: str = "reliability",
     ax: Optional[mpl.axes.Axes] = None,
+    plot_backend: str = "matplotlib",
 ):
     r"""Plot a reliability diagram.
 
@@ -80,10 +105,16 @@ def plot_reliability_diagram(
 
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.
+    plot_backend: str
+        The plotting backend to use when `ax = None`. Options are:
+
+        - "matplotlib"
+        - "plotly"
 
     Returns
     -------
-    ax
+    ax :
+        Either the matplotlib axes or the plotly figure.
 
     Notes
     -----
@@ -107,8 +138,30 @@ def plot_reliability_diagram(
         In: Proceedings of the National Academy of Sciences 118.8 (2021), e2016191118.
         [doi:10.1073/pnas.2016191118](https://doi.org/10.1073/pnas.2016191118).
     """
+    if plot_backend not in ("matplotlib", "plotly"):
+        msg = f"The plot_backend must be matplotlib or plotly, got {plot_backend}."
+        raise ValueError(msg)
+
     if ax is None:
-        ax = plt.gca()
+        if plot_backend == "matplotlib":
+            ax = plt.gca()
+        else:
+            import plotly.graph_objects as go
+
+            fig = ax = go.Figure()
+    elif isinstance(ax, mpl.axes.Axes):
+        plot_backend = "matplotlib"
+    elif _is_plotly_figure(ax):
+        import plotly.graph_objects as go
+
+        plot_backend = "plotly"
+        fig = ax
+    else:
+        msg = (
+            "The ax argument must be None, a matplotlib Axes or a plotly Figure, "
+            f"got {type(ax)}."
+        )
+        raise ValueError(msg)
 
     if diagram_type not in ("reliability", "bias"):
         msg = (
@@ -128,13 +181,26 @@ def plot_reliability_diagram(
 
     y_min, y_max = get_array_min_max(y_pred)
     if diagram_type == "reliability":
-        ax.plot([y_min, y_max], [y_min, y_max], color="k", linestyle="dotted")
-    else:
+        if plot_backend == "matplotlib":
+            ax.plot([y_min, y_max], [y_min, y_max], color="k", linestyle="dotted")
+        else:
+            fig.add_scatter(
+                x=[y_min, y_max],
+                y=[y_min, y_max],
+                mode="lines",
+                line={"color": "black", "dash": "dot"},
+                showlegend=False,
+            )
+    elif plot_backend == "matplotlib":
         # horizontal line at y=0
+
         # The following plots in axis coordinates
         # ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
         # but we plot in data coordinates instead.
         ax.hlines(0, xmin=y_min, xmax=y_max, color="k", linestyle="dotted")
+    else:
+        # horizontal line at y=0
+        fig.add_hline(y=0, line={"color": "black", "dash": "dot"}, showlegend=False)
 
     if n_bootstrap is not None:
         if functional == "mean":
@@ -197,7 +263,23 @@ def plot_reliability_diagram(
             if diagram_type == "bias":
                 lower = iso.X_thresholds_ - lower
                 upper = iso.X_thresholds_ - upper
-            ax.fill_between(iso.X_thresholds_, lower, upper, alpha=0.1)
+            if plot_backend == "matplotlib":
+                ax.fill_between(iso.X_thresholds_, lower, upper, alpha=0.1)
+            else:
+                # plotly has not equivalent of fill_between and needs a bit more coding
+                color = _get_plotly_color(i)
+                # color = _get_plotly_color(i)
+                fig.add_scatter(
+                    x=np.r_[iso.X_thresholds_, iso.X_thresholds_[::-1]],
+                    y=np.r_[lower, upper[::-1]],
+                    fill="toself",
+                    fillcolor=color,
+                    hoverinfo="skip",
+                    line={"color": color},
+                    mode="lines",
+                    opacity=0.1,
+                    showlegend=False,
+                )
 
         # reliability curve
         label = pred_names[i] if n_pred >= 2 else None
@@ -207,7 +289,17 @@ def plot_reliability_diagram(
             if diagram_type == "reliability"
             else iso.X_thresholds_ - iso.y_thresholds_
         )
-        ax.plot(iso.X_thresholds_, y_plot, label=label)
+        if plot_backend == "matplotlib":
+            ax.plot(iso.X_thresholds_, y_plot, label=label)
+        else:
+            color = _get_plotly_color(i)
+            fig.add_scatter(
+                x=iso.X_thresholds_,
+                y=y_plot,
+                mode="lines",
+                line={"color": color},
+                name=label,
+            )
 
     xlabel_mapping = {
         "mean": "E(Y|X)",
@@ -228,17 +320,19 @@ def plot_reliability_diagram(
     else:
         ylabel = "prediction - estimated " + ylabel_mapping[functional]
         title = "Bias Reliability Diagram"
-    ax.set(xlabel=xlabel, ylabel=ylabel)
 
-    if n_pred >= 2:
+    if n_pred <= 1 and len(pred_names[0]) > 0:
+        title = title + " " + pred_names[0]
+
+    if plot_backend == "matplotlib":
+        if n_pred >= 2:
+            ax.legend()
         ax.set_title(title)
-        ax.legend()
+        ax.set(xlabel=xlabel, ylabel=ylabel)
     else:
-        y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
-        if len(pred_names[0]) > 0:
-            ax.set_title(title + " " + pred_names[0])
-        else:
-            ax.set_title(title)
+        if n_pred <= 1:
+            fig.update_layout(showlegend=False)
+        fig.update_layout(xaxis_title=xlabel, yaxis_title=ylabel, title=title)
 
     return ax
 

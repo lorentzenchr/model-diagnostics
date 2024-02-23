@@ -1,3 +1,4 @@
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
@@ -18,12 +19,34 @@ from model_diagnostics._utils.test_helper import (
 from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
 
 
+def get_xlabel(ax):
+    if isinstance(ax, mpl.axes.Axes):
+        return ax.get_xlabel()
+    else:
+        return ax.layout.xaxis.title.text
+
+
+def get_ylabel(ax):
+    if isinstance(ax, mpl.axes.Axes):
+        return ax.get_ylabel()
+    else:
+        return ax.layout.yaxis.title.text
+
+
+def get_title(ax):
+    if isinstance(ax, mpl.axes.Axes):
+        return ax.get_title()
+    else:
+        return ax.layout.title.text
+
+
 @pytest.mark.parametrize(
     ("param", "value", "msg"),
     [
         ("diagram_type", "XXX", "Parameter diagram_type must be either.*XXX"),
         ("functional", "XXX", "Argument functional must be one of.*XXX"),
         ("level", 2, "Argument level must fulfil 0 < level < 1, got 2"),
+        ("plot_backend", "XXX", "The plot_backend must be"),
     ],
 )
 def test_plot_reliability_diagram_raises(param, value, msg):
@@ -52,8 +75,14 @@ def test_plot_reliability_diagram_raises_y_obs_multdim():
 @pytest.mark.parametrize("n_bootstrap", [None, 10])
 @pytest.mark.parametrize("weights", [None, True])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
-def test_plot_reliability_diagram(diagram_type, functional, n_bootstrap, weights, ax):
+@pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
+def test_plot_reliability_diagram(
+    diagram_type, functional, n_bootstrap, weights, ax, plot_backend
+):
     """Test that plot_reliability_diagram works."""
+    if plot_backend == "plotly":
+        pytest.importorskip("plotly")
+
     X, y = make_classification(random_state=42, n_classes=2)
     if weights is None:
         X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
@@ -72,11 +101,12 @@ def test_plot_reliability_diagram(diagram_type, functional, n_bootstrap, weights
         y_obs=y_test,
         y_pred=y_pred,
         weights=w_test,
-        ax=ax,
         functional=functional,
         level=0.8,
         n_bootstrap=n_bootstrap,
         diagram_type=diagram_type,
+        ax=ax,
+        plot_backend=plot_backend,
     )
 
     xlabel_mapping = {
@@ -94,16 +124,19 @@ def test_plot_reliability_diagram(diagram_type, functional, n_bootstrap, weights
 
     if ax is not None:
         assert ax is plt_ax
-    assert plt_ax.get_xlabel() == "prediction for " + xlabel_mapping[functional]
+
+    if isinstance(plt_ax, mpl.axes.Axes):
+        assert get_xlabel(plt_ax) == "prediction for " + xlabel_mapping[functional]
+
     if diagram_type == "reliability":
-        assert plt_ax.get_ylabel() == "estimated " + ylabel_mapping[functional]
-        assert plt_ax.get_title() == "Reliability Diagram"
+        if isinstance(plt_ax, mpl.axes.Axes):
+            assert get_ylabel(plt_ax) == "estimated " + ylabel_mapping[functional]
+            assert get_title(plt_ax) == "Reliability Diagram"
     else:
         assert (
-            plt_ax.get_ylabel()
-            == "prediction - estimated " + ylabel_mapping[functional]
+            get_ylabel(plt_ax) == "prediction - estimated " + ylabel_mapping[functional]
         )
-        assert plt_ax.get_title() == "Bias Reliability Diagram"
+        assert get_title(plt_ax) == "Bias Reliability Diagram"
 
     plt_ax = plot_reliability_diagram(
         y_obs=y_test,
@@ -114,9 +147,9 @@ def test_plot_reliability_diagram(diagram_type, functional, n_bootstrap, weights
         diagram_type=diagram_type,
     )
     if diagram_type == "reliability":
-        assert plt_ax.get_title() == "Reliability Diagram simple"
+        assert get_title(plt_ax) == "Reliability Diagram simple"
     else:
-        assert plt_ax.get_title() == "Bias Reliability Diagram simple"
+        assert get_title(plt_ax) == "Bias Reliability Diagram simple"
 
 
 def test_plot_reliability_diagram_multiple_predictions():
