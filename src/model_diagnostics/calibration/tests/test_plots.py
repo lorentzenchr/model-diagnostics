@@ -134,13 +134,11 @@ def test_plot_reliability_diagram(
     if ax is not None:
         assert ax is plt_ax
 
-    if isinstance(plt_ax, mpl.axes.Axes):
-        assert get_xlabel(plt_ax) == "prediction for " + xlabel_mapping[functional]
+    assert get_xlabel(plt_ax) == "prediction for " + xlabel_mapping[functional]
 
     if diagram_type == "reliability":
-        if isinstance(plt_ax, mpl.axes.Axes):
-            assert get_ylabel(plt_ax) == "estimated " + ylabel_mapping[functional]
-            assert get_title(plt_ax) == "Reliability Diagram"
+        assert get_ylabel(plt_ax) == "estimated " + ylabel_mapping[functional]
+        assert get_title(plt_ax) == "Reliability Diagram"
     else:
         assert (
             get_ylabel(plt_ax) == "prediction - estimated " + ylabel_mapping[functional]
