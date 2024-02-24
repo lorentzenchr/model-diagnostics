@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from functools import partial
 
 import numpy as np
@@ -234,6 +235,26 @@ def test_compute_bias_numerical_feature():
     # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
     # of numpy array. Therefore, we add the np.asarray().
     bias = np.asarray((df.get_column("y_pred") - df.get_column("y_obs")).to_numpy())
+    assert df.schema == OrderedDict(
+        [("y_obs", pl.Float64), ("y_pred", pl.Float64), ("feature", pl.Float64)]
+    )
+    assert_series_equal(
+        (df.get_column("y_pred") - df.get_column("y_obs"))[:n_steps],
+        pl.Series(
+            "y_pred", [1.0, 0.99, 0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.91]
+        ),
+    )
+    assert n_steps == 10
+    assert np.sqrt(n_steps) == pytest.approx(3.1622776601683795)
+    np.testing.assert_allclose(
+        (df.get_column("y_pred") - df.get_column("y_obs")).to_numpy()[:n_steps],
+        [1.0, 0.99, 0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.91],
+    )
+    np.testing.assert_allclose(
+        bias[:n_steps],
+        [1.0, 0.99, 0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.91],
+    )
+    assert np.std(bias[:n_steps], ddof=1) == pytest.approx(0.030276503540974924)
     df_expected = pl.DataFrame(
         {
             "feature": 0.045 + 0.1 * np.arange(10),
