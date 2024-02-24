@@ -233,7 +233,10 @@ def test_compute_bias_numerical_feature():
     )
     # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
     # of numpy array. Therefore, we add the np.asarray().
-    bias = np.asarray((df.get_column("y_pred") - df.get_column("y_obs")).to_numpy())
+    # The Windows CI runner with python 3.10, polars 0.19.19 and numpy1.22.0 seems to
+    # have a bug in to_numpy, as bias[0] = 2.854484e-311 instead of 1. Therefore, we
+    # use to_list instead of to_numpy.
+    bias = np.asarray((df.get_column("y_pred") - df.get_column("y_obs")).to_list())
     df_expected = pl.DataFrame(
         {
             "feature": 0.045 + 0.1 * np.arange(10),
