@@ -46,6 +46,11 @@ def get_title(ax):
         ("diagram_type", "XXX", "Parameter diagram_type must be either.*XXX"),
         ("functional", "XXX", "Argument functional must be one of.*XXX"),
         ("level", 2, "Argument level must fulfil 0 < level < 1, got 2"),
+        (
+            "ax",
+            "XXX",
+            "The ax argument must be None, a matplotlib Axes or a plotly Figure",
+        ),
         ("plot_backend", "XXX", "The plot_backend must be"),
     ],
 )
@@ -74,14 +79,18 @@ def test_plot_reliability_diagram_raises_y_obs_multdim():
 @pytest.mark.parametrize("functional", ["mean", "expectile", "quantile"])
 @pytest.mark.parametrize("n_bootstrap", [None, 10])
 @pytest.mark.parametrize("weights", [None, True])
-@pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
+@pytest.mark.parametrize("ax", [None, plt.subplots()[1], "plotly"])
 @pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
 def test_plot_reliability_diagram(
     diagram_type, functional, n_bootstrap, weights, ax, plot_backend
 ):
     """Test that plot_reliability_diagram works."""
-    if plot_backend == "plotly":
+    if plot_backend == "plotly" or ax == "plotly":
         pytest.importorskip("plotly")
+        import plotly.graph_objects as go
+
+    if ax == "plotly":
+        ax = go.Figure()
 
     X, y = make_classification(random_state=42, n_classes=2)
     if weights is None:
