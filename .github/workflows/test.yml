@@ -50,7 +50,8 @@ jobs:
       name: Build docs
       run: hatch run docs:build
 
-    - name: Run tests with coverage report
+    - if: matrix.python-version == '3.11' && runner.os == 'Linux'
+      name: Run tests with coverage report
       # run: hatch run cov --cov-report=xml
       # Run coverage with hatch test matrix and cov-append.
       run: |
@@ -58,11 +59,10 @@ jobs:
         hatch run test:cov --cov-report=xml
 
     - if: matrix.python-version == '3.11' && runner.os == 'Linux'
-      name: Upload coverage reports to Codecov
+      name: Upload coverage report to Codecov
       uses: codecov/codecov-action@v3
       
-    - if: matrix.python-version == '3.11' && runner.os == 'Linux'
-      name: Run test matrix
+    - name: Run test matrix
       run: |
         hatch -e test run versions
         hatch -e test run pytest

@@ -258,7 +258,9 @@ name."py3.11".set-extra-dependencies = [
 # To check correct versions, you can run
 # hatch -e test run pip freeze | grep polars
 [tool.hatch.envs.test.scripts]
-versions = ["pip freeze | grep -E 'numpy|polars|scipy|pandas|pyarrow'"]
+# versions = ["pip freeze | grep -E 'numpy|polars|scipy|pandas|pyarrow'"]
+# A version of 'versions' working on all plattforms, in particular Windows.
+versions = "python dev_tools/print_package_versions.py"
 cov = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=src/model_diagnostics --cov-append {args}"
 
 [tool.hatch.version]
