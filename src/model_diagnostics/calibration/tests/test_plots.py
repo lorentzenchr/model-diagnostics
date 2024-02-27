@@ -40,6 +40,13 @@ def get_title(ax):
         return ax.layout.title.text
 
 
+def get_legend_list(ax):
+    if isinstance(ax, mpl.axes.Axes):
+        return [t.get_text() for t in ax.get_legend().get_texts()]
+    else:
+        return [d.name for d in ax.data if d.showlegend is None or d.showlegend]
+
+
 @pytest.mark.parametrize(
     ("param", "value", "msg"),
     [
@@ -159,8 +166,12 @@ def test_plot_reliability_diagram(
         assert get_title(plt_ax) == "Bias Reliability Diagram simple"
 
 
-def test_plot_reliability_diagram_multiple_predictions():
+@pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
+def test_plot_reliability_diagram_multiple_predictions(plot_backend):
     """Test that plot_reliability_diagram works for multiple predictions."""
+    if plot_backend == "plotly":
+        pytest.importorskip("plotly")
+
     n_obs = 10
     y_obs = np.arange(n_obs)
     y_obs[::2] = 0
@@ -169,12 +180,13 @@ def test_plot_reliability_diagram_multiple_predictions():
     plt_ax = plot_reliability_diagram(
         y_obs=y_obs,
         y_pred=y_pred,
+        plot_backend=plot_backend,
     )
-    assert plt_ax.get_title() == "Reliability Diagram"
-    legend_text = plt_ax.get_legend().get_texts()
+    assert get_title(plt_ax) == "Reliability Diagram"
+    legend_text = get_legend_list(plt_ax)
     assert len(legend_text) == 2
-    assert legend_text[0].get_text() == "model_2"
-    assert legend_text[1].get_text() == "model_1"
+    assert legend_text[0] == "model_2"
+    assert legend_text[1] == "model_1"
 
 
 @pytest.mark.parametrize(
@@ -240,6 +252,12 @@ def test_plot_reliability_diagram_constant_prediction_transform_output():
             1,
             "Argument confidence_level must fulfil 0 <= level < 1, got 1",
         ),
+        (
+            "ax",
+            "XXX",
+            "The ax argument must be None, a matplotlib Axes or a plotly Figure",
+        ),
+        ("plot_backend", "XXX", "The plot_backend must be"),
     ],
 )
 def test_plot_bias_raises(param, value, msg):
@@ -276,9 +294,17 @@ def test_plot_bias_warning_for_null_stderr():
     "feature_type", ["cat", "cat_pandas", "cat_physical", "enum", "num", "string"]
 )
 @pytest.mark.parametrize("confidence_level", [0, 0.95])
-@pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
-def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
+@pytest.mark.parametrize("ax", [None, plt.subplots()[1], "plotly"])
+@pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
+def test_plot_bias(with_null_values, feature_type, confidence_level, ax, plot_backend):
     """Test that plot_bias works."""
+    if plot_backend == "plotly" or ax == "plotly":
+        pytest.importorskip("plotly")
+        import plotly.graph_objects as go
+
+    if ax == "plotly":
+        ax = go.Figure()
+
     if feature_type in ["cat_physical", "enum"] and polars_version < Version("0.20.0"):
         pytest.skip("Test needs polars >= 0.20.0")
     X, y = make_classification(
@@ -338,24 +364,32 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
             feature=feature,
             confidence_level=confidence_level,
             ax=ax,
+            plot_backend=plot_backend,
         )
 
         if ax is not None:
             assert ax is plt_ax
-        if feature_type == "num":
-            assert plt_ax.get_xlabel() == "binned feature"
-        else:
-            assert plt_ax.get_xlabel() == "feature"
-        assert plt_ax.get_ylabel() == "bias"
-        assert plt_ax.get_title() == "Bias Plot"
 
-        if with_null_values and feature_type in [
-            "cat",
-            "cat_pandas",
-            "cat_physical",
-            "enum",
-            "string",
-        ]:
+        if feature_type == "num":
+            assert get_xlabel(plt_ax) == "binned feature"
+        else:
+            assert get_xlabel(plt_ax) == "feature"
+
+        assert get_ylabel(plt_ax) == "bias"
+        assert get_title(plt_ax) == "Bias Plot"
+
+        if (
+            isinstance(ax, mpl.axes.Axes)
+            and with_null_values
+            and feature_type
+            in [
+                "cat",
+                "cat_pandas",
+                "cat_physical",
+                "enum",
+                "string",
+            ]
+        ):
             xtick_labels = plt_ax.xaxis.get_ticklabels()
             assert xtick_labels[-1].get_text() == "Null"
 
@@ -366,11 +400,11 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax):
             confidence_level=confidence_level,
             ax=ax,
         )
-    assert plt_ax.get_title() == "Bias Plot simple"
+    assert get_title(plt_ax) == "Bias Plot simple"
 
 
 def test_plot_bias_feature_none():
-    """Test that plot_bias works."""
+    """Test that plot_bias works for feature=None."""
     y_obs = np.arange(10)
     y_pred = pl.DataFrame(
         {

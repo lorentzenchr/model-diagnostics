@@ -103,7 +103,7 @@ def plot_reliability_diagram(
         - `"bias"`: Plot roughly a 45 degree rotated reliability diagram. The resulting
           plot is similar to `plot_bias`, i.e. `y_pred - E(y_obs|y_pred)` vs `y_pred`.
 
-    ax : matplotlib.axes.Axes
+    ax : matplotlib.axes.Axes or plotly Figure
         Axes object to draw the plot onto, otherwise uses the current Axes.
     plot_backend: str
         The plotting backend to use when `ax = None`. Options are:
@@ -268,7 +268,6 @@ def plot_reliability_diagram(
             else:
                 # plotly has not equivalent of fill_between and needs a bit more coding
                 color = _get_plotly_color(i)
-                # color = _get_plotly_color(i)
                 fig.add_scatter(
                     x=np.r_[iso.X_thresholds_, iso.X_thresholds_[::-1]],
                     y=np.r_[lower, upper[::-1]],
@@ -292,12 +291,11 @@ def plot_reliability_diagram(
         if plot_backend == "matplotlib":
             ax.plot(iso.X_thresholds_, y_plot, label=label)
         else:
-            color = _get_plotly_color(i)
             fig.add_scatter(
                 x=iso.X_thresholds_,
                 y=y_plot,
                 mode="lines",
-                line={"color": color},
+                line={"color": _get_plotly_color(i)},
                 name=label,
             )
 
@@ -348,6 +346,7 @@ def plot_bias(
     n_bins: int = 10,
     confidence_level: float = 0.9,
     ax: Optional[mpl.axes.Axes] = None,
+    plot_backend: str = "matplotlib",
 ):
     r"""Plot model bias conditional on a feature.
 
@@ -396,8 +395,13 @@ def plot_bias(
     confidence_level : float
         Confidence level for error bars. If 0, no error bars are plotted. Value must
         fulfil `0 <= confidence_level < 1`.
-    ax : matplotlib.axes.Axes
+    ax : matplotlib.axes.Axes or plotly Figure
         Axes object to draw the plot onto, otherwise uses the current Axes.
+    plot_backend: str
+        The plotting backend to use when `ax = None`. Options are:
+
+        - "matplotlib"
+        - "plotly"
 
     Returns
     -------
@@ -424,8 +428,30 @@ def plot_bias(
         )
         raise ValueError(msg)
     with_errorbars = confidence_level > 0
+
+    if plot_backend not in ("matplotlib", "plotly"):
+        msg = f"The plot_backend must be matplotlib or plotly, got {plot_backend}."
+        raise ValueError(msg)
     if ax is None:
-        ax = plt.gca()
+        if plot_backend == "matplotlib":
+            ax = plt.gca()
+        else:
+            import plotly.graph_objects as go
+
+            fig = ax = go.Figure()
+    elif isinstance(ax, mpl.axes.Axes):
+        plot_backend = "matplotlib"
+    elif _is_plotly_figure(ax):
+        import plotly.graph_objects as go
+
+        plot_backend = "plotly"
+        fig = ax
+    else:
+        msg = (
+            "The ax argument must be None, a matplotlib Axes or a plotly Figure, "
+            f"got {type(ax)}."
+        )
+        raise ValueError(msg)
 
     df = compute_bias(
         y_obs=y_obs,
@@ -473,7 +499,10 @@ def plot_bias(
     n_x = df[feature_name].n_unique()
 
     # horizontal line at y=0
-    ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
+    if plot_backend == "matplotlib":
+        ax.axhline(y=0, xmin=0, xmax=1, color="k", linestyle="dotted")
+    else:
+        fig.add_hline(y=0, line={"color": "black", "dash": "dot"}, showlegend=False)
 
     # bias plot
     if feature is None or col_model is None:
@@ -517,35 +546,77 @@ def plot_bias(
             x = np.arange(n_x - feature_has_nulls)
             if n_models > 1:
                 x = x + (i - n_models // 2) * span * 0.5
-            ax.errorbar(
-                x,
-                df_ii["bias_mean"],
-                yerr=df_ii["bias_stderr"] if with_errorbars_i else None,
-                marker="o",
-                linestyle="None",
-                capsize=4,
-                label=label,
-            )
+            if plot_backend == "matplotlib":
+                ax.errorbar(
+                    x,
+                    df_ii["bias_mean"],
+                    yerr=df_ii["bias_stderr"] if with_errorbars_i else None,
+                    marker="o",
+                    linestyle="None",
+                    capsize=4,
+                    label=label,
+                )
+            else:
+                fig.add_scatter(
+                    x=x,
+                    y=df_ii["bias_mean"],
+                    error_y={
+                        "type": "data",  # value of error bar given in data coordinates
+                        "array": df_ii["bias_stderr"] if with_errorbars_i else None,
+                        "width": 4,
+                        "visible": True,
+                    },
+                    marker={"color": _get_plotly_color(i)},
+                    mode="markers",
+                    name=label,
+                )
         else:
             if with_errorbars_i:
                 lower = df_i["bias_mean"] - df_i["bias_stderr"]
                 upper = df_i["bias_mean"] + df_i["bias_stderr"]
-                ax.fill_between(
+                if plot_backend == "matplotlib":
+                    ax.fill_between(
+                        df_i[feature_name],
+                        lower,
+                        upper,
+                        alpha=0.1,
+                    )
+                else:
+                    # plotly has not equivalent of fill_between and needs a bit more
+                    # coding
+                    # FIXME: polars >= 0.20.0 use df_i[::-1, feature_name]
+                    color = _get_plotly_color(i)
+                    fig.add_scatter(
+                        x=pl.concat([df_i[feature_name], df_i[feature_name][::-1]]),
+                        y=pl.concat([lower, upper[::-1]]),
+                        fill="toself",
+                        fillcolor=color,
+                        hoverinfo="skip",
+                        line={"color": color},
+                        mode="lines",
+                        opacity=0.1,
+                        showlegend=False,
+                    )
+            if plot_backend == "matplotlib":
+                ax.plot(
                     df_i[feature_name],
-                    lower,
-                    upper,
-                    alpha=0.1,
+                    df_i["bias_mean"],
+                    linestyle="solid",
+                    marker="o",
+                    label=label,
                 )
-            ax.plot(
-                df_i[feature_name],
-                df_i["bias_mean"],
-                linestyle="solid",
-                marker="o",
-                label=label,
-            )
+            else:
+                fig.add_scatter(
+                    x=df_i[feature_name],
+                    y=df_i["bias_mean"],
+                    marker_symbol="circle",
+                    mode="lines+markers",
+                    line={"color": _get_plotly_color(i)},
+                    name=label,
+                )
 
         if df_i[feature_name].null_count() > 0:
-            color = ax.get_lines()[-1].get_color()  # previous line color
+            # Null values are plotted as diamonds as rightmost point.
             df_i_null = df_i.filter(pl.col(feature_name).is_null())
 
             if is_string or is_categorical:
@@ -565,16 +636,32 @@ def plot_bias(
             if n_models > 1:
                 x_null = x_null + (i - n_models // 2) * span * 0.5
 
-            ax.errorbar(
-                x_null,
-                df_i_null["bias_mean"],
-                yerr=df_i_null["bias_stderr"] if with_errorbars_i else None,
-                marker="D",
-                linestyle="None",
-                capsize=4,
-                label=None,
-                color=color,
-            )
+            if plot_backend == "matplotlib":
+                color = ax.get_lines()[-1].get_color()  # previous line color
+                ax.errorbar(
+                    x_null,
+                    df_i_null["bias_mean"],
+                    yerr=df_i_null["bias_stderr"] if with_errorbars_i else None,
+                    marker="D",
+                    linestyle="None",
+                    capsize=4,
+                    label=None,
+                    color=color,
+                )
+            else:
+                fig.add_scatter(
+                    x=x_null,
+                    y=df_i_null["bias_mean"],
+                    error_y={
+                        "type": "data",  # value of error bar given in data coordinates
+                        "array": df_i_null["bias_stderr"] if with_errorbars_i else None,
+                        "width": 4,
+                        "visible": True,
+                    },
+                    marker={"color": _get_plotly_color(i), "symbol": "diamond"},
+                    mode="markers",
+                    showlegend=False,
+                )
 
     if is_categorical or is_string:
         if df_i[feature_name].null_count() > 0:
@@ -585,21 +672,35 @@ def plot_bias(
             tick_labels = df_i[feature_name].cast(pl.Utf8).fill_null("Null")
         else:
             tick_labels = df_i[feature_name]
-        ax.set_xticks(np.arange(n_x), labels=tick_labels)
-        ax.set(xlabel=feature_name, ylabel="bias")
+        x_label = feature_name
+        if plot_backend == "matplotlib":
+            ax.set_xticks(np.arange(n_x), labels=tick_labels)
+        else:
+            fig.update_layout(
+                xaxis={
+                    "tickmode": "array",
+                    "tickvals": np.arange(n_x),
+                    "ticktext": tick_labels,
+                }
+            )
     elif feature_name is not None:
-        ax.set(xlabel="binned " + feature_name, ylabel="bias")
+        x_label = "binned " + feature_name
+    else:
+        x_label = ""
 
     if feature is None:
-        ax.set_title("Bias Plot")
+        title = "Bias Plot"
     else:
         model_name = array_name(y_pred, default="")
-        if not model_name:  # test for empty string ""
-            ax.set_title("Bias Plot")
-        else:
-            ax.set_title("Bias Plot " + model_name)
+        # test for empty string ""
+        title = "Bias Plot" if not model_name else "Bias Plot " + model_name
 
-    if with_label:
+    if plot_backend == "matplotlib":
+        ax.set(xlabel=x_label, ylabel="bias", title=title)
+    else:
+        fig.update_layout(xaxis_title=x_label, yaxis_title="bias", title=title)
+
+    if with_label and plot_backend == "matplotlib":
         if feature_has_nulls:
             # Add legend entry for diamonds as Null values.
             # Unfortunately, the Null value legend entry often appears first, but we
@@ -614,5 +715,13 @@ def plot_bias(
             ax.legend(handles=handles, labels=labels)
         else:
             ax.legend()
+    elif with_label and feature_has_nulls:
+        fig.add_scatter(
+            x=[None],
+            y=[None],
+            mode="markers",
+            name="Null values",
+            marker={"size": 7, "color": "grey", "symbol": "diamond"},
+        )
 
     return ax
