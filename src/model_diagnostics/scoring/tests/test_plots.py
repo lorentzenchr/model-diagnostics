@@ -6,6 +6,12 @@ from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
+from model_diagnostics._utils.plot_helper import (
+    get_legend_list,
+    get_title,
+    get_xlabel,
+    get_ylabel,
+)
 from model_diagnostics.scoring import plot_murphy_diagram
 
 
@@ -18,6 +24,12 @@ from model_diagnostics.scoring import plot_murphy_diagram
             [[1, 1], [1, 1]],
             "All values y_obs and y_pred are one single and same value",
         ),
+        (
+            "ax",
+            "XXX",
+            "The ax argument must be None, a matplotlib Axes or a plotly Figure",
+        ),
+        ("plot_backend", "XXX", "The plot_backend must be"),
     ],
 )
 def test_plot_murphy_diagram_raises(param, value, msg):
@@ -48,9 +60,17 @@ def test_plot_murphy_diagram_raises_y_obs_multdim():
 )
 @pytest.mark.parametrize("etas", [10, np.arange(10)])
 @pytest.mark.parametrize("weights", [None, True])
-@pytest.mark.parametrize("ax", [None, plt.subplots()[1]])
-def test_plot_murphy_diagram(functional, level, etas, weights, ax):
+@pytest.mark.parametrize("ax", [None, plt.subplots()[1], "plotly"])
+@pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
+def test_plot_murphy_diagram(functional, level, etas, weights, ax, plot_backend):
     """Test that plot_murphy_diagram works."""
+    if plot_backend == "plotly" or ax == "plotly":
+        pytest.importorskip("plotly")
+        import plotly.graph_objects as go
+
+    if ax == "plotly":
+        ax = go.Figure()
+
     X, y = make_classification(random_state=42, n_classes=2)
     if weights is None:
         X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
@@ -71,13 +91,15 @@ def test_plot_murphy_diagram(functional, level, etas, weights, ax):
         functional=functional,
         level=level,
         ax=ax,
+        plot_backend=plot_backend,
     )
 
     if ax is not None:
         assert ax is plt_ax
-    assert plt_ax.get_xlabel() == "eta"
-    assert plt_ax.get_ylabel() == "score"
-    assert plt_ax.get_title() == "Murphy Diagram"
+
+    assert get_xlabel(plt_ax) == "eta"
+    assert get_ylabel(plt_ax) == "score"
+    assert get_title(plt_ax) == "Murphy Diagram"
 
     plt_ax = plot_murphy_diagram(
         y_obs=y_test,
@@ -87,12 +109,17 @@ def test_plot_murphy_diagram(functional, level, etas, weights, ax):
         functional=functional,
         level=level,
         ax=ax,
+        plot_backend=plot_backend,
     )
-    assert plt_ax.get_title() == "Murphy Diagram simple"
+    assert get_title(plt_ax) == "Murphy Diagram simple"
 
 
-def test_plot_murphy_diagram_multiple_predictions():
+@pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
+def test_plot_murphy_diagram_multiple_predictions(plot_backend):
     """Test that plot_murphy_diagram works for multiple predictions."""
+    if plot_backend == "plotly":
+        pytest.importorskip("plotly")
+
     n_obs = 10
     y_obs = np.arange(n_obs)
     y_obs[::2] = 0
@@ -102,9 +129,10 @@ def test_plot_murphy_diagram_multiple_predictions():
         y_obs=y_obs,
         y_pred=y_pred,
         ax=ax,
+        plot_backend=plot_backend,
     )
-    assert plt_ax.get_title() == "Murphy Diagram"
-    legend_text = plt_ax.get_legend().get_texts()
+    assert get_title(plt_ax) == "Murphy Diagram"
+    legend_text = get_legend_list(plt_ax)
     assert len(legend_text) == 2
-    assert legend_text[0].get_text() == "model_2"
-    assert legend_text[1].get_text() == "model_1"
+    assert legend_text[0] == "model_2"
+    assert legend_text[1] == "model_1"

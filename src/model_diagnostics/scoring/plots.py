@@ -12,6 +12,7 @@ from model_diagnostics._utils._array import (
     get_sorted_array_names,
     length_of_second_dimension,
 )
+from model_diagnostics._utils.plot_helper import get_plotly_color, is_plotly_figure
 
 from .scoring import ElementaryScore
 
@@ -25,6 +26,7 @@ def plot_murphy_diagram(
     functional: str = "mean",
     level: float = 0.5,
     ax: Optional[mpl.axes.Axes] = None,
+    plot_backend: str = "matplotlib",
 ):
     r"""Plot a Murphy diagram.
 
@@ -61,6 +63,11 @@ def plot_murphy_diagram(
         `level=0.5` and `functional="quantile"` gives the median.
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.
+    plot_backend: str
+        The plotting backend to use when `ax = None`. Options are:
+
+        - "matplotlib"
+        - "plotly"
 
     Returns
     -------
@@ -79,8 +86,30 @@ def plot_murphy_diagram(
         Representations, and Forecast Rankings".
         [arxiv:1503.08195](https://arxiv.org/abs/1503.08195).
     """
+    if plot_backend not in ("matplotlib", "plotly"):
+        msg = f"The plot_backend must be matplotlib or plotly, got {plot_backend}."
+        raise ValueError(msg)
+
     if ax is None:
-        ax = plt.gca()
+        if plot_backend == "matplotlib":
+            ax = plt.gca()
+        else:
+            import plotly.graph_objects as go
+
+            fig = ax = go.Figure()
+    elif isinstance(ax, mpl.axes.Axes):
+        plot_backend = "matplotlib"
+    elif is_plotly_figure(ax):
+        import plotly.graph_objects as go
+
+        plot_backend = "plotly"
+        fig = ax
+    else:
+        msg = (
+            "The ax argument must be None, a matplotlib Axes or a plotly Figure, "
+            f"got {type(ax)}."
+        )
+        raise ValueError(msg)
 
     if (n_cols := length_of_second_dimension(y_obs)) > 0:
         if n_cols == 1:
@@ -120,19 +149,31 @@ def plot_murphy_diagram(
             for eta in etas
         ]
         label = pred_names[i] if n_pred >= 2 else None
-        ax.plot(etas, y_plot, label=label)
-
-    title = "Murphy Diagram"
-    ax.set(xlabel="eta", ylabel="score")
-
-    if n_pred >= 2:
-        ax.set_title(title)
-        ax.legend()
-    else:
-        y_pred_i = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
-        if len(pred_names[0]) > 0:
-            ax.set_title(title + " " + pred_names[0])
+        if plot_backend == "matplotlib":
+            ax.plot(etas, y_plot, label=label)
         else:
-            ax.set_title(title)
+            fig.add_scatter(
+                x=etas,
+                y=y_plot,
+                mode="lines",
+                line={"color": get_plotly_color(i)},
+                name=label,
+            )
+
+    xlabel = "eta"
+    ylabel = "score"
+    title = "Murphy Diagram"
+    if n_pred <= 1 and len(pred_names[0]) > 0:
+        title = title + " " + pred_names[0]
+
+    if plot_backend == "matplotlib":
+        if n_pred >= 2:
+            ax.legend()
+        ax.set_title(title)
+        ax.set(xlabel=xlabel, ylabel=ylabel)
+    else:
+        if n_pred <= 1:
+            fig.update_layout(showlegend=False)
+        fig.update_layout(xaxis_title=xlabel, yaxis_title=ylabel, title=title)
 
     return ax
