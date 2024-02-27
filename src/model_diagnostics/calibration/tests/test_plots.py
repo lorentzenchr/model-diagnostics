@@ -9,6 +9,12 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
 from model_diagnostics import polars_version
+from model_diagnostics._utils.plot_helper import (
+    get_legend_list,
+    get_title,
+    get_xlabel,
+    get_ylabel,
+)
 from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
@@ -17,34 +23,6 @@ from model_diagnostics._utils.test_helper import (
     pd_Series,
 )
 from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
-
-
-def get_xlabel(ax):
-    if isinstance(ax, mpl.axes.Axes):
-        return ax.get_xlabel()
-    else:
-        return ax.layout.xaxis.title.text
-
-
-def get_ylabel(ax):
-    if isinstance(ax, mpl.axes.Axes):
-        return ax.get_ylabel()
-    else:
-        return ax.layout.yaxis.title.text
-
-
-def get_title(ax):
-    if isinstance(ax, mpl.axes.Axes):
-        return ax.get_title()
-    else:
-        return ax.layout.title.text
-
-
-def get_legend_list(ax):
-    if isinstance(ax, mpl.axes.Axes):
-        return [t.get_text() for t in ax.get_legend().get_texts()]
-    else:
-        return [d.name for d in ax.data if d.showlegend is None or d.showlegend]
 
 
 @pytest.mark.parametrize(

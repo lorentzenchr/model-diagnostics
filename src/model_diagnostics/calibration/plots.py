@@ -1,4 +1,3 @@
-import sys
 import warnings
 from functools import partial
 from typing import Optional
@@ -22,31 +21,9 @@ from model_diagnostics._utils._array import (
     length_of_second_dimension,
 )
 from model_diagnostics._utils.isotonic import IsotonicRegression
+from model_diagnostics._utils.plot_helper import get_plotly_color, is_plotly_figure
 
 from .identification import compute_bias
-
-
-def _is_plotly_figure(x):
-    """Return True if the x is a plotly figure."""
-    try:
-        plotly = sys.modules["plotly"]
-    except KeyError:
-        return False
-    return isinstance(x, plotly.graph_objects.Figure)
-
-
-def _get_plotly_color(i):
-    try:
-        sys.modules["plotly"]
-        # Sometimes, those turn out to be the same as matplotlib default.
-        # colors = plotly.colors.DEFAULT_PLOTLY_COLORS
-        # Those are the plotly color default color palette in hex.
-        import plotly.express as px
-
-        colors = px.colors.qualitative.Plotly
-        return colors[i % len(colors)]
-    except KeyError:
-        return False
 
 
 def plot_reliability_diagram(
@@ -151,7 +128,7 @@ def plot_reliability_diagram(
             fig = ax = go.Figure()
     elif isinstance(ax, mpl.axes.Axes):
         plot_backend = "matplotlib"
-    elif _is_plotly_figure(ax):
+    elif is_plotly_figure(ax):
         import plotly.graph_objects as go
 
         plot_backend = "plotly"
@@ -267,7 +244,7 @@ def plot_reliability_diagram(
                 ax.fill_between(iso.X_thresholds_, lower, upper, alpha=0.1)
             else:
                 # plotly has not equivalent of fill_between and needs a bit more coding
-                color = _get_plotly_color(i)
+                color = get_plotly_color(i)
                 fig.add_scatter(
                     x=np.r_[iso.X_thresholds_, iso.X_thresholds_[::-1]],
                     y=np.r_[lower, upper[::-1]],
@@ -295,7 +272,7 @@ def plot_reliability_diagram(
                 x=iso.X_thresholds_,
                 y=y_plot,
                 mode="lines",
-                line={"color": _get_plotly_color(i)},
+                line={"color": get_plotly_color(i)},
                 name=label,
             )
 
@@ -441,7 +418,7 @@ def plot_bias(
             fig = ax = go.Figure()
     elif isinstance(ax, mpl.axes.Axes):
         plot_backend = "matplotlib"
-    elif _is_plotly_figure(ax):
+    elif is_plotly_figure(ax):
         import plotly.graph_objects as go
 
         plot_backend = "plotly"
@@ -566,7 +543,7 @@ def plot_bias(
                         "width": 4,
                         "visible": True,
                     },
-                    marker={"color": _get_plotly_color(i)},
+                    marker={"color": get_plotly_color(i)},
                     mode="markers",
                     name=label,
                 )
@@ -585,7 +562,7 @@ def plot_bias(
                     # plotly has not equivalent of fill_between and needs a bit more
                     # coding
                     # FIXME: polars >= 0.20.0 use df_i[::-1, feature_name]
-                    color = _get_plotly_color(i)
+                    color = get_plotly_color(i)
                     fig.add_scatter(
                         x=pl.concat([df_i[feature_name], df_i[feature_name][::-1]]),
                         y=pl.concat([lower, upper[::-1]]),
@@ -611,7 +588,7 @@ def plot_bias(
                     y=df_i["bias_mean"],
                     marker_symbol="circle",
                     mode="lines+markers",
-                    line={"color": _get_plotly_color(i)},
+                    line={"color": get_plotly_color(i)},
                     name=label,
                 )
 
@@ -658,7 +635,7 @@ def plot_bias(
                         "width": 4,
                         "visible": True,
                     },
-                    marker={"color": _get_plotly_color(i), "symbol": "diamond"},
+                    marker={"color": get_plotly_color(i), "symbol": "diamond"},
                     mode="markers",
                     showlegend=False,
                 )
