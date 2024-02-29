@@ -1,3 +1,5 @@
+from importlib.util import find_spec
+
 import pytest
 
 from model_diagnostics import config_context, get_config, set_config
@@ -13,6 +15,14 @@ def test_set_config_raises(param, value, msg):
     """Test that set_config raises errors."""
     with pytest.raises(ValueError, match=msg):
         set_config(**{param: value})
+
+
+def test_set_config_raises_plotly_not_installed():
+    if find_spec("plotly"):
+        pytest.skip("This test can only work if plotly is NOT installed.")
+    msg = "In order to set the plot backend to plotly, plotly must be installed"
+    with pytest.raises(ModuleNotFoundError, match=msg):
+        set_config(plot_backend="plotly")
 
 
 def test_config_context():
