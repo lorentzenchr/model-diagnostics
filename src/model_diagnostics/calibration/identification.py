@@ -45,7 +45,6 @@ def identification_function(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
-
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
         It must be `0 < level < 1`.
@@ -162,7 +161,6 @@ def compute_bias(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
-
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
         It must be `0 < level < 1`.

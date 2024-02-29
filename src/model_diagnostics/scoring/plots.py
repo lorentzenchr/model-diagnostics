@@ -55,7 +55,6 @@ def plot_murphy_diagram(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
-
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
         It must be `0 < level < 1`.
@@ -67,8 +66,10 @@ def plot_murphy_diagram(
     Returns
     -------
     ax :
-        Either the matplotlib axes or the plotly figure. This is configurable via
-        `model_diagnostics.set_config` and `model_diagnostics.config_context`.
+        Either the matplotlib axes or the plotly figure. This is configurable by
+        setting the `plot_backend` via
+        [`model_diagnostics.set_config`][model_diagnostics.set_config] or
+        [`model_diagnostics.config_context`][model_diagnostics.config_context].
 
     Notes
     -----

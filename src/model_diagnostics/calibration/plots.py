@@ -63,7 +63,6 @@ def plot_reliability_diagram(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
-
     level : float
         The level of the expectile or quantile. (Often called \(\alpha\).)
         It must be `0 <= level <= 1`.
@@ -78,15 +77,16 @@ def plot_reliability_diagram(
         - `"reliability"`: Plot a reliability diagram.
         - `"bias"`: Plot roughly a 45 degree rotated reliability diagram. The resulting
           plot is similar to `plot_bias`, i.e. `y_pred - E(y_obs|y_pred)` vs `y_pred`.
-
     ax : matplotlib.axes.Axes or plotly Figure
         Axes object to draw the plot onto, otherwise uses the current Axes.
 
     Returns
     -------
     ax :
-        Either the matplotlib axes or the plotly figure. This is configurable via
-        `model_diagnostics.set_config` and `model_diagnostics.config_context`.
+        Either the matplotlib axes or the plotly figure. This is configurable by
+        setting the `plot_backend` via
+        [`model_diagnostics.set_config`][model_diagnostics.set_config] or
+        [`model_diagnostics.config_context`][model_diagnostics.config_context].
 
     Notes
     -----
@@ -351,7 +351,6 @@ def plot_bias(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
-
     level : float
         The level of the expectile or quantile. (Often called \(\alpha\).)
         It must be `0 <= level <= 1`.
@@ -370,8 +369,10 @@ def plot_bias(
     Returns
     -------
     ax :
-        Either the matplotlib axes or the plotly figure. This is configurable via
-        `model_diagnostics.set_config` and `model_diagnostics.config_context`.
+        Either the matplotlib axes or the plotly figure. This is configurable by
+        setting the `plot_backend` via
+        [`model_diagnostics.set_config`][model_diagnostics.set_config] or
+        [`model_diagnostics.config_context`][model_diagnostics.config_context].
 
     Notes
     -----
