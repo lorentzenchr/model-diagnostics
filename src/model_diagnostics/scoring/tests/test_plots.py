@@ -6,6 +6,7 @@ from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
+from model_diagnostics import config_context
 from model_diagnostics._utils.plot_helper import (
     get_legend_list,
     get_title,
@@ -29,7 +30,6 @@ from model_diagnostics.scoring import plot_murphy_diagram
             "XXX",
             "The ax argument must be None, a matplotlib Axes or a plotly Figure",
         ),
-        ("plot_backend", "XXX", "The plot_backend must be"),
     ],
 )
 def test_plot_murphy_diagram_raises(param, value, msg):
@@ -83,16 +83,16 @@ def test_plot_murphy_diagram(functional, level, etas, weights, ax, plot_backend)
     clf = LogisticRegression(solver="newton-cholesky")
     clf.fit(X_train, y_train, w_train)
     y_pred = clf.predict_proba(X_test)[:, 1]
-    plt_ax = plot_murphy_diagram(
-        y_obs=y_test,
-        y_pred=y_pred,
-        weights=w_test,
-        etas=etas,
-        functional=functional,
-        level=level,
-        ax=ax,
-        plot_backend=plot_backend,
-    )
+    with config_context(plot_backend=plot_backend):
+        plt_ax = plot_murphy_diagram(
+            y_obs=y_test,
+            y_pred=y_pred,
+            weights=w_test,
+            etas=etas,
+            functional=functional,
+            level=level,
+            ax=ax,
+        )
 
     if ax is not None:
         assert ax is plt_ax
@@ -101,16 +101,16 @@ def test_plot_murphy_diagram(functional, level, etas, weights, ax, plot_backend)
     assert get_ylabel(plt_ax) == "score"
     assert get_title(plt_ax) == "Murphy Diagram"
 
-    plt_ax = plot_murphy_diagram(
-        y_obs=y_test,
-        y_pred=pl.Series(values=y_pred, name="simple"),
-        weights=w_test,
-        etas=etas,
-        functional=functional,
-        level=level,
-        ax=ax,
-        plot_backend=plot_backend,
-    )
+    with config_context(plot_backend=plot_backend):
+        plt_ax = plot_murphy_diagram(
+            y_obs=y_test,
+            y_pred=pl.Series(values=y_pred, name="simple"),
+            weights=w_test,
+            etas=etas,
+            functional=functional,
+            level=level,
+            ax=ax,
+        )
     assert get_title(plt_ax) == "Murphy Diagram simple"
 
 
@@ -125,12 +125,12 @@ def test_plot_murphy_diagram_multiple_predictions(plot_backend):
     y_obs[::2] = 0
     y_pred = pl.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
     fig, ax = plt.subplots()
-    plt_ax = plot_murphy_diagram(
-        y_obs=y_obs,
-        y_pred=y_pred,
-        ax=ax,
-        plot_backend=plot_backend,
-    )
+    with config_context(plot_backend=plot_backend):
+        plt_ax = plot_murphy_diagram(
+            y_obs=y_obs,
+            y_pred=y_pred,
+            ax=ax,
+        )
     assert get_title(plt_ax) == "Murphy Diagram"
     legend_text = get_legend_list(plt_ax)
     assert len(legend_text) == 2

@@ -8,7 +8,7 @@ from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
-from model_diagnostics import polars_version
+from model_diagnostics import config_context, polars_version
 from model_diagnostics._utils.plot_helper import (
     get_legend_list,
     get_title,
@@ -36,7 +36,6 @@ from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
             "XXX",
             "The ax argument must be None, a matplotlib Axes or a plotly Figure",
         ),
-        ("plot_backend", "XXX", "The plot_backend must be"),
     ],
 )
 def test_plot_reliability_diagram_raises(param, value, msg):
@@ -91,17 +90,17 @@ def test_plot_reliability_diagram(
     clf = LogisticRegression(solver="newton-cholesky")
     clf.fit(X_train, y_train, w_train)
     y_pred = clf.predict_proba(X_test)[:, 1]
-    plt_ax = plot_reliability_diagram(
-        y_obs=y_test,
-        y_pred=y_pred,
-        weights=w_test,
-        functional=functional,
-        level=0.8,
-        n_bootstrap=n_bootstrap,
-        diagram_type=diagram_type,
-        ax=ax,
-        plot_backend=plot_backend,
-    )
+    with config_context(plot_backend=plot_backend):
+        plt_ax = plot_reliability_diagram(
+            y_obs=y_test,
+            y_pred=y_pred,
+            weights=w_test,
+            functional=functional,
+            level=0.8,
+            n_bootstrap=n_bootstrap,
+            diagram_type=diagram_type,
+            ax=ax,
+        )
 
     xlabel_mapping = {
         "mean": "E(Y|X)",
@@ -130,14 +129,15 @@ def test_plot_reliability_diagram(
         )
         assert get_title(plt_ax) == "Bias Reliability Diagram"
 
-    plt_ax = plot_reliability_diagram(
-        y_obs=y_test,
-        y_pred=pl.Series(values=y_pred, name="simple"),
-        weights=w_test,
-        ax=ax,
-        n_bootstrap=n_bootstrap,
-        diagram_type=diagram_type,
-    )
+    with config_context(plot_backend=plot_backend):
+        plt_ax = plot_reliability_diagram(
+            y_obs=y_test,
+            y_pred=pl.Series(values=y_pred, name="simple"),
+            weights=w_test,
+            ax=ax,
+            n_bootstrap=n_bootstrap,
+            diagram_type=diagram_type,
+        )
     if diagram_type == "reliability":
         assert get_title(plt_ax) == "Reliability Diagram simple"
     else:
@@ -154,12 +154,11 @@ def test_plot_reliability_diagram_multiple_predictions(plot_backend):
     y_obs = np.arange(n_obs)
     y_obs[::2] = 0
     y_pred = pl.DataFrame({"model_2": np.ones(n_obs), "model_1": 3 * np.ones(n_obs)})
-    fig, ax = plt.subplots()
-    plt_ax = plot_reliability_diagram(
-        y_obs=y_obs,
-        y_pred=y_pred,
-        plot_backend=plot_backend,
-    )
+    with config_context(plot_backend=plot_backend):
+        plt_ax = plot_reliability_diagram(
+            y_obs=y_obs,
+            y_pred=y_pred,
+        )
     assert get_title(plt_ax) == "Reliability Diagram"
     legend_text = get_legend_list(plt_ax)
     assert len(legend_text) == 2
@@ -235,7 +234,6 @@ def test_plot_reliability_diagram_constant_prediction_transform_output():
             "XXX",
             "The ax argument must be None, a matplotlib Axes or a plotly Figure",
         ),
-        ("plot_backend", "XXX", "The plot_backend must be"),
     ],
 )
 def test_plot_bias_raises(param, value, msg):
@@ -336,14 +334,14 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax, plot_ba
                 else:
                     feature = pl.Series(feature).set_at_idx(0, None)
 
-        plt_ax = plot_bias(
-            y_obs=y_test,
-            y_pred=clf.predict_proba(X_test)[:, 1],
-            feature=feature,
-            confidence_level=confidence_level,
-            ax=ax,
-            plot_backend=plot_backend,
-        )
+        with config_context(plot_backend=plot_backend):
+            plt_ax = plot_bias(
+                y_obs=y_test,
+                y_pred=clf.predict_proba(X_test)[:, 1],
+                feature=feature,
+                confidence_level=confidence_level,
+                ax=ax,
+            )
 
         if ax is not None:
             assert ax is plt_ax
@@ -371,14 +369,15 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax, plot_ba
             xtick_labels = plt_ax.xaxis.get_ticklabels()
             assert xtick_labels[-1].get_text() == "Null"
 
-        plt_ax = plot_bias(
-            y_obs=y_test,
-            y_pred=pl.Series(values=clf.predict_proba(X_test)[:, 1], name="simple"),
-            feature=feature,
-            confidence_level=confidence_level,
-            ax=ax,
-        )
-    assert get_title(plt_ax) == "Bias Plot simple"
+        with config_context(plot_backend=plot_backend):
+            plt_ax = plot_bias(
+                y_obs=y_test,
+                y_pred=pl.Series(values=clf.predict_proba(X_test)[:, 1], name="simple"),
+                feature=feature,
+                confidence_level=confidence_level,
+                ax=ax,
+            )
+        assert get_title(plt_ax) == "Bias Plot simple"
 
 
 def test_plot_bias_feature_none():

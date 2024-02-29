@@ -4,17 +4,13 @@ import matplotlib as mpl
 
 
 def get_plotly_color(i):
-    try:
-        sys.modules["plotly"]
-        # Sometimes, those turn out to be the same as matplotlib default.
-        # colors = plotly.colors.DEFAULT_PLOTLY_COLORS
-        # Those are the plotly color default color palette in hex.
-        import plotly.express as px
+    # Sometimes, those turn out to be the same as matplotlib default.
+    # colors = plotly.colors.DEFAULT_PLOTLY_COLORS
+    # Those are the plotly color default color palette in hex.
+    import plotly.express as px
 
-        colors = px.colors.qualitative.Plotly
-        return colors[i % len(colors)]
-    except KeyError:
-        return False
+    colors = px.colors.qualitative.Plotly
+    return colors[i % len(colors)]
 
 
 def get_xlabel(ax):

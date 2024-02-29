@@ -19,6 +19,7 @@ Highlights:
 - Assess the predictive performance of models
     - strictly consistent, homogeneous [scoring functions](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/scoring/scoring/)
     - [score decomposition](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/scoring/scoring/#model_diagnostics.scoring.scoring.decompose) into miscalibration, discrimination and uncertainty
+- Choose your plot backend, either [matplotlib](https://matplotlib.org) or [plotly](https://plotly.com/python/), e.g., via [set_config](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/#model_diagnostics.set_config).
 
 :rocket: To our knowledge, this is the first python package to offer reliability diagrams for quantiles and expectiles and a score decomposition, both made available by an internal implementation of isotonic quantile/expectile regression. :rocket:
 
