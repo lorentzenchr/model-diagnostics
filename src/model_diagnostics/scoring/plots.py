@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 
+from model_diagnostics import get_config
 from model_diagnostics._utils._array import (
     get_array_min_max,
     get_second_dimension,
@@ -26,7 +27,6 @@ def plot_murphy_diagram(
     functional: str = "mean",
     level: float = 0.5,
     ax: Optional[mpl.axes.Axes] = None,
-    plot_backend: str = "matplotlib",
 ):
     r"""Plot a Murphy diagram.
 
@@ -63,15 +63,12 @@ def plot_murphy_diagram(
         `level=0.5` and `functional="quantile"` gives the median.
     ax : matplotlib.axes.Axes
         Axes object to draw the plot onto, otherwise uses the current Axes.
-    plot_backend: str
-        The plotting backend to use when `ax = None`. Options are:
-
-        - "matplotlib"
-        - "plotly"
 
     Returns
     -------
-    ax
+    ax :
+        Either the matplotlib axes or the plotly figure. This is configurable via
+        `model_diagnostics.set_config` and `model_diagnostics.config_context`.
 
     Notes
     -----
@@ -86,11 +83,8 @@ def plot_murphy_diagram(
         Representations, and Forecast Rankings".
         [arxiv:1503.08195](https://arxiv.org/abs/1503.08195).
     """
-    if plot_backend not in ("matplotlib", "plotly"):
-        msg = f"The plot_backend must be matplotlib or plotly, got {plot_backend}."
-        raise ValueError(msg)
-
     if ax is None:
+        plot_backend = get_config()["plot_backend"]
         if plot_backend == "matplotlib":
             ax = plt.gca()
         else:

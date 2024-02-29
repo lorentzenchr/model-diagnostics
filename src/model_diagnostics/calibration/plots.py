@@ -12,7 +12,7 @@ from scipy import special
 from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression as IsotonicRegression_skl
 
-from model_diagnostics import polars_version
+from model_diagnostics import get_config, polars_version
 from model_diagnostics._utils._array import (
     array_name,
     get_array_min_max,
@@ -37,7 +37,6 @@ def plot_reliability_diagram(
     confidence_level: float = 0.9,
     diagram_type: str = "reliability",
     ax: Optional[mpl.axes.Axes] = None,
-    plot_backend: str = "matplotlib",
 ):
     r"""Plot a reliability diagram.
 
@@ -82,16 +81,12 @@ def plot_reliability_diagram(
 
     ax : matplotlib.axes.Axes or plotly Figure
         Axes object to draw the plot onto, otherwise uses the current Axes.
-    plot_backend: str
-        The plotting backend to use when `ax = None`. Options are:
-
-        - "matplotlib"
-        - "plotly"
 
     Returns
     -------
     ax :
-        Either the matplotlib axes or the plotly figure.
+        Either the matplotlib axes or the plotly figure. This is configurable via
+        `model_diagnostics.set_config` and `model_diagnostics.config_context`.
 
     Notes
     -----
@@ -115,11 +110,8 @@ def plot_reliability_diagram(
         In: Proceedings of the National Academy of Sciences 118.8 (2021), e2016191118.
         [doi:10.1073/pnas.2016191118](https://doi.org/10.1073/pnas.2016191118).
     """
-    if plot_backend not in ("matplotlib", "plotly"):
-        msg = f"The plot_backend must be matplotlib or plotly, got {plot_backend}."
-        raise ValueError(msg)
-
     if ax is None:
+        plot_backend = get_config()["plot_backend"]
         if plot_backend == "matplotlib":
             ax = plt.gca()
         else:
@@ -374,15 +366,12 @@ def plot_bias(
         fulfil `0 <= confidence_level < 1`.
     ax : matplotlib.axes.Axes or plotly Figure
         Axes object to draw the plot onto, otherwise uses the current Axes.
-    plot_backend: str
-        The plotting backend to use when `ax = None`. Options are:
-
-        - "matplotlib"
-        - "plotly"
 
     Returns
     -------
-    ax
+    ax :
+        Either the matplotlib axes or the plotly figure. This is configurable via
+        `model_diagnostics.set_config` and `model_diagnostics.config_context`.
 
     Notes
     -----
@@ -406,10 +395,8 @@ def plot_bias(
         raise ValueError(msg)
     with_errorbars = confidence_level > 0
 
-    if plot_backend not in ("matplotlib", "plotly"):
-        msg = f"The plot_backend must be matplotlib or plotly, got {plot_backend}."
-        raise ValueError(msg)
     if ax is None:
+        plot_backend = get_config()["plot_backend"]
         if plot_backend == "matplotlib":
             ax = plt.gca()
         else:
