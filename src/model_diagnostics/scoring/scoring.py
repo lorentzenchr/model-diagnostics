@@ -75,7 +75,7 @@ class _BaseScoringFunction(ABC):
         score_stddev = np.average((score_per_obs - avg_score) ** 2, weights=weights) / np.amax(
             [1, df]
         )
-        return t.interval(confidence_level, df=df, scale=np.sqrt(score_stddev))
+        return avg_score + t.interval(confidence_level, df=df, scale=np.sqrt(score_stddev))
 
     @abstractmethod
     def score_per_obs(
@@ -1171,7 +1171,7 @@ def compute_score(
                 recalibrated[:idx2] = 0.5 * (lower + upper)
 
         score = scoring_function(y_o, x, w)
-        interval = score + scoring_function.confidence_interval(y_o, x, confidence_level, w,)
+        interval = scoring_function.confidence_interval(y_o, x, confidence_level, w,)
         try:
             score_recalibrated = scoring_function(y_o, recalibrated, w)
         except ValueError as exc:
