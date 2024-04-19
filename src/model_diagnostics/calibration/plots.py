@@ -315,7 +315,6 @@ def plot_bias(
     n_bins: int = 10,
     confidence_level: float = 0.9,
     ax: Optional[mpl.axes.Axes] = None,
-    plot_backend: str = "matplotlib",
 ):
     r"""Plot model bias conditional on a feature.
 
