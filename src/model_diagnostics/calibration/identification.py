@@ -466,8 +466,15 @@ def compute_bias(
                     )
                     .sort("__priority", descending=True)
                     .head(n_bins)
-                    .sort(feature_name, descending=False)
                 )
+                # FIXME: When n_bins=0, the resut should be an empty dataframe
+                # (0 rows and some columns). For some unknown reason as of
+                # polars 0.20.20, the following sort neglects the head(0) statement.
+                # Therefore, we place an explicit collect here. This should not be
+                # needed!
+                if n_bins == 0 or feature.null_count() >= 1:
+                    df = df.collect().lazy()
+                df = df.sort(feature_name, descending=False)
 
                 df = df.select(
                     [
