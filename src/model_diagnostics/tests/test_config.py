@@ -64,7 +64,7 @@ def test_config_context():
 
     # No positional arguments
     with pytest.raises(TypeError):
-        config_context(True)  # ruff: noqa: FBT003
+        config_context(True)  # noqa: FBT003
 
     # No unknown arguments
     with pytest.raises(TypeError):

@@ -43,8 +43,8 @@ jobs:
         pip install hatch
 
     - if: matrix.python-version == '3.11' && runner.os == 'Linux'
-      name: Lint
-      run: hatch run lint:all
+      name: Formatter & Linter
+      run: hatch run format:check
 
     - if: matrix.python-version == '3.11' && runner.os == 'Linux'
       name: Build docs
