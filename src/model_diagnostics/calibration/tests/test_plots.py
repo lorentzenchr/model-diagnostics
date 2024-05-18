@@ -43,7 +43,7 @@ def test_plot_reliability_diagram_raises(param, value, msg):
     y_obs = [0, 1]
     y_pred = [-1, 1]
     d = {param: value}
-    if "functional" not in d.keys():
+    if "functional" not in d:
         d["functional"] = "quantile"  # as a default
     with pytest.raises(ValueError, match=msg):
         plot_reliability_diagram(y_obs=y_obs, y_pred=y_pred, **d)
@@ -327,9 +327,9 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax, plot_ba
                     feature = (
                         pl.Series(feature).cast(str).set_at_idx(0, None).cast(dtype)
                     )
-            else:
+            else:  # noqa: PLR5501
                 # FIXME: polars >= 0.19.14
-                if polars_version >= Version("0.19.14"):  # noqa: PLR5501
+                if polars_version >= Version("0.19.14"):
                     feature = pl.Series(feature).scatter(0, None)
                 else:
                     feature = pl.Series(feature).set_at_idx(0, None)
