@@ -27,7 +27,9 @@ This package relies on the giant shoulders of, among others, [polars](https://po
 
 ## Installation
 
-`pip install model-diagnostics`
+```
+pip install model-diagnostics
+```
 
 ## Contributions
 
