@@ -3,7 +3,7 @@ import polars as pl
 import pytest
 from numpy.testing import assert_array_equal
 
-from model_diagnostics._utils._array import (
+from model_diagnostics._utils.array import (
     array_name,
     get_array_min_max,
     get_second_dimension,

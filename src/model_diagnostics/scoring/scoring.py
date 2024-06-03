@@ -14,7 +14,7 @@ from scipy import special
 from scipy.stats import expectile
 from sklearn.isotonic import IsotonicRegression as IsotonicRegression_skl
 
-from model_diagnostics._utils._array import (
+from model_diagnostics._utils.array import (
     get_second_dimension,
     get_sorted_array_names,
     length_of_second_dimension,
