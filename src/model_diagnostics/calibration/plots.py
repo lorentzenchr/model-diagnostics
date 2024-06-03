@@ -53,7 +53,8 @@ def plot_reliability_diagram(
         Observed values of the response variable.
         For binary classification, y_obs is expected to be in the interval [0, 1].
     y_pred : array-like of shape (n_obs) or (n_obs, n_models)
-        Predicted values, e.g. for the conditional expectation of the response, `E(Y|X)`.
+        Predicted values, e.g. for the conditional expectation of the response,
+        `E(Y|X)`.
     weights : array-like of shape (n_obs) or None
         Case weights.
     functional : str
@@ -334,7 +335,8 @@ def plot_bias(
         Observed values of the response variable.
         For binary classification, y_obs is expected to be in the interval [0, 1].
     y_pred : array-like of shape (n_obs) or (n_obs, n_models)
-        Predicted values, e.g. for the conditional expectation of the response, `E(Y|X)`.
+        Predicted values, e.g. for the conditional expectation of the response,
+        `E(Y|X)`.
     feature : array-like of shape (n_obs) or None
         Some feature column.
     weights : array-like of shape (n_obs) or None
