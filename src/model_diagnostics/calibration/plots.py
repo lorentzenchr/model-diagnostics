@@ -13,7 +13,7 @@ from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression as IsotonicRegression_skl
 
 from model_diagnostics import get_config, polars_version
-from model_diagnostics._utils._array import (
+from model_diagnostics._utils.array import (
     array_name,
     get_array_min_max,
     get_second_dimension,

@@ -8,7 +8,7 @@ from packaging.version import Version
 from scipy import special
 
 from model_diagnostics import polars_version
-from model_diagnostics._utils._array import (
+from model_diagnostics._utils.array import (
     array_name,
     get_second_dimension,
     get_sorted_array_names,

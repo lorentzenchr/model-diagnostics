@@ -8,7 +8,7 @@ import polars as pl
 from scipy.interpolate import interp1d
 from scipy.stats import expectile
 
-from ._array import length_of_second_dimension, validate_2_arrays
+from .array import length_of_second_dimension, validate_2_arrays
 
 
 def quantile_lower(x, wx=None, level=0.5):

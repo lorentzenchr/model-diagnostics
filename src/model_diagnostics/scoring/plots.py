@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 
 from model_diagnostics import get_config
-from model_diagnostics._utils._array import (
+from model_diagnostics._utils.array import (
     get_array_min_max,
     get_second_dimension,
     get_sorted_array_names,
