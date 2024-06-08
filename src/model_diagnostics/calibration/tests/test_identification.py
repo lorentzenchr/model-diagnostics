@@ -16,6 +16,7 @@ from model_diagnostics._utils.test_helper import (
     pd_Series,
 )
 from model_diagnostics.calibration import compute_bias, identification_function
+from model_diagnostics.calibration.identification import _compute_marginal
 
 
 @pytest.mark.parametrize(
@@ -551,3 +552,208 @@ def test_compute_bias_1d_array_like(list2array):
         }
     )
     assert_frame_equal(df_bias, df_expected, check_exact=False)
+
+
+@pytest.mark.parametrize(
+    ("feature", "f_grouped"),
+    [
+        (
+            pl.Series(["a", "a", "b", "b", "b"]),
+            pl.Series(["a", "b"]),
+        ),
+        (
+            pl.Series([0.1, 0.1, 0.9, 0.9, 0.9]),
+            pl.Series([0.1, 0.9]),
+        ),
+        (
+            pl.Series([None, np.nan, 1.0, 1, 1]),
+            pl.Series([None, 1.0]),
+        ),
+        (
+            pl.Series(["a", "a", None, None, None]),
+            pl.Series(["a", None]),
+        ),
+        (
+            pa_array(["a", "a", "b", "b", "b"]),
+            pa_array(["a", "b"]),
+        ),
+        (
+            pa_array([0.1, 0.1, 0.9, 0.9, 0.9]),
+            pa_array([0.1, 0.9]),
+        ),
+        (
+            pa_array([None, np.nan, 1.0, 1, 1]),
+            pa_array([None, 1.0]),
+        ),
+        (
+            pa_array(["a", "a", None, None, None]),
+            pa_array(["a", None]),
+        ),
+        (
+            pa_DictionaryArray_from_arrays([0, 0, 1, 1, 1], ["b", "a"]),
+            pa_DictionaryArray_from_arrays(np.array([0, 1], dtype=np.int8), ["b", "a"]),
+        ),
+    ],
+)
+def test_compute_marginal(feature, f_grouped):
+    """Test compute_marginal on simple data."""
+    if isinstance(feature, SkipContainer):
+        pytest.skip("Module for data container not imported.")
+    with pl.StringCache():
+        # The string cache is needed to avoid the following error message:
+        # exceptions.ComputeError: Cannot compare categoricals originating from
+        # different sources. Consider setting a global string cache.
+        df = pl.DataFrame(
+            {
+                "y_obs": [0, 1, 2, 4, 3],
+                "y_pred": [1, 1, 2, 2, 2],
+                "feature": feature,
+            }
+        )
+        df_marginal = _compute_marginal(
+            y_obs=df.get_column("y_obs"),
+            y_pred=df.get_column("y_pred"),
+            feature=df.get_column("feature"),
+        )
+        df_expected = pl.DataFrame(
+            {
+                "feature": f_grouped,
+                "y_obs_mean": [0.5, 3],
+                "y_pred_mean": [1.0, 2.0],
+                "y_obs_stderr": np.sqrt([0.25 + 0.25, (1 + 1 + 0) / 2])
+                / np.sqrt([2, 3]),
+                "y_pred_stderr": [0.0, 0.0],
+                "count": pl.Series(values=[2, 3], dtype=pl.UInt32),
+                "weights": pl.Series(values=[2, 3], dtype=pl.Float64),
+            }
+        ).sort("feature")
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+        # Same with weights.
+        # FIXME: polars >= 0.19.14
+        if polars_version >= Version("0.19.14"):
+            feature = pl.Series(values=feature).gather([0, 4, 4]).alias("feature")
+        else:
+            feature = pl.Series(values=feature).take([0, 4, 4]).alias("feature")
+        df_marginal = _compute_marginal(
+            # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
+            y_obs=[0.5, 8 / 3, 10 / 3],
+            y_pred=[1, 2, 2],
+            weights=[2, 1.5, 1.5],
+            feature=feature,
+        )
+        df_expected = pl.DataFrame(
+            {
+                "feature": f_grouped,
+                "y_obs_mean": [0.5, 3.0],
+                "y_pred_mean": [1.0, 2.0],
+                "y_obs_stderr": [0.0, np.sqrt((1 / 9 + 1 / 9) / 1 / 2)],
+                "y_pred_stderr": [0.0, 0.0],
+                "count": pl.Series(values=[1, 2], dtype=pl.UInt32),
+                "weights": pl.Series(values=[2, 3], dtype=pl.Float64),
+            }
+        ).sort("feature")
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+
+def test_compute_marginal_feature_none():
+    """Test compute_marginal for feature = None."""
+    df = pl.DataFrame(
+        {
+            "y_obs": [0, 1, 2, 4, 3],
+            "y_pred": [1, 1, 2, 2, 2],
+        }
+    )
+    df_marginal = _compute_marginal(
+        y_obs=df.get_column("y_obs"),
+        y_pred=df.get_column("y_pred"),
+        feature=None,
+    )
+    df_expected = pl.DataFrame(
+        {
+            "y_obs_mean": [2.0],
+            "y_pred_mean": [8 / 5],
+            "y_obs_stderr": [np.sqrt(2.5 / 5)],
+            "y_pred_stderr": [np.sqrt((9 + 9 + 4 + 4 + 4) / 25 / 4 / 5)],
+            "count": pl.Series(values=[5], dtype=pl.UInt32),
+            "weights": [5.0],
+        }
+    )
+    assert_frame_equal(df_marginal, df_expected)
+
+    # Same with weights.
+    df_marginal = _compute_marginal(
+        # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
+        y_obs=[0.5, 8 / 3, 10 / 3],
+        y_pred=[1, 2, 2],
+        weights=[2, 1.5, 1.5],
+        feature=None,
+    )
+    df_expected = df_expected.with_columns(
+        pl.Series(values=[3], dtype=pl.UInt32).alias("count"),
+        pl.Series(values=[np.sqrt((9 / 2 + 2 / 3 + 8 / 3) / 5 / 2)]).alias(
+            "y_obs_stderr"
+        ),
+        pl.Series(values=[np.sqrt(1.2 / 5 / 2)]).alias("y_pred_stderr"),
+    )
+    assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+
+def test_compute_marginal_numerical_feature():
+    """Test compute_marginal for a numerical feature."""
+    n_obs = 100
+    n_bins = 10
+    n_steps = n_obs // n_bins
+    df = pl.DataFrame(
+        {
+            "y_obs": 2 * np.linspace(-0.5, 0.5, num=n_obs, endpoint=False),
+            "y_pred": np.linspace(0, 1, num=n_obs, endpoint=False),
+            "feature": np.linspace(0, 1, num=n_obs, endpoint=False),
+        }
+    )
+    df_bias = compute_bias(
+        y_obs=df.get_column("y_obs"),
+        y_pred=df.get_column("y_pred"),
+        feature=df.get_column("feature"),
+        n_bins=n_bins,
+    )
+    # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
+    # of numpy array. Therefore, we add the np.asarray().
+    # The Windows CI runner with python 3.10, polars 0.19.19 and numpy1.22.0 seems to
+    # have a bug in to_numpy, as bias[0] = 2.854484e-311 instead of 1. Therefore, we
+    # use to_list instead of to_numpy.
+    bias = np.asarray((df.get_column("y_pred") - df.get_column("y_obs")).to_list())
+    df_expected = pl.DataFrame(
+        {
+            "feature": 0.045 + 0.1 * np.arange(10),
+            "bias_mean": 0.955 - 0.1 * np.arange(10),
+            "bias_count": n_steps * np.ones(n_bins, dtype=np.uint32),
+            "bias_weights": [n_obs / n_bins] * n_bins,
+            "bias_stderr": [
+                np.std(bias[n : n + n_steps], ddof=1) / np.sqrt(n_steps)
+                for n in range(0, n_obs, n_steps)
+            ],
+            "p_value": [
+                ttest_1samp(bias[n : n + n_steps], 0).pvalue
+                for n in range(0, n_obs, n_steps)
+            ],
+        }
+    )
+    assert_frame_equal(df_bias, df_expected, check_exact=False)
+
+
+@pytest.mark.parametrize("n_bins", [2, 10])
+def test_compute_marginal_n_bins_numerical_feature(n_bins):
+    """Test compute_marginal returns right number of bins for a numerical feature."""
+    n_obs = 10
+    y_obs = np.linspace(-1, 1, num=n_obs, endpoint=False)
+    y_pred = y_obs**2
+    feature = [4, 4, 4, 4, 3, 3, 3, 2, 2, 11]
+    df_marginal = _compute_marginal(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+        n_bins=n_bins,
+    )
+    assert df_marginal.shape[0] == np.min([n_bins, 4])
+    assert df_marginal["count"].sum() == n_obs

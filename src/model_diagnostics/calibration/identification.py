@@ -1,3 +1,4 @@
+from itertools import chain
 from typing import Optional, Union
 
 import numpy as np
@@ -431,6 +432,273 @@ def compute_bias(
                 "bias_weights",
                 "bias_stderr",
                 "p_value",
+            ]
+            df_list.append(df.select(col_selection))
+
+        df = pl.concat(df_list)
+    return df
+
+
+def _compute_marginal(
+    y_obs: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    feature: Optional[Union[npt.ArrayLike, pl.Series]] = None,
+    weights: Optional[npt.ArrayLike] = None,
+    *,
+    n_bins: int = 10,
+):
+    r"""Compute the marginal expectation conditional on a single feature.
+
+    This function computes the (weighted) average of observed response and predictions
+    conditioned on a given feature.
+
+    Parameters
+    ----------
+    y_obs : array-like of shape (n_obs)
+        Observed values of the response variable.
+        For binary classification, y_obs is expected to be in the interval [0, 1].
+    y_pred : array-like of shape (n_obs) or (n_obs, n_models)
+        Predicted values, e.g. for the conditional expectation of the response,
+        `E(Y|X)`.
+    feature : array-like of shape (n_obs) or None
+        Some feature column.
+    weights : array-like of shape (n_obs) or None
+        Case weights. If given, the bias is calculated as weighted average of the
+        identification function with these weights.
+        Note that the standard errors and p-values in the output are based on the
+        assumption that the variance of the bias is inverse proportional to the
+        weights. See the Notes section for details.
+    n_bins : int
+        The number of bins for numerical features and the maximal number of (most
+        frequent) categories shown for categorical features. Due to ties, the effective
+        number of bins might be smaller than `n_bins`. Null values are always included
+        in the output, accounting for one bin. NaN values are treated as null values.
+
+    Returns
+    -------
+    df : polars.DataFrame
+        The result table contains at least the columns:
+
+        - `y_obs_mean`: Mean of `y_obs`
+        - `y_pred_mean`: Mean of `y_pred`
+        - `y_obs_stderr`: Standard error, i.e. standard deviation of `y_obs_mean`
+        - `y_pred_stderr`: Standard error, i.e. standard deviation of `y_pred_mean`
+        - `count`: Number of data rows
+        - `weights`: Sum of weights
+
+    Notes
+    -----
+    The marginal values iare computed as an estimation of:
+
+        - `y_obs`: \(\mathbb{E}(Y|features)\).
+        - `y_pred`: \(\mathbb{E}(m(X)|features)\).
+    Computationally that is more or less a group-by operation on a dataset.
+
+    The standard error for both are calculated in the standard way as
+    \(\mathrm{SE} = \sqrt{\operatorname{Var}(\bar{Y})} = \frac{\sigma}{\sqrt{n}}\) and
+    the standard variance estimator for \(\sigma^2\) with Bessel correction, i.e.
+    division by \(n-1\) instead of \(n\).
+
+    With case weights, the variance estimator becomes \(\operatorname{Var}(\bar{Y})
+    = \frac{1}{n-1} \frac{1}{\sum_i w_i} \sum_i w_i (y_i - \bar{y})^2\) with
+    the implied relation \(\operatorname{Var}(y_i) \sim \frac{1}{w_i} \).
+    If your weights are for repeated observations, so-called frequency weights, then
+    the above estimate is conservative because it uses \(n - 1\) instead
+    of \((\sum_i w_i) - 1\).
+
+    Examples
+    --------
+    >>> _compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    shape: (1, 6)
+    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐
+    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │
+    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │
+    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │
+    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡
+    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │
+    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘
+    >>> _compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2],
+    ... feature=["a", "a", "b", "b"])
+    shape: (2, 7)
+    ┌─────────┬────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐
+    │ feature ┆ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │
+    │ ---     ┆ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │
+    │ str     ┆ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │
+    ╞═════════╪════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡
+    │ a       ┆ 0.0        ┆ 0.0         ┆ 0.0          ┆ 1.0           ┆ 2     ┆ 2.0     │
+    │ b       ┆ 1.0        ┆ 1.5         ┆ 0.0          ┆ 0.5           ┆ 2     ┆ 2.0     │
+    └─────────┴────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘
+    """  # noqa: E501
+    validate_same_first_dimension(y_obs, y_pred)
+    n_pred = length_of_second_dimension(y_pred)
+    pred_names, _ = get_sorted_array_names(y_pred)
+    y_obs = np.asarray(y_obs)
+
+    if weights is not None:
+        validate_same_first_dimension(weights, y_obs)
+        w = np.asarray(weights)
+        if w.ndim > 1:
+            msg = f"The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
+            raise ValueError(msg)
+    else:
+        w = np.ones_like(y_obs, dtype=float)
+
+    df_list = []
+    with pl.StringCache():
+        feature, feature_name, is_categorical, is_string, n_bins, f_binned = (
+            bin_feature(feature=feature, y_obs=y_obs, n_bins=n_bins)
+        )
+
+        for i in range(len(pred_names)):
+            # Loop over columns of y_pred.
+            x = np.asarray(y_pred if n_pred == 0 else get_second_dimension(y_pred, i))
+
+            if feature is None:
+                y_obs_mean = np.average(y_obs, weights=w)
+                y_pred_mean = np.average(x, weights=w)
+                weights_sum = np.sum(w)
+                count = y_obs.shape[0]
+                # Note: with Bessel correction
+                y_obs_stddev = np.average(
+                    (y_obs - y_obs_mean) ** 2, weights=w
+                ) / np.amax([1, count - 1])
+                y_pred_stddev = np.average((x - y_pred_mean) ** 2, weights=w) / np.amax(
+                    [1, count - 1]
+                )
+                df = pl.DataFrame(
+                    {
+                        "y_obs_mean": [y_obs_mean],
+                        "y_pred_mean": [y_pred_mean],
+                        "count": pl.Series([count], dtype=pl.UInt32),
+                        "weights": [weights_sum],
+                        "y_obs_stderr": [np.sqrt(y_obs_stddev)],
+                        "y_pred_stderr": [np.sqrt(y_pred_stddev)],
+                    }
+                )
+            else:
+                df = pl.DataFrame(
+                    {
+                        "y_obs": y_obs,
+                        "y_pred": x,
+                        feature_name: feature,
+                        "weights": w,
+                    }
+                )
+
+                agg_list = [
+                    pl.count("y_obs").alias("count"),
+                    pl.col("weights").sum().alias("weights_sum"),
+                    *chain.from_iterable(
+                        [
+                            pl.col(c + "_mean").first(),
+                            (
+                                (
+                                    pl.col("weights")
+                                    * ((pl.col(c) - pl.col(c + "_mean")) ** 2)
+                                ).sum()
+                                / pl.col("weights").sum()
+                            ).alias(c + "_variance"),
+                        ]
+                        for c in ["y_obs", "y_pred"]
+                    ),
+                ]
+
+                if is_categorical or is_string:
+                    groupby_name = feature_name
+                else:
+                    # See above for the creation of the binned feature f_binned.
+                    df = df.hstack([f_binned])
+                    groupby_name = "bin"
+                    agg_list.append(pl.col(feature_name).mean())
+
+                df = df.lazy().select(
+                    [
+                        pl.all(),
+                        (
+                            (pl.col("weights") * pl.col("y_obs"))
+                            .sum()
+                            .over(groupby_name)
+                            / pl.col("weights").sum().over(groupby_name)
+                        ).alias("y_obs_mean"),
+                        (
+                            (pl.col("weights") * pl.col("y_pred"))
+                            .sum()
+                            .over(groupby_name)
+                            / pl.col("weights").sum().over(groupby_name)
+                        ).alias("y_pred_mean"),
+                    ]
+                )
+                # FIXME: polars >= 0.19
+                if polars_version >= Version("0.19.0"):
+                    df = df.group_by(groupby_name)
+                else:
+                    df = df.groupby(groupby_name)
+                df = (
+                    df.agg(agg_list)
+                    .with_columns(
+                        [
+                            pl.when(pl.col("count") > 1)
+                            .then(pl.col(c + "_variance") / (pl.col("count") - 1))
+                            .otherwise(pl.col(c + "_variance"))
+                            .sqrt()
+                            .alias(c + "_stderr")
+                            for c in ("y_obs", "y_pred")
+                        ]
+                    )
+                    # With sort and head alone, we could lose the null value, but we
+                    # want to keep it.
+                    # .sort("bias_count", descending=True)
+                    # .head(n_bins)
+                    .with_columns(
+                        pl.when(pl.col(feature_name).is_null())
+                        .then(pl.max("count") + 1)
+                        .otherwise(pl.col("count"))
+                        .alias("__priority")
+                    )
+                    .sort("__priority", descending=True)
+                    .head(n_bins)
+                )
+                # FIXME: When n_bins=0, the resut should be an empty dataframe
+                # (0 rows and some columns). For some unknown reason as of
+                # polars 0.20.20, the following sort neglects the head(0) statement.
+                # Therefore, we place an explicit collect here. This should not be
+                # needed!
+                if n_bins == 0 or feature.null_count() >= 1:
+                    df = df.collect().lazy()
+                df = df.sort(feature_name, descending=False)
+
+                df = df.select(
+                    [
+                        pl.col(feature_name),
+                        pl.col("y_obs_mean"),
+                        pl.col("y_pred_mean"),
+                        pl.col("y_obs_stderr"),
+                        pl.col("y_pred_stderr"),
+                        pl.col("weights_sum").alias("weights"),
+                        pl.col("count"),
+                    ]
+                ).collect()
+
+            # Add column "model".
+            if n_pred > 0:
+                model_col_name = "model_" if feature_name == "model" else "model"
+                df = df.with_columns(
+                    pl.Series(model_col_name, [pred_names[i]] * df.shape[0])
+                )
+
+            # Select the columns in the correct order.
+            col_selection = []
+            if n_pred > 0:
+                col_selection.append(model_col_name)
+            if feature_name is not None and feature_name in df.columns:
+                col_selection.append(feature_name)
+            col_selection += [
+                "y_obs_mean",
+                "y_pred_mean",
+                "y_obs_stderr",
+                "y_pred_stderr",
+                "count",
+                "weights",
             ]
             df_list.append(df.select(col_selection))
 
