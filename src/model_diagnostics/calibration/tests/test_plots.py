@@ -22,7 +22,11 @@ from model_diagnostics._utils.test_helper import (
     pd_available,
     pd_Series,
 )
-from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
+from model_diagnostics.calibration import (
+    plot_bias,
+    plot_marginal,
+    plot_reliability_diagram,
+)
 
 
 @pytest.mark.parametrize(
@@ -446,3 +450,47 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_leve
     assert legend_text[2].get_text() == "model_2"
     if with_null:
         assert legend_text[3].get_text() == "Null values"
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version >= Version("0.20.16"), reason="requires polars 0.20.15 or lower"
+)
+def test_plot_marginal_raises_polars_version():
+    msg = "The function plot_marginal requires polars >= 0.20.16."
+    with pytest.raises(ValueError, match=msg):
+        plot_marginal(
+            predict_callable=lambda x: x.shape[0],
+            X=np.arange(4).reshape(2, 2),
+            y_obs=np.arange(2),
+            feature_name=0,
+        )
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version >= Version("0.20.16"), reason="requires polars 0.20.15 or lower"
+)
+@pytest.mark.parametrize(
+    ("param", "value", "msg"),
+    [
+        (
+            "ax",
+            "XXX",
+            "The ax argument must be None, a matplotlib Axes or a plotly Figure",
+        ),
+    ],
+)
+def test_plot_marginal_raises(param, value, msg):
+    """Test that plot_marginal raises errors."""
+    y_obs = [0, 1, 2]
+    y_pred = [-1, 1, 1]
+    d = {param: value}
+    with pytest.raises(ValueError, match=msg):
+        plot_marginal(
+            predict_callable=lambda x: x.shape[0],
+            X=np.ones_like(y_obs)[:, None],
+            y_obs=y_obs,
+            feature_name=0,
+            **d,
+        )

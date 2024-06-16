@@ -186,6 +186,11 @@ def compute_bias(
         - `p_value`: p-value of the 2-sided t-test with null hypothesis:
           `bias_mean = 0`
 
+        If `feautre ` is not None, then there is also the column:
+
+        - `feature_name`: The actual name of the feature with the (binned) feature
+          values.
+
     Notes
     -----
     [](){#notes}
@@ -320,8 +325,7 @@ def compute_bias(
                 if is_categorical or is_string:
                     groupby_name = feature_name
                 else:
-                    # See above for the creation of the binned feature f_binned.
-                    df = df.hstack([f_binned])
+                    df = df.hstack([f_binned.get_column("bin")])
                     groupby_name = "bin"
                     agg_list.append(pl.col(feature_name).mean())
 
@@ -486,6 +490,15 @@ def _compute_marginal(
         - `count`: Number of data rows
         - `weights`: Sum of weights
 
+        If `feature ` is not None, then there is also the column:
+
+        - `feature_name`: The actual name of the feature with the (binned) feature
+          values.
+
+        If `feature` is numerical, one also has:
+
+        - `bin_edges`: The edges of the bins.
+
     Notes
     -----
     The marginal values iare computed as an estimation of:
@@ -508,27 +521,35 @@ def _compute_marginal(
 
     Examples
     --------
-    >>> _compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
-    shape: (1, 6)
-    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐
-    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │
-    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │
-    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │
-    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡
-    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │
-    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘
-    >>> _compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2],
-    ... feature=["a", "a", "b", "b"])
-    shape: (2, 7)
-    ┌─────────┬────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐
-    │ feature ┆ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │
-    │ ---     ┆ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │
-    │ str     ┆ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │
-    ╞═════════╪════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡
-    │ a       ┆ 0.0        ┆ 0.0         ┆ 0.0          ┆ 1.0           ┆ 2     ┆ 2.0     │
-    │ b       ┆ 1.0        ┆ 1.5         ┆ 0.0          ┆ 0.5           ┆ 2     ┆ 2.0     │
-    └─────────┴────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘
+    >>> _compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])                         # doctest: +SKIP
+    shape: (1, 6)                                                                            # doctest: +SKIP
+    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐            # doctest: +SKIP
+    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │            # doctest: +SKIP
+    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │            # doctest: +SKIP
+    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │            # doctest: +SKIP
+    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡            # doctest: +SKIP
+    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │            # doctest: +SKIP
+    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘            # doctest: +SKIP
+    >>> _compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2],                         # doctest: +SKIP
+    ... feature=["a", "a", "b", "b"])                                                        # doctest: +SKIP
+    shape: (2, 7)                                                                            # doctest: +SKIP
+    ┌─────────┬────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐  # doctest: +SKIP
+    │ feature ┆ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │  # doctest: +SKIP
+    │ ---     ┆ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │  # doctest: +SKIP
+    │ str     ┆ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │  # doctest: +SKIP
+    ╞═════════╪════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡  # doctest: +SKIP
+    │ a       ┆ 0.0        ┆ 0.0         ┆ 0.0          ┆ 1.0           ┆ 2     ┆ 2.0     │  # doctest: +SKIP
+    │ b       ┆ 1.0        ┆ 1.5         ┆ 0.0          ┆ 0.5           ┆ 2     ┆ 2.0     │  # doctest: +SKIP
+    └─────────┴────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘  # doctest: +SKIP
     """  # noqa: E501
+    # FIXME: polars >= 0.20.16
+    # Also remove the doctest: +SKIP above.
+    if polars_version < Version("0.20.16"):
+        msg = (
+            "The function plot_marginal requires polars >= 0.20.16. "
+            f" You have {polars_version}."
+        )
+        raise ValueError(msg)
     validate_same_first_dimension(y_obs, y_pred)
     n_pred = length_of_second_dimension(y_pred)
     pred_names, _ = get_sorted_array_names(y_pred)
@@ -545,9 +566,14 @@ def _compute_marginal(
 
     df_list = []
     with pl.StringCache():
-        feature, feature_name, is_categorical, is_string, n_bins, f_binned = (
-            bin_feature(feature=feature, y_obs=y_obs, n_bins=n_bins)
-        )
+        (
+            feature,
+            feature_name,
+            is_categorical,
+            is_string,
+            n_bins,
+            f_binned,
+        ) = bin_feature(feature=feature, y_obs=y_obs, n_bins=n_bins)
 
         for i in range(len(pred_names)):
             # Loop over columns of y_pred.
@@ -606,10 +632,15 @@ def _compute_marginal(
                 if is_categorical or is_string:
                     groupby_name = feature_name
                 else:
-                    # See above for the creation of the binned feature f_binned.
-                    df = df.hstack([f_binned])
+                    # We also add the bin edges.
+                    df = df.hstack(
+                        [f_binned.get_column("bin"), f_binned.get_column("bin_edges")]
+                    )
                     groupby_name = "bin"
-                    agg_list.append(pl.col(feature_name).mean())
+                    agg_list += [
+                        pl.col(feature_name).mean(),
+                        pl.col("bin_edges").first(),
+                    ]
 
                 df = df.lazy().select(
                     [
@@ -677,6 +708,7 @@ def _compute_marginal(
                         pl.col("weights_sum").alias("weights"),
                         pl.col("count"),
                     ]
+                    + ([] if is_categorical or is_string else [pl.col("bin_edges")])
                 ).collect()
 
             # Add column "model".
@@ -700,6 +732,8 @@ def _compute_marginal(
                 "count",
                 "weights",
             ]
+            if feature_name in df.columns and not is_categorical and not is_string:
+                col_selection += ["bin_edges"]
             df_list.append(df.select(col_selection))
 
         df = pl.concat(df_list)

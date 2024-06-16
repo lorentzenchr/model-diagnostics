@@ -23,7 +23,7 @@ from model_diagnostics._utils.array import (
 from model_diagnostics._utils.isotonic import IsotonicRegression
 from model_diagnostics._utils.plot_helper import get_plotly_color, is_plotly_figure
 
-from .identification import compute_bias
+from .identification import _compute_marginal, compute_bias
 
 
 def plot_reliability_diagram(
@@ -582,7 +582,7 @@ def plot_bias(
                     name=label,
                 )
 
-        if df_i[feature_name].null_count() > 0:
+        if feature_has_nulls:
             # Null values are plotted as diamonds as rightmost point.
             df_i_null = df_i.filter(pl.col(feature_name).is_null())
 
@@ -631,7 +631,7 @@ def plot_bias(
                 )
 
     if is_categorical or is_string:
-        if df_i[feature_name].null_count() > 0:
+        if feature_has_nulls:
             # print(f"{df_i=}")
             # Without cast to pl.Uft8, the following error might occur:
             # exceptions.ComputeError: cannot combine categorical under a global string
@@ -689,6 +689,301 @@ def plot_bias(
             mode="markers",
             name="Null values",
             marker={"size": 7, "color": "grey", "symbol": "diamond"},
+        )
+
+    return ax
+
+
+def plot_marginal(
+    predict_callable,
+    X,
+    y_obs,
+    feature_name=None,
+    weights=None,
+    *,
+    n_bins=10,
+    ax=None,
+):
+    if ax is None:
+        plot_backend = get_config()["plot_backend"]
+        if plot_backend == "matplotlib":
+            ax = plt.gca()
+        else:
+            from plotly.subplots import make_subplots
+
+            # fig = ax = go.Figure()
+            fig = ax = make_subplots(specs=[[{"secondary_y": True}]])
+    elif isinstance(ax, mpl.axes.Axes):
+        plot_backend = "matplotlib"
+    elif is_plotly_figure(ax):
+        plot_backend = "plotly"
+        fig = ax
+    else:
+        msg = (
+            "The ax argument must be None, a matplotlib Axes or a plotly Figure, "
+            f"got {type(ax)}."
+        )
+        raise ValueError(msg)
+
+    # estimator = getattr(predict_callable, "__self__", None)
+    y_pred = predict_callable(X)
+    # X_polars = pl.DataFrame(X)
+
+    if feature_name is None:
+        # We treat the predictions as a feature.
+        feature = pl.Series(name="predictions", values=y_pred)
+    elif isinstance(feature_name, int):
+        feature = get_second_dimension(X, feature_name)
+    else:
+        X_names, _ = get_sorted_array_names(X)
+        feature = get_second_dimension(X, X_names.index(feature_name))
+
+    df = _compute_marginal(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        feature=feature,
+        weights=weights,
+        n_bins=n_bins,
+    )
+    feature_name = df.columns[0]
+
+    feature_has_nulls = df[feature_name].null_count() > 0
+    n_bins_eff = df.shape[0] - feature_has_nulls
+    # If df contains the columns "bin_edges", it's a numerical feature.
+    is_categorical = "bin_edges" not in df.columns
+
+    n_x = df[feature_name].n_unique()
+
+    # marginal plot
+    if is_categorical and feature_has_nulls:
+        # We want the Null values at the end and therefore sort again.
+        df = df.sort(feature_name, descending=False, nulls_last=True)
+    df_no_nulls = df.filter(pl.col(feature_name).is_not_null())
+
+    # Numerical columns are sometimes better treated as categorical.
+    bin_edges = None if is_categorical else df_no_nulls.get_column("bin_edges")
+    num_as_cat = (
+        not is_categorical
+        and (
+            (bin_edges.arr.first() == bin_edges.arr.last())
+            | (bin_edges.arr.last() == df_no_nulls.get_column("feature"))
+        ).all()
+    )
+
+    # First the histogram of weights on secondary y-axis.
+    # Other graph elements should appear on top of it. For plotly, we therefore need to
+    # plot the histogram on the primary y-axis and put primary to the right and
+    # secondary to the left. All other plotly graphs are put on the secondary yaxis.
+    if plot_backend == "matplotlib":
+        ax2 = ax.twinx()
+        if is_categorical or num_as_cat:
+            # We x-shift a little for a better visual.
+            x = (
+                np.arange(n_x - feature_has_nulls)
+                if is_categorical
+                else df_no_nulls[feature_name]
+            )
+            ax2.bar(
+                x=x,
+                height=df_no_nulls["weights"] / df["weights"].sum(),
+                color="lightgrey",
+            )
+        else:
+            ax2.hist(
+                x=df_no_nulls[feature_name],
+                weights=df_no_nulls["weights"] / df["weights"].sum(),
+                bins=np.r_[bin_edges[0][0], bin_edges.arr.last()],  # n_bins_eff,
+                color="lightgrey",
+                edgecolor="grey",
+                rwidth=0.8 if n_bins_eff <= 2 else None,
+            )
+        # https://stackoverflow.com/questions/30505616/how-to-arrange-plots-of-secondary-axis-to-be-below-plots-of-primary-axis-in-matp
+        ax.set_zorder(ax2.get_zorder() + 1)
+        ax.set_frame_on(False)
+    else:
+        if is_categorical or num_as_cat:
+            fig.add_histogram(
+                x=df_no_nulls[feature_name],
+                y=df_no_nulls["weights"] / df["weights"].sum(),
+                histfunc="sum",
+                marker={"color": "lightgrey"},
+                secondary_y=False,
+                showlegend=False,
+            )
+        else:
+            fig.add_bar(
+                x=0.5 * (bin_edges.arr.last() + bin_edges.arr.first()),
+                y=df_no_nulls["weights"] / df["weights"].sum(),
+                width=bin_edges.arr.last() - bin_edges.arr.first(),
+                marker={"color": "lightgrey", "line": {"width": 1.0, "color": "grey"}},
+                secondary_y=False,
+                showlegend=False,
+            )
+        fig.update_layout(yaxis_side="right", yaxis2_side="left")
+        if n_bins_eff <= 2:
+            fig.update_layout(bargap=0.2)
+
+    if feature_has_nulls:
+        df_null = df.filter(pl.col(feature_name).is_null())
+        # Null values are plotted as rightmost point at x_null.
+        if is_categorical:
+            x_null = np.array([n_x - 1])
+        else:
+            x_min = df[feature_name].min()
+            x_max = df[feature_name].max()
+            if n_x == 1:
+                # df[feature_name] is the null value.
+                x_null = np.array([0])
+            elif n_x == 2:
+                x_null = np.array([2 * x_max])
+            else:
+                x_null = np.array([x_max + (x_max - x_min) / n_x])
+
+        # Null value histogram
+        if plot_backend == "matplotlib":
+            ax2.bar(
+                x=x_null,
+                width=x_null - bin_edges.arr.last().max(),
+                height=df_null["weights"] / df["weights"].sum(),
+                color="lightgrey",
+            )
+        else:
+            fig.add_bar(
+                x=x_null,
+                y=df_null["weights"] / df["weights"].sum(),
+                width=x_null - bin_edges.arr.last().max(),
+                marker={"color": "lightgrey"},
+                secondary_y=False,
+                showlegend=False,
+            )
+
+    for i, m in enumerate(["y_obs_mean", "y_pred_mean"]):
+        label = {"y_obs_mean": "mean y_obs", "y_pred_mean": "mean y_pred"}[m]
+
+        if is_categorical:
+            # We x-shift a little for a better visual.
+            x = np.arange(n_x - feature_has_nulls)
+            if plot_backend == "matplotlib":
+                ax.plot(
+                    x,
+                    df_no_nulls[m],
+                    marker="o",
+                    linestyle="None",
+                    capsize=4,
+                    label=label,
+                )
+            else:
+                fig.add_scatter(
+                    x=x,
+                    y=df_no_nulls[m],
+                    marker={"color": get_plotly_color(i)},
+                    mode="markers",
+                    name="mean y_obs",
+                    secondary_y=True,
+                )
+        elif plot_backend == "matplotlib":
+            ax.plot(
+                df[feature_name],
+                df[m],
+                linestyle="solid",
+                marker="o",
+                label=label,
+            )
+        else:
+            fig.add_scatter(
+                x=df[feature_name],
+                y=df[m],
+                marker_symbol="circle",
+                mode="lines+markers",
+                line={"color": get_plotly_color(i)},
+                name=label,
+                secondary_y=True,
+            )
+
+        if feature_has_nulls:
+            # Null values are plotted as diamonds as rightmost point.
+            if plot_backend == "matplotlib":
+                color = ax.get_lines()[-1].get_color()  # previous line color
+                ax.plot(
+                    x_null,
+                    df_null[m],
+                    marker="D",
+                    linestyle="None",
+                    label=None,
+                    color=color,
+                )
+            else:
+                fig.add_scatter(
+                    x=x_null,
+                    y=df_null[m],
+                    marker={"color": get_plotly_color(i), "symbol": "diamond"},
+                    mode="markers",
+                    secondary_y=True,
+                    showlegend=False,
+                )
+
+    if is_categorical:
+        if df[feature_name].null_count() > 0:
+            # print(f"{df=}")
+            # Without cast to pl.Uft8, the following error might occur:
+            # exceptions.ComputeError: cannot combine categorical under a global string
+            # cache with a non cached categorical
+            tick_labels = df[feature_name].cast(pl.Utf8).fill_null("Null")
+        else:
+            tick_labels = df[feature_name]
+        x_label = feature_name
+        if plot_backend == "matplotlib":
+            ax.set_xticks(np.arange(n_x), labels=tick_labels)
+        else:
+            fig.update_layout(
+                xaxis={
+                    "tickmode": "array",
+                    "tickvals": np.arange(n_x),
+                    "ticktext": tick_labels,
+                }
+            )
+    elif feature_name is not None:
+        x_label = "binned " + feature_name
+    else:
+        x_label = ""
+
+    if feature is None:
+        title = "Marginal Plot"
+    else:
+        # TODO
+        model_name = array_name(y_pred, default="")
+        # test for empty string ""
+        title = "Marginal Plot" if not model_name else "Marginal Plot " + model_name
+
+    if plot_backend == "matplotlib":
+        ax.set(xlabel=x_label, ylabel="y", title=title)
+    else:
+        fig.update_layout(xaxis_title=x_label, yaxis2_title="y", title=title)
+        fig["layout"]["yaxis"]["showgrid"] = False
+
+    if plot_backend == "matplotlib":
+        if feature_has_nulls:
+            # Add legend entry for diamonds as Null values.
+            # Unfortunately, the Null value legend entry often appears first, but we
+            # want it at the end.
+            ax.scatter([], [], marker="D", color="grey", label="Null values")
+            handles, labels = ax.get_legend_handles_labels()
+            if (labels[-1] != "Null values") and "Null values" in labels:
+                i = labels.index("Null values")
+                # i can't be the last index
+                labels = labels[:i] + labels[i + 1 :] + [labels[i]]
+                handles = handles[:i] + handles[i + 1 :] + [handles[i]]
+            ax.legend(handles=handles, labels=labels)
+        else:
+            ax.legend()
+    elif feature_has_nulls:
+        fig.add_scatter(
+            x=[None],
+            y=[None],
+            mode="markers",
+            name="Null values",
+            marker={"size": 7, "color": "grey", "symbol": "diamond"},
+            secondary_y=True,
         )
 
     return ax

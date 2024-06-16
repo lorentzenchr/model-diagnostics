@@ -42,10 +42,14 @@ def bin_feature(
         True if feature is categorical or enum.
     is_string : bool
         True if feature is a string type.
-    n_bins: int
+    n_bins : int
         Effective number of bins.
-    f_binned : pl.Series or None
+    f_binned : pl.DataFrame or None
         For a numerical feature the binned/digitized version of it.
+        Columns are:
+
+        - `bin`: The bin number.
+        - `bin_edges`: edges/thresholds of the bins.
     """
     is_categorical = False
     is_string = False
@@ -136,24 +140,56 @@ def bin_feature(
                 q=np.arange(1, n_bins_ef) / n_bins_ef,
                 method="inverted_cdf",
             )
-            q = np.unique(q)  # Some quantiles might be the same.
+            bin_edges = np.unique(q)  # Some quantiles might be the same.
             # We want: bins[i-1] < x <= bins[i]
-            f_binned = np.digitize(feature, bins=q, right=True)
+            f_binned = np.digitize(feature, bins=bin_edges, right=True)
+            # We also want the bin edges and need min and max of the feature.
+            feature_min, feature_max = feature.min(), feature.max()
+            if bin_edges.size == 0:
+                bin_edges = np.r_[feature_min, feature_max]
+            bin_edges = np.r_[feature_min, bin_edges, feature_max]
+            # This is quite a hack with numpy strides and views.
+            bin_edges = np.lib.stride_tricks.as_strided(
+                bin_edges, (bin_edges.shape[0] - 1, 2), bin_edges.strides * 2
+            )
+            # Back to the binned feature.
             # Now, we insert Null values again at the original places.
             f_binned = (
                 pl.LazyFrame(
                     [
-                        pl.Series("__f_binned", f_binned, dtype=feature.dtype),
                         feature,
+                        pl.Series("__f_binned", f_binned, dtype=feature.dtype),
+                        # FIXME: polars >= 0.20.16
+                        *(
+                            []
+                            if polars_version < Version("0.20.16")
+                            else [
+                                pl.Series(
+                                    "__bin_edges",
+                                    bin_edges[f_binned],
+                                    dtype=pl.Array(pl.Float64, 2),
+                                )
+                            ]
+                        ),
                     ]
                 )
                 .select(
                     pl.when(pl.col(feature_name).is_null())
                     .then(None)
                     .otherwise(pl.col("__f_binned"))
-                    .alias("bin")
+                    .alias("bin"),
+                    # FIXME: polars >= 0.20.16
+                    *(
+                        []
+                        if polars_version < Version("0.20.16")
+                        else [
+                            pl.when(pl.col(feature_name).is_null())
+                            .then(None)
+                            .otherwise(pl.col("__bin_edges"))
+                            .alias("bin_edges"),
+                        ]
+                    ),
                 )
                 .collect()
-                .get_column("bin")
             )
     return feature, feature_name, is_categorical, is_string, n_bins, f_binned
