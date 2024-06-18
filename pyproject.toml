@@ -261,8 +261,8 @@ name."py3.10".set-extra-dependencies = [
 ]
 # latest versions, with plotly
 name."py3.11".set-extra-dependencies = [
-  "numpy",
-  "polars",
+  "numpy>=2.0.0",
+  "polars>=1.0.0b1",
   "scipy",
   "pandas",
   "plotly",
