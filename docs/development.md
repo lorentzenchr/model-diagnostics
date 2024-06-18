@@ -24,6 +24,24 @@ Apart from the default environment are `docs`, `jupyter`, `lint` and `test`
    updates immediately. Press Control+C to stop.
 - `hatch run jupyter:lab` to start a jupyter lab server
 
+## Hatch config
+
+If you work with, e.g., VSCode and want to detect the python executable, one way to do
+it is the following:
+
+- Edit the `config.toml` of hatch. Look at https://hatch.pypa.io/latest/config/hatch/
+  for its platform dependent path.
+- Add the entry
+  ```
+  [dirs.env]
+  virtual = ".hatch"
+  ```
+
+This way, hatch will install the virtual environments specified in `pyprojects.toml`
+(look out for `tool.hatch.envs.`) under a `.hatch` subdirectory in the project (for us
+in the `model-diagnostics` git repository folder). Now, it is a bit easier to select a
+path for the python interpreter or jupyter kernel, e.g. `.hatch/jupyter/bin/python`.
+
 ## Release Process
 
 See <https://packaging.python.org/en/latest/tutorials/packaging-projects/>,
