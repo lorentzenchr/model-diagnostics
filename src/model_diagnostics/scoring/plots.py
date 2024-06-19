@@ -74,6 +74,7 @@ def plot_murphy_diagram(
 
     Notes
     -----
+    [](){#notes}
     For details, refer to `[Ehm2015]`.
 
     References

@@ -91,6 +91,7 @@ def plot_reliability_diagram(
 
     Notes
     -----
+    [](){#notes}
     The expectation conditional on the predictions is \(E(Y|y_{pred})\). This object is
     estimated by the pool-adjacent violator (PAV) algorithm, which has very desirable
     properties:

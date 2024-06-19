@@ -57,6 +57,7 @@ def identification_function(
 
     Notes
     -----
+    [](){#notes}
     The function \(V(y, z)\) for observation \(y=y_{pred}\) and prediction
     \(z=y_{pred}\) is a strict identification function for the functional \(T\), or
     induces the functional \(T\) as:
@@ -136,7 +137,7 @@ def compute_bias(
     Well calibrated models have bias terms around zero.
     For the mean functional, the generalised bias is the negative residual
     `y_pred - y_obs`.
-    See Notes for further details.
+    See [Notes](#notes) for further details.
 
     Parameters
     ----------
@@ -186,6 +187,7 @@ def compute_bias(
 
     Notes
     -----
+    [](){#notes}
     A model \(m(X)\) is conditionally calibrated iff
     \(\mathbb{E}(V(m(X), Y)|X)=0\) almost surely with canonical identification
     function \(V\).
