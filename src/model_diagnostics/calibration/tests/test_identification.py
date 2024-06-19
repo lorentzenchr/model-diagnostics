@@ -232,6 +232,7 @@ def test_compute_bias_numerical_feature():
         feature=df.get_column("feature"),
         n_bins=n_bins,
     )
+    # FIXME: polars >= 0.19.20
     # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
     # of numpy array. Therefore, we add the np.asarray().
     # The Windows CI runner with python 3.10, polars 0.19.19 and numpy1.22.0 seems to
@@ -275,7 +276,7 @@ def test_compute_bias_n_bins_numerical_feature(n_bins):
 
 
 @pytest.mark.parametrize("feature_type", ["cat", "cat_physical", "enum", "string"])
-def test_compute_n_bins_string_like_feature(feature_type):
+def test_compute_bias_n_bins_string_like_feature(feature_type):
     """Test compute_bias returns right number of bins and sorted for string feature."""
     if feature_type == "cat":
         dtype = pl.Categorical
@@ -532,7 +533,7 @@ def test_compute_bias_raises_weights_shape():
     [lambda x: x, np.asarray, pa_array, pd_Series, pl.Series],
 )
 def test_compute_bias_1d_array_like(list2array):
-    """Test that plot_reliability_diagram workds for 1d array-likes."""
+    """Test that compute_bias workds for 1d array-likes."""
     y_obs = list2array([0, 1, 2, 3])
     y_pred = list2array([-1, 1, 0, 2])
     feature = list2array([0, 1, 0, 1])
@@ -745,37 +746,45 @@ def test_compute_marginal_numerical_feature():
     n_steps = n_obs // n_bins
     df = pl.DataFrame(
         {
-            "y_obs": 2 * np.linspace(-0.5, 0.5, num=n_obs, endpoint=False),
-            "y_pred": np.linspace(0, 1, num=n_obs, endpoint=False),
+            "y_obs": (y_obs := 2 * np.linspace(-0.5, 0.5, num=n_obs, endpoint=False)),
+            "y_pred": (y_pred := np.linspace(0, 1, num=n_obs, endpoint=False)),
             "feature": np.linspace(0, 1, num=n_obs, endpoint=False),
         }
     )
-    df_marginal = compute_bias(
+    df_marginal = _compute_marginal(
         y_obs=df.get_column("y_obs"),
         y_pred=df.get_column("y_pred"),
         feature=df.get_column("feature"),
         n_bins=n_bins,
     )
+    # FIXME: polars >= 0.19.20
     # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
     # of numpy array. Therefore, we add the np.asarray().
     # The Windows CI runner with python 3.10, polars 0.19.19 and numpy1.22.0 seems to
     # have a bug in to_numpy, as bias[0] = 2.854484e-311 instead of 1. Therefore, we
     # use to_list instead of to_numpy.
-    bias = np.asarray((df.get_column("y_pred") - df.get_column("y_obs")).to_list())
     df_expected = pl.DataFrame(
         {
             "feature": 0.045 + 0.1 * np.arange(10),
-            "bias_mean": 0.955 - 0.1 * np.arange(10),
-            "bias_count": n_steps * np.ones(n_bins, dtype=np.uint32),
-            "bias_weights": [n_obs / n_bins] * n_bins,
-            "bias_stderr": [
-                np.std(bias[n : n + n_steps], ddof=1) / np.sqrt(n_steps)
+            "y_obs_mean": -0.91 + 0.2 * np.arange(10),
+            "y_pred_mean": 0.045 + 0.1 * np.arange(10),
+            "y_obs_stderr": [
+                np.std(y_obs[n : n + n_steps], ddof=1) / np.sqrt(n_steps)
                 for n in range(0, n_obs, n_steps)
             ],
-            "p_value": [
-                ttest_1samp(bias[n : n + n_steps], 0).pvalue
+            "y_pred_stderr": [
+                np.std(y_pred[n : n + n_steps], ddof=1) / np.sqrt(n_steps)
                 for n in range(0, n_obs, n_steps)
             ],
+            "count": n_steps * np.ones(n_bins, dtype=np.uint32),
+            "weights": [n_obs / n_bins] * n_bins,
+            "bin_edges": pl.Series(
+                [
+                    [0, 0.09],
+                    *[[x * 0.1 - 0.01, (x + 1) * 0.1 - 0.01] for x in range(1, 10)],
+                ],
+                dtype=pl.Array(pl.Float64, 2),
+            ),
         }
     )
     assert_frame_equal(df_marginal, df_expected, check_exact=False)
@@ -800,3 +809,63 @@ def test_compute_marginal_n_bins_numerical_feature(n_bins):
     )
     assert df_marginal.shape[0] == np.min([n_bins, 4])
     assert df_marginal["count"].sum() == n_obs
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize("feature_type", ["cat", "cat_physical", "enum", "string"])
+def test_compute_marginal_n_bins_string_like_feature(feature_type):
+    """Test compute_marginal returns right number of bins and sorted string feature."""
+    if feature_type == "cat":
+        dtype = pl.Categorical
+    elif feature_type == "cat_physical":
+        if polars_version >= Version("0.20.0"):
+            dtype = pl.Categorical(ordering="physical")
+        else:
+            pytest.skip("Test needs polars >= 0.20.0")
+    elif feature_type == "enum":
+        if polars_version >= Version("0.20.0"):
+            dtype = pl.Enum(categories=["b", "a", "c"])
+        else:
+            pytest.skip("Test needs polars >= 0.20.0")
+    else:
+        dtype = pl.Utf8
+
+    with pl.StringCache():
+        n_bins = 3
+        n_obs = 6
+        y_obs = np.array([1, 1, 0, 2, 2, 3])
+        y_pred = np.zeros(n_obs)
+        feature = pl.Series("feature", ["a", "a", None, "b", "b", "c"], dtype=dtype)
+
+        df_expected = pl.DataFrame(
+            {
+                "feature": pl.Series(
+                    [None, "b", "a"] if feature_type == "enum" else [None, "a", "b"],
+                    dtype=dtype,
+                ),
+                "y_obs_mean": [0.0, 2, 1] if feature_type == "enum" else [0.0, 1, 2],
+                "y_pred_mean": 0.0,
+                "count": pl.Series([1, 2, 2], dtype=pl.UInt32),
+            }
+        )
+        for _i in range(10):
+            # The default args in polars group_by(..., maintain_order=False) returns
+            # non-deterministic ordering which compute_bias should take care of such
+            # that compute_bias is deterministic.
+            df = _compute_marginal(
+                y_obs=y_obs, y_pred=y_pred, feature=feature, n_bins=n_bins
+            )
+            assert_frame_equal(
+                df.select(["feature", "y_obs_mean", "y_pred_mean", "count"]),
+                df_expected,
+            )
+
+
+# TODO: We could also add test for _compute_marginal like
+# - test_compute_bias_keeps_null_values
+# - test_compute_bias_warning_for_n_bins
+# - test_compute_bias_raises_weights_shape
+# - test_compute_bias_1d_array_like

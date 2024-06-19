@@ -484,7 +484,6 @@ def test_plot_marginal_raises_polars_version():
 def test_plot_marginal_raises(param, value, msg):
     """Test that plot_marginal raises errors."""
     y_obs = [0, 1, 2]
-    y_pred = [-1, 1, 1]
     d = {param: value}
     with pytest.raises(ValueError, match=msg):
         plot_marginal(
