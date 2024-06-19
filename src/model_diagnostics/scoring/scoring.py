@@ -605,6 +605,7 @@ class ElementaryScore(_BaseScoringFunction):
 
     Notes
     -----
+    [](){#notes}
     The elementary scoring or loss function is given by
 
     \[

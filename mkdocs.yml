@@ -73,6 +73,8 @@ plugins:
             docstring_style: "numpy"
             filters:
               - "!^_[^_]"  # this is the default
+              - "!^test"
+            show_submodules: false  # this is the default
             # Headings
             show_root_heading: true
             show_root_full_path: false
