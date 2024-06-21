@@ -16,7 +16,7 @@ from model_diagnostics._utils.test_helper import (
     pd_Series,
 )
 from model_diagnostics.calibration import compute_bias, identification_function
-from model_diagnostics.calibration.identification import _compute_marginal
+from model_diagnostics.calibration.identification import compute_marginal
 
 
 @pytest.mark.parametrize(
@@ -636,10 +636,11 @@ def test_compute_marginal(feature, f_grouped, bin_edges):
                 "feature": feature,
             }
         )
-        df_marginal = _compute_marginal(
+        df_marginal = compute_marginal(
             y_obs=df.get_column("y_obs"),
             y_pred=df.get_column("y_pred"),
-            feature=df.get_column("feature"),
+            X=df.select("feature"),
+            feature_name="feature",
         )
         df_expected = pl.DataFrame(
             {
@@ -664,12 +665,13 @@ def test_compute_marginal(feature, f_grouped, bin_edges):
             feature = pl.Series(values=feature).gather([0, 4, 4]).alias("feature")
         else:
             feature = pl.Series(values=feature).take([0, 4, 4]).alias("feature")
-        df_marginal = _compute_marginal(
+        df_marginal = compute_marginal(
             # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
             y_obs=[0.5, 8 / 3, 10 / 3],
             y_pred=[1, 2, 2],
             weights=[2, 1.5, 1.5],
-            feature=feature,
+            X=pl.DataFrame({"feature": feature}),
+            feature_name="feature",
         )
         df_expected = pl.DataFrame(
             {
@@ -700,10 +702,11 @@ def test_compute_marginal_feature_none():
             "y_pred": [1, 1, 2, 2, 2],
         }
     )
-    df_marginal = _compute_marginal(
+    df_marginal = compute_marginal(
         y_obs=df.get_column("y_obs"),
         y_pred=df.get_column("y_pred"),
-        feature=None,
+        X=None,
+        feature_name=None,
     )
     df_expected = pl.DataFrame(
         {
@@ -718,12 +721,13 @@ def test_compute_marginal_feature_none():
     assert_frame_equal(df_marginal, df_expected)
 
     # Same with weights.
-    df_marginal = _compute_marginal(
+    df_marginal = compute_marginal(
         # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
         y_obs=[0.5, 8 / 3, 10 / 3],
         y_pred=[1, 2, 2],
         weights=[2, 1.5, 1.5],
-        feature=None,
+        X=None,
+        feature_name=None,
     )
     df_expected = df_expected.with_columns(
         pl.Series(values=[3], dtype=pl.UInt32).alias("count"),
@@ -751,10 +755,11 @@ def test_compute_marginal_numerical_feature():
             "feature": np.linspace(0, 1, num=n_obs, endpoint=False),
         }
     )
-    df_marginal = _compute_marginal(
+    df_marginal = compute_marginal(
         y_obs=df.get_column("y_obs"),
         y_pred=df.get_column("y_pred"),
-        feature=df.get_column("feature"),
+        X=df.select("feature"),
+        feature_name="feature",
         n_bins=n_bins,
     )
     # FIXME: polars >= 0.19.20
@@ -801,10 +806,11 @@ def test_compute_marginal_n_bins_numerical_feature(n_bins):
     y_obs = np.linspace(-1, 1, num=n_obs, endpoint=False)
     y_pred = y_obs**2
     feature = [4, 4, 4, 4, 3, 3, 3, 2, 2, 11]
-    df_marginal = _compute_marginal(
+    df_marginal = compute_marginal(
         y_obs=y_obs,
         y_pred=y_pred,
-        feature=feature,
+        X=pl.DataFrame({"col": feature}),
+        feature_name="col",
         n_bins=n_bins,
     )
     assert df_marginal.shape[0] == np.min([n_bins, 4])
@@ -855,8 +861,12 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
             # The default args in polars group_by(..., maintain_order=False) returns
             # non-deterministic ordering which compute_bias should take care of such
             # that compute_bias is deterministic.
-            df = _compute_marginal(
-                y_obs=y_obs, y_pred=y_pred, feature=feature, n_bins=n_bins
+            df = compute_marginal(
+                y_obs=y_obs,
+                y_pred=y_pred,
+                X=pl.DataFrame({"feature": feature}),
+                feature_name=0,
+                n_bins=n_bins,
             )
             assert_frame_equal(
                 df.select(["feature", "y_obs_mean", "y_pred_mean", "count"]),
@@ -864,7 +874,7 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
             )
 
 
-# TODO: We could also add test for _compute_marginal like
+# TODO: We could also add test for compute_marginal like
 # - test_compute_bias_keeps_null_values
 # - test_compute_bias_warning_for_n_bins
 # - test_compute_bias_raises_weights_shape

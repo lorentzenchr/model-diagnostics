@@ -12,6 +12,7 @@ from model_diagnostics._utils.array import array_name, validate_same_first_dimen
 
 def bin_feature(
     feature: Optional[Union[npt.ArrayLike, pl.Series]],
+    feature_name: Optional[Union[int, str]],
     y_obs: npt.ArrayLike,
     n_bins: int = 10,
 ):
@@ -23,6 +24,8 @@ def bin_feature(
     ----------
     feature : array-like of shape (n_obs) or None
         Some feature column.
+    feature_name : int, str or None
+        Name of the feature.
     y_obs : array-like of shape (n_obs)
         Observed values of the response variable.
         Only needed for validation of dimensions of feature.
@@ -56,9 +59,14 @@ def bin_feature(
     f_binned = None
 
     if feature is None:
+        # TODO: Remove this branch.
         feature_name = None
     else:
-        feature_name = array_name(feature, default="feature")
+        if isinstance(feature_name, int):
+            default = f"feature {feature_name}"
+        else:
+            default = "feature"
+        feature_name = array_name(feature, default=default)
         # The following statement, i.e. possibly the creation of a pl.Categorical,
         # MUST be under the StringCache context manager!
         feature = pl.Series(name=feature_name, values=feature)

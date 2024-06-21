@@ -460,10 +460,11 @@ def test_plot_marginal_raises_polars_version():
     msg = "The function plot_marginal requires polars >= 0.20.16."
     with pytest.raises(ValueError, match=msg):
         plot_marginal(
-            predict_callable=lambda x: x.shape[0],
-            X=np.arange(4).reshape(2, 2),
             y_obs=np.arange(2),
+            y_pred=np.arange(2),
+            X=np.arange(4).reshape(2, 2),
             feature_name=0,
+            # predict_callable=lambda x: x.shape[0],
         )
 
 
@@ -487,9 +488,10 @@ def test_plot_marginal_raises(param, value, msg):
     d = {param: value}
     with pytest.raises(ValueError, match=msg):
         plot_marginal(
-            predict_callable=lambda x: x.shape[0],
-            X=np.ones_like(y_obs)[:, None],
+            # predict_callable=lambda x: x.shape[0],
             y_obs=y_obs,
+            y_pred=y_obs,
+            X=np.ones_like(y_obs)[:, None],
             feature_name=0,
             **d,
         )

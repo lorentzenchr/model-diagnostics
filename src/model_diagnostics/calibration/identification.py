@@ -268,7 +268,7 @@ def compute_bias(
     df_list = []
     with pl.StringCache():
         feature, feature_name, is_categorical, is_string, n_bins, f_binned = (
-            bin_feature(feature=feature, y_obs=y_obs, n_bins=n_bins)
+            bin_feature(feature=feature, feature_name=None, y_obs=y_obs, n_bins=n_bins)
         )
 
         for i in range(len(pred_names)):
@@ -443,10 +443,11 @@ def compute_bias(
     return df
 
 
-def _compute_marginal(
+def compute_marginal(
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
-    feature: Optional[Union[npt.ArrayLike, pl.Series]] = None,
+    X: npt.ArrayLike,
+    feature_name: Optional[Union[str, int]],
     weights: Optional[npt.ArrayLike] = None,
     *,
     n_bins: int = 10,
@@ -464,14 +465,14 @@ def _compute_marginal(
     y_pred : array-like of shape (n_obs) or (n_obs, n_models)
         Predicted values, e.g. for the conditional expectation of the response,
         `E(Y|X)`.
-    feature : array-like of shape (n_obs) or None
-        Some feature column.
+    X : array-like of shape (n_obs, n_features)
+        The dataframe or array of features to be passed to the model predict function.
+    feature_name : int, str or None
+        Column name (str) or index (int) of feature in `X`. If None, the total marginal
+        is computed.
     weights : array-like of shape (n_obs) or None
         Case weights. If given, the bias is calculated as weighted average of the
         identification function with these weights.
-        Note that the standard errors and p-values in the output are based on the
-        assumption that the variance of the bias is inverse proportional to the
-        weights. See the Notes section for details.
     n_bins : int
         The number of bins for numerical features and the maximal number of (most
         frequent) categories shown for categorical features. Due to ties, the effective
@@ -505,6 +506,7 @@ def _compute_marginal(
 
         - `y_obs`: \(\mathbb{E}(Y|features)\).
         - `y_pred`: \(\mathbb{E}(m(X)|features)\).
+
     Computationally that is more or less a group-by operation on a dataset.
 
     The standard error for both are calculated in the standard way as
@@ -521,7 +523,7 @@ def _compute_marginal(
 
     Examples
     --------
-    >>> _compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])                         # doctest: +SKIP
+    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])                          # doctest: +SKIP
     shape: (1, 6)                                                                            # doctest: +SKIP
     ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐            # doctest: +SKIP
     │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │            # doctest: +SKIP
@@ -530,8 +532,8 @@ def _compute_marginal(
     ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡            # doctest: +SKIP
     │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │            # doctest: +SKIP
     └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘            # doctest: +SKIP
-    >>> _compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2],                         # doctest: +SKIP
-    ... feature=["a", "a", "b", "b"])                                                        # doctest: +SKIP
+    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2],                          # doctest: +SKIP
+    ... X=[["a"], ["a"], ["b"], ["b"]], feature_name=0)                                      # doctest: +SKIP
     shape: (2, 7)                                                                            # doctest: +SKIP
     ┌─────────┬────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐  # doctest: +SKIP
     │ feature ┆ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │  # doctest: +SKIP
@@ -564,6 +566,17 @@ def _compute_marginal(
     else:
         w = np.ones_like(y_obs, dtype=float)
 
+    if feature_name is None:
+        feature_input = None
+    elif not isinstance(feature_name, (int, str)):
+        msg = f"The argument 'feature_name' must be an int or str; got {feature_name}"
+        ValueError(msg)
+    elif isinstance(feature_name, int):
+        feature_input = get_second_dimension(X, feature_name)
+    else:
+        X_names, _ = get_sorted_array_names(X)
+        feature_input = get_second_dimension(X, X_names.index(feature_name))
+
     df_list = []
     with pl.StringCache():
         (
@@ -573,7 +586,12 @@ def _compute_marginal(
             is_string,
             n_bins,
             f_binned,
-        ) = bin_feature(feature=feature, y_obs=y_obs, n_bins=n_bins)
+        ) = bin_feature(
+            feature=feature_input,
+            feature_name=feature_name,
+            y_obs=y_obs,
+            n_bins=n_bins,
+        )
 
         for i in range(len(pred_names)):
             # Loop over columns of y_pred.
@@ -723,7 +741,7 @@ def _compute_marginal(
             if n_pred > 0:
                 col_selection.append(model_col_name)
             if feature_name is not None and feature_name in df.columns:
-                col_selection.append(feature_name)
+                col_selection.append(str(feature_name))
             col_selection += [
                 "y_obs_mean",
                 "y_pred_mean",

@@ -1,6 +1,6 @@
 import warnings
 from functools import partial
-from typing import Optional
+from typing import Optional, Union
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -23,7 +23,7 @@ from model_diagnostics._utils.array import (
 from model_diagnostics._utils.isotonic import IsotonicRegression
 from model_diagnostics._utils.plot_helper import get_plotly_color, is_plotly_figure
 
-from .identification import _compute_marginal, compute_bias
+from .identification import compute_bias, compute_marginal
 
 
 def plot_reliability_diagram(
@@ -361,7 +361,8 @@ def plot_bias(
     n_bins : int
         The number of bins for numerical features and the maximal number of (most
         frequent) categories shown for categorical features. Due to ties, the effective
-        number of bins might be smaller than `n_bins`.
+        number of bins might be smaller than `n_bins`. Null values are always included
+        in the output, accounting for one bin. NaN values are treated as null values.
     confidence_level : float
         Confidence level for error bars. If 0, no error bars are plotted. Value must
         fulfil `0 <= confidence_level < 1`.
@@ -695,15 +696,55 @@ def plot_bias(
 
 
 def plot_marginal(
-    predict_callable,
-    X,
-    y_obs,
-    feature_name=None,
-    weights=None,
+    y_obs: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    X: npt.ArrayLike,
+    feature_name: Union[str, int],
+    weights: Optional[npt.ArrayLike] = None,
     *,
-    n_bins=10,
-    ax=None,
+    n_bins: int = 10,
+    ax: Optional[mpl.axes.Axes] = None,
 ):
+    """Plot marginal observed and predicted conditional on a feature.
+
+    This plot provides a means to inspect a model per feature.
+    The average of observed and predicted are plotted as well as a histogram of the
+    feature.
+
+    Parameters
+    ----------
+    y_obs : array-like of shape (n_obs)
+        Observed values of the response variable.
+        For binary classification, y_obs is expected to be in the interval [0, 1].
+    y_pred : array-like of shape (n_obs)
+        Predicted values, e.g. for the conditional expectation of the response,
+        `E(Y|X)`.
+    X : array-like of shape (n_obs, n_features)
+        The dataframe or array of features to be passed to the model predict function.
+    feature_name : str or int
+        Column name (str) or index (int) of feature in `X`.
+    weights : array-like of shape (n_obs) or None
+        Case weights. If given, the bias is calculated as weighted average of the
+        identification function with these weights.
+    n_bins : int
+        The number of bins for numerical features and the maximal number of (most
+        frequent) categories shown for categorical features. Due to ties, the effective
+        number of bins might be smaller than `n_bins`. Null values are always included
+        in the output, accounting for one bin. NaN values are treated as null values.
+    confidence_level : float
+        Confidence level for error bars. If 0, no error bars are plotted. Value must
+        fulfil `0 <= confidence_level < 1`.
+    ax : matplotlib.axes.Axes or plotly Figure
+        Axes object to draw the plot onto, otherwise uses the current Axes.
+
+    Returns
+    -------
+    ax :
+        Either the matplotlib axes or the plotly figure. This is configurable by
+        setting the `plot_backend` via
+        [`model_diagnostics.set_config`][model_diagnostics.set_config] or
+        [`model_diagnostics.config_context`][model_diagnostics.config_context].
+    """
     if ax is None:
         plot_backend = get_config()["plot_backend"]
         if plot_backend == "matplotlib":
@@ -726,22 +767,14 @@ def plot_marginal(
         raise ValueError(msg)
 
     # estimator = getattr(predict_callable, "__self__", None)
-    y_pred = predict_callable(X)
+    # y_pred = predict_callable(X)
     # X_polars = pl.DataFrame(X)
 
-    if feature_name is None:
-        # We treat the predictions as a feature.
-        feature = pl.Series(name="predictions", values=y_pred)
-    elif isinstance(feature_name, int):
-        feature = get_second_dimension(X, feature_name)
-    else:
-        X_names, _ = get_sorted_array_names(X)
-        feature = get_second_dimension(X, X_names.index(feature_name))
-
-    df = _compute_marginal(
+    df = compute_marginal(
         y_obs=y_obs,
         y_pred=y_pred,
-        feature=feature,
+        X=X,
+        feature_name=feature_name,
         weights=weights,
         n_bins=n_bins,
     )
@@ -765,8 +798,8 @@ def plot_marginal(
     num_as_cat = (
         not is_categorical
         and (
-            (bin_edges.arr.first() == bin_edges.arr.last())
-            | (bin_edges.arr.last() == df_no_nulls.get_column("feature"))
+            (bin_edges.arr.first() == bin_edges.arr.last())  # type: ignore
+            | (bin_edges.arr.last() == df_no_nulls.get_column("feature"))  # type: ignore
         ).all()
     )
 
@@ -792,7 +825,7 @@ def plot_marginal(
             ax2.hist(
                 x=df_no_nulls[feature_name],
                 weights=df_no_nulls["weights"] / df["weights"].sum(),
-                bins=np.r_[bin_edges[0][0], bin_edges.arr.last()],  # n_bins_eff,
+                bins=np.r_[bin_edges[0][0], bin_edges.arr.last()],  # type: ignore # n_bins_eff,
                 color="lightgrey",
                 edgecolor="grey",
                 rwidth=0.8 if n_bins_eff <= 2 else None,
@@ -812,9 +845,9 @@ def plot_marginal(
             )
         else:
             fig.add_bar(
-                x=0.5 * (bin_edges.arr.last() + bin_edges.arr.first()),
+                x=0.5 * (bin_edges.arr.last() + bin_edges.arr.first()),  # type: ignore
                 y=df_no_nulls["weights"] / df["weights"].sum(),
-                width=bin_edges.arr.last() - bin_edges.arr.first(),
+                width=bin_edges.arr.last() - bin_edges.arr.first(),  # type: ignore
                 marker={"color": "lightgrey", "line": {"width": 1.0, "color": "grey"}},
                 secondary_y=False,
                 showlegend=False,
@@ -843,7 +876,7 @@ def plot_marginal(
         if plot_backend == "matplotlib":
             ax2.bar(
                 x=x_null,
-                width=x_null - bin_edges.arr.last().max(),
+                width=x_null - bin_edges.arr.last().max(),  # type: ignore
                 height=df_null["weights"] / df["weights"].sum(),
                 color="lightgrey",
             )
@@ -851,7 +884,7 @@ def plot_marginal(
             fig.add_bar(
                 x=x_null,
                 y=df_null["weights"] / df["weights"].sum(),
-                width=x_null - bin_edges.arr.last().max(),
+                width=x_null - bin_edges.arr.last().max(),  # type: ignore
                 marker={"color": "lightgrey"},
                 secondary_y=False,
                 showlegend=False,
@@ -943,17 +976,18 @@ def plot_marginal(
                 }
             )
     elif feature_name is not None:
-        x_label = "binned " + feature_name
+        x_label = "binned " + str(feature_name)
     else:
         x_label = ""
 
-    if feature is None:
-        title = "Marginal Plot"
-    else:
-        # TODO
-        model_name = array_name(y_pred, default="")
-        # test for empty string ""
-        title = "Marginal Plot" if not model_name else "Marginal Plot " + model_name
+    # TODO: Clean up code
+    # if feature is None:
+    #     title = "Marginal Plot"
+    # else:
+    # TODO
+    model_name = array_name(y_pred, default="")
+    # test for empty string ""
+    title = "Marginal Plot" if not model_name else "Marginal Plot " + model_name
 
     if plot_backend == "matplotlib":
         ax.set(xlabel=x_label, ylabel="y", title=title)
