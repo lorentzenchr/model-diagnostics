@@ -1,3 +1,5 @@
+import copy
+import sys
 from typing import Optional, Union
 
 import numpy as np
@@ -24,18 +26,6 @@ def length_of_first_dimension(a: npt.ArrayLike) -> int:
         raise ValueError(msg)
 
 
-def validate_same_first_dimension(a: AL_or_polars, b: AL_or_polars) -> bool:
-    """Validate that 2 array-like have the same length of the first dimension."""
-    if length_of_first_dimension(a) != length_of_first_dimension(b):
-        msg = (
-            "The two array-like objects don't have the same length of their first "
-            "dimension."
-        )
-        raise ValueError(msg)
-    else:
-        return True
-
-
 def length_of_second_dimension(a: npt.ArrayLike) -> int:
     """Return length of second dimension."""
     if not hasattr(a, "shape"):
@@ -56,14 +46,26 @@ def get_second_dimension(a: npt.ArrayLike, i: int) -> npt.ArrayLike:
     if hasattr(a, "iloc"):
         # pandas
         return a.iloc[:, i]
-    elif hasattr(a, "column"):
+    elif hasattr(a, "column") and callable(a.column):
         # pyarrow
         return a.column(i)  # a[i] would also work
     elif isinstance(a, (list, tuple)):
-        return np.asarray(a)[:, i]
+        return np.array([row[i] for row in a])
     else:
         # numpy or polars
         return a[:, i]  # type: ignore
+
+
+def validate_same_first_dimension(a: AL_or_polars, b: AL_or_polars) -> bool:
+    """Validate that 2 array-like have the same length of the first dimension."""
+    if length_of_first_dimension(a) != length_of_first_dimension(b):
+        msg = (
+            "The two array-like objects don't have the same length of their first "
+            "dimension."
+        )
+        raise ValueError(msg)
+    else:
+        return True
 
 
 def validate_2_arrays(
@@ -71,8 +73,8 @@ def validate_2_arrays(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Validate 2 arrays.
 
-    Both arrays are checked to have same dimensions and shapes and returned as numpy
-    arrays.
+    Both arrays are checked to have same dimensions and shapes.
+    They are returned as numpy arrays.
 
     Returns
     -------
@@ -163,3 +165,142 @@ def get_sorted_array_names(y_pred: Union[npt.ArrayLike, pl.Series, pl.DataFrame]
         sorted_indices = [0]
 
     return pred_names, sorted_indices
+
+
+def is_pandas_df(x):
+    """Return True if the x is a pandas DataFrame."""
+    try:
+        pd = sys.modules["pandas"]
+    except KeyError:
+        return False
+    return isinstance(x, pd.DataFrame)
+
+
+def is_pyarrow_array(x):
+    """Return True if the x is a pyarrow Array or ChunkedArray."""
+    try:
+        pa = sys.modules["pyarrow"]
+    except KeyError:
+        return False
+    return isinstance(x, (pa.Array, pa.ChunkedArray))
+
+
+def is_pyarrow_table(x):
+    """Return True if the x is a pyarrow Table or RecordBatch."""
+    try:
+        pa = sys.modules["pyarrow"]
+    except KeyError:
+        return False
+    return isinstance(x, (pa.Table, pa.RecordBatch))
+
+
+def safe_assign_column(x, values, column_index):
+    """Safely assign values array to a column of an array_like x.
+
+    Parameters
+    ----------
+    x : array-like
+        Array to be modified. It is expected to be 2-dimensional.
+
+    values : ndarray
+        The values to be assigned to `x`.
+
+    column_index : int
+        Index of the column / second dimension.
+
+    Returns
+    -------
+    x : Modified `x` with the new assign column.
+    """
+    if isinstance(x, list):
+        # Multiple rows may point to the same underlying object, e.g. a result of
+        # repeated indices like safe_index_rows(x, [0, 0, 1, 1]). Therefore, we must
+        # be careful, i.e. (shallow) copy the rows.
+        if hasattr(x[0], "copy"):
+
+            def copy_element(x):
+                return x.copy()
+        elif hasattr(x[0], "clone"):
+
+            def copy_element(x):
+                return x.clone()
+        else:
+
+            def copy_element(x):
+                return copy.copy(x)
+
+        try:
+            row = copy_element(x[0])
+            row[column_index] = values[0]
+        except Exception as e:
+            e.add_note("Unable to set item in safe_assign_column of a list object.")
+            raise
+        if row[column_index] != values[0]:
+            msg = "Elements of the list can't be assigned new vlues."
+            raise ValueError(msg)
+
+        for i in range(len(x)):
+            row = copy_element(x[i])
+            row[column_index] = values[i]
+            x[i] = row
+    elif is_pandas_df(x):
+        # Possible fix for older versions
+        # if isinstance(values, pl.Series):
+        #     pd = sys.modules["pandas"]
+        #     values = pd.api.interchange.from_dataframe(
+        #               pl.DataFrame(values)).iloc[:, 0]
+        try:
+            x.iloc[:, column_index] = (
+                values.to_pandas() if isinstance(values, pl.Series) else values
+            )
+        except Exception as e:
+            # FIXME: pyarrow version XXX
+            # Older pyarrow versions of AttributeError do not have a 'add_note' method.
+            args = e.args
+            msg = (
+                args[0]
+                + "\nThe problem might be fixable with newer versions of pandas, polars"
+                " or pyarrow."
+            )
+            raise type(e)(msg, *args[1:]) from e
+    elif is_pyarrow_table(x):
+        x = x.set_column(column_index, x.column_names[column_index], [values])
+    elif isinstance(x, pl.DataFrame):
+        cname = x.columns[column_index]
+        dtype = x.get_column(cname).dtype
+        x = x.with_columns(pl.Series(values, dtype=dtype).alias(cname))
+    else:  # numpy array or other array-like
+        x[:, column_index] = values
+    return x
+
+
+def safe_index_rows(x, indices):
+    """Safely index rows (first dimention) of an array-like x.
+
+    Parameters
+    ----------
+    x : array-like
+        Array-like to be indexed on its first dimension.
+    indices : array-like of integers
+
+    Returns
+    -------
+    subset
+        Subset of x on first dimension. This may be a view.
+    """
+    index = np.asarray(indices)
+    if index.dtype.kind not in ("i", "u"):
+        msg = "Only integer indives are allowed for indexing rows."
+        raise ValueError(msg)
+
+    if is_pyarrow_table(x) or is_pyarrow_array(x):
+        return x.take(indices)
+    elif hasattr(x, "iloc"):
+        # using take() instead of iloc[] ensures the return value is a "proper"
+        # copy that will not raise SettingWithCopyWarning
+        return x.take(indices, axis=0)
+    elif isinstance(x, (list, tuple)):
+        return [x[idx] for idx in indices]
+    else:
+        # numpy, polars
+        return x[indices]
