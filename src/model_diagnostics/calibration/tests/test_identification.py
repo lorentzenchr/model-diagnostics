@@ -879,3 +879,49 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
 # - test_compute_bias_warning_for_n_bins
 # - test_compute_bias_raises_weights_shape
 # - test_compute_bias_1d_array_like
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize("weights", [None, True])
+def test_compute_marginal_with_partial_dependence(weights):
+    """Test partial_dependence values in compute_marginal."""
+    n_obs = 20
+    n_bins = 5
+    X = pl.DataFrame(
+        {
+            "a": np.arange(n_obs) % n_bins,
+            "b": -(np.arange(n_obs) % n_bins),
+        }
+    )
+    if weights is not None:
+        weights = np.ones(n_obs)
+
+    def predict(X):
+        a = X.get_column("a")
+        b = X.get_column("b")
+        return a + b - 2 * a * b
+
+    df = compute_marginal(
+        y_obs=np.zeros(n_obs),
+        y_pred=predict(X),
+        X=X,
+        feature_name="a",
+        predict_function=predict,
+        weights=weights,
+        n_bins=100,
+        n_max=n_obs,
+        rng=123,
+    ).select(["a", "y_obs_mean", "y_pred_mean", "partial_dependence"])
+
+    df_expected = pl.DataFrame(
+        {
+            "a": pl.Series(np.arange(n_bins), dtype=pl.Float64),
+            "y_obs_mean": 0.0,
+            "y_pred_mean": 2.0 * np.arange(n_bins) ** 2,
+            "partial_dependence": 5.0 * np.arange(n_bins) - 2,
+        }
+    )
+    assert_frame_equal(df, df_expected)

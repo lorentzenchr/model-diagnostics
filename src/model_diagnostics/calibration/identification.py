@@ -1,5 +1,5 @@
 from itertools import chain
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -16,6 +16,7 @@ from model_diagnostics._utils.array import (
     validate_same_first_dimension,
 )
 from model_diagnostics._utils.binning import bin_feature
+from model_diagnostics._utils.partial_dependence import compute_partial_dependence
 
 
 def identification_function(
@@ -448,9 +449,12 @@ def compute_marginal(
     y_pred: npt.ArrayLike,
     X: npt.ArrayLike,
     feature_name: Optional[Union[str, int]],
+    predict_function: Optional[Callable] = None,
     weights: Optional[npt.ArrayLike] = None,
     *,
     n_bins: int = 10,
+    n_max: int = 1000,
+    rng: Optional[Union[np.random.Generator, int]] = None,
 ):
     r"""Compute the marginal expectation conditional on a single feature.
 
@@ -470,6 +474,9 @@ def compute_marginal(
     feature_name : int, str or None
         Column name (str) or index (int) of feature in `X`. If None, the total marginal
         is computed.
+    predict_function : callable or None
+        A callable to get prediction, i.e. `predict_function(X)`. Used to compute
+        partial dependence. If `None`, partial dependence is omitted.
     weights : array-like of shape (n_obs) or None
         Case weights. If given, the bias is calculated as weighted average of the
         identification function with these weights.
@@ -478,6 +485,13 @@ def compute_marginal(
         frequent) categories shown for categorical features. Due to ties, the effective
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
+    n_max : int or None
+        Used only for partial dependence computation. The number of rows to subsample
+        from X. This speeds up computation, in particular for slow predict functions.
+    rng : np.random.Generator, int or None
+        Used only for partial dependence computation. The random number generator used
+        for subsampling of `n_max` rows. The input is internally wrapped by
+        `np.random.default_rng(rng)`.
 
     Returns
     -------
@@ -523,26 +537,34 @@ def compute_marginal(
 
     Examples
     --------
-    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])                          # doctest: +SKIP
-    shape: (1, 6)                                                                            # doctest: +SKIP
-    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐            # doctest: +SKIP
-    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │            # doctest: +SKIP
-    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │            # doctest: +SKIP
-    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │            # doctest: +SKIP
-    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡            # doctest: +SKIP
-    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │            # doctest: +SKIP
-    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘            # doctest: +SKIP
-    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2],                          # doctest: +SKIP
-    ... X=[["a"], ["a"], ["b"], ["b"]], feature_name=0)                                      # doctest: +SKIP
-    shape: (2, 7)                                                                            # doctest: +SKIP
-    ┌─────────┬────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐  # doctest: +SKIP
-    │ feature ┆ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │  # doctest: +SKIP
-    │ ---     ┆ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │  # doctest: +SKIP
-    │ str     ┆ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │  # doctest: +SKIP
-    ╞═════════╪════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡  # doctest: +SKIP
-    │ a       ┆ 0.0        ┆ 0.0         ┆ 0.0          ┆ 1.0           ┆ 2     ┆ 2.0     │  # doctest: +SKIP
-    │ b       ┆ 1.0        ┆ 1.5         ┆ 0.0          ┆ 0.5           ┆ 2     ┆ 2.0     │  # doctest: +SKIP
-    └─────────┴────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘  # doctest: +SKIP
+    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2])                                      # doctest: +SKIP
+    shape: (1, 6)                                                                                       # doctest: +SKIP
+    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐                       # doctest: +SKIP
+    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │                       # doctest: +SKIP
+    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │                       # doctest: +SKIP
+    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │                       # doctest: +SKIP
+    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡                       # doctest: +SKIP
+    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │                       # doctest: +SKIP
+    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘                       # doctest: +SKIP
+    >>> from sklearn.linear_model import Ridge                                                          # doctest: +SKIP
+    >>> y_obs, X =[0, 0, 1, 1], [[0, 1], [1, 1], [1, 2], [2, 2]]                                        # doctest: +SKIP
+    >>> m = Ridge().fit(X, y_obs)                                                                       # doctest: +SKIP
+    >>> compute_marginal(y_obs=y_obs, y_pred=m.predict(X), X=X, feature_name=0,                         # doctest: +SKIP
+    ... predict_function=m.predict)                                                                     # doctest: +SKIP
+    shape: (3, 9)                                                                                       # doctest: +SKIP
+    ┌───────────┬────────────┬────────────┬────────────┬───┬───────┬─────────┬───────────┬───────────┐  # doctest: +SKIP
+    │ feature 0 ┆ y_obs_mean ┆ y_pred_mea ┆ y_obs_stde ┆ … ┆ count ┆ weights ┆ bin_edges ┆ partial_d │  # doctest: +SKIP
+    │ ---       ┆ ---        ┆ n          ┆ rr         ┆   ┆ ---   ┆ ---     ┆ ---       ┆ ependence │  # doctest: +SKIP
+    │ f64       ┆ f64        ┆ ---        ┆ ---        ┆   ┆ u32   ┆ f64     ┆ array[f64 ┆ ---       │  # doctest: +SKIP
+    │           ┆            ┆ f64        ┆ f64        ┆   ┆       ┆         ┆ , 2]      ┆ f64       │  # doctest: +SKIP
+    ╞═══════════╪════════════╪════════════╪════════════╪═══╪═══════╪═════════╪═══════════╪═══════════╡  # doctest: +SKIP
+    │ 0.0       ┆ 0.0        ┆ 0.1        ┆ 0.0        ┆ … ┆ 1     ┆ 1.0     ┆ [0.0,     ┆ 0.3       │  # doctest: +SKIP
+    │           ┆            ┆            ┆            ┆   ┆       ┆         ┆ 0.0]      ┆           │  # doctest: +SKIP
+    │ 1.0       ┆ 0.5        ┆ 0.5        ┆ 0.5        ┆ … ┆ 2     ┆ 2.0     ┆ [0.0,     ┆ 0.5       │  # doctest: +SKIP
+    │           ┆            ┆            ┆            ┆   ┆       ┆         ┆ 1.0]      ┆           │  # doctest: +SKIP
+    │ 2.0       ┆ 1.0        ┆ 0.9        ┆ 0.0        ┆ … ┆ 1     ┆ 1.0     ┆ [1.0,     ┆ 0.7       │  # doctest: +SKIP
+    │           ┆            ┆            ┆            ┆   ┆       ┆         ┆ 2.0]      ┆           │  # doctest: +SKIP
+    └───────────┴────────────┴────────────┴────────────┴───┴───────┴─────────┴───────────┴───────────┘  # doctest: +SKIP
     """  # noqa: E501
     # FIXME: polars >= 0.20.16
     # Also remove the doctest: +SKIP above.
@@ -572,10 +594,12 @@ def compute_marginal(
         msg = f"The argument 'feature_name' must be an int or str; got {feature_name}"
         ValueError(msg)
     elif isinstance(feature_name, int):
+        feature_index = feature_name
         feature_input = get_second_dimension(X, feature_name)
     else:
         X_names, _ = get_sorted_array_names(X)
-        feature_input = get_second_dimension(X, X_names.index(feature_name))
+        feature_index = X_names.index(feature_name)
+        feature_input = get_second_dimension(X, feature_index)
 
     df_list = []
     with pl.StringCache():
@@ -736,6 +760,20 @@ def compute_marginal(
                     pl.Series(model_col_name, [pred_names[i]] * df.shape[0])
                 )
 
+            # Add partial dependence.
+            with_pd = predict_function is not None and feature_name is not None
+            if with_pd:
+                pd_values = compute_partial_dependence(
+                    pred_fun=predict_function,  # type: ignore
+                    X=X,
+                    feature_index=feature_index,
+                    grid=df.get_column(feature_name),
+                    weights=weights,
+                    n_max=n_max,
+                    rng=rng,
+                )
+                df = df.with_columns(pl.Series("partial_dependence", pd_values))
+
             # Select the columns in the correct order.
             col_selection = []
             if n_pred > 0:
@@ -752,6 +790,8 @@ def compute_marginal(
             ]
             if feature_name in df.columns and not is_categorical and not is_string:
                 col_selection += ["bin_edges"]
+            if with_pd:
+                col_selection += ["partial_dependence"]
             df_list.append(df.select(col_selection))
 
         df = pl.concat(df_list)
