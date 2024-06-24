@@ -21,12 +21,14 @@ def get_xlabel(ax):
         return ax.layout.xaxis.title.text
 
 
-def get_ylabel(ax):
+def get_ylabel(ax, yaxis=1):
     if isinstance(ax, mpl.axes.Axes):
         return ax.get_ylabel()
-    else:
-        # ax = plotly figure
+    elif yaxis == 1:
         return ax.layout.yaxis.title.text
+    elif yaxis >= 2:
+        axis = getattr(ax.layout, f"yaxis{yaxis}")
+        return axis.title.text
 
 
 def get_title(ax):

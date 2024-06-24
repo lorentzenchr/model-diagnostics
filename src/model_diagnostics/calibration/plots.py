@@ -1,6 +1,7 @@
+import collections
 import warnings
 from functools import partial
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -700,9 +701,12 @@ def plot_marginal(
     y_pred: npt.ArrayLike,
     X: npt.ArrayLike,
     feature_name: Union[str, int],
+    predict_function: Optional[Callable] = None,
     weights: Optional[npt.ArrayLike] = None,
     *,
     n_bins: int = 10,
+    n_max: int = 1000,
+    rng: Optional[Union[np.random.Generator, int]] = None,
     ax: Optional[mpl.axes.Axes] = None,
 ):
     """Plot marginal observed and predicted conditional on a feature.
@@ -723,6 +727,9 @@ def plot_marginal(
         The dataframe or array of features to be passed to the model predict function.
     feature_name : str or int
         Column name (str) or index (int) of feature in `X`.
+    predict_function : callable or None
+        A callable to get prediction, i.e. `predict_function(X)`. Used to compute
+        partial dependence. If `None`, partial dependence is omitted.
     weights : array-like of shape (n_obs) or None
         Case weights. If given, the bias is calculated as weighted average of the
         identification function with these weights.
@@ -731,9 +738,13 @@ def plot_marginal(
         frequent) categories shown for categorical features. Due to ties, the effective
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
-    confidence_level : float
-        Confidence level for error bars. If 0, no error bars are plotted. Value must
-        fulfil `0 <= confidence_level < 1`.
+    n_max : int or None
+        Used only for partial dependence computation. The number of rows to subsample
+        from X. This speeds up computation, in particular for slow predict functions.
+    rng : np.random.Generator, int or None
+        Used only for partial dependence computation. The random number generator used
+        for subsampling of `n_max` rows. The input is internally wrapped by
+        `np.random.default_rng(rng)`.
     ax : matplotlib.axes.Axes or plotly Figure
         Axes object to draw the plot onto, otherwise uses the current Axes.
 
@@ -759,6 +770,37 @@ def plot_marginal(
     elif is_plotly_figure(ax):
         plot_backend = "plotly"
         fig = ax
+        # Take care to mimick make_suplits for secondary y axis.
+        # The following code is by comparing
+        #   make_subplots(specs=[[{"secondary_y": True}]])
+        # vs
+        #   go.Figure()
+        if not hasattr(fig.layout, "yaxis2"):
+            fig.update_layout(
+                xaxis={"anchor": "y", "domain": [0.0, 0.94]},
+                yaxis={"anchor": "x", "domain": [0.0, 1.0]},
+                yaxis2={"anchor": "x", "overlaying": "y", "side": "right"},
+            )
+            SubplotRef = collections.namedtuple(  # noqa: PYI024
+                "SubplotRef", ("subplot_type", "layout_keys", "trace_kwargs")
+            )
+            fig._grid_ref = [  # noqa: SLF001
+                [
+                    (
+                        SubplotRef(
+                            subplot_type="xy",
+                            layout_keys=("xaxis", "yaxis"),
+                            trace_kwargs={"xaxis": "x", "yaxis": "y"},
+                        ),
+                        SubplotRef(
+                            subplot_type="xy",
+                            layout_keys=("xaxis", "yaxis2"),
+                            trace_kwargs={"xaxis": "x", "yaxis": "y2"},
+                        ),
+                    )
+                ]
+            ]
+            fig._grid_str = "This is the format of your plot grid:\n[ (1,1) x,y,y2 ]\n"  # noqa: SLF001
     else:
         msg = (
             "The ax argument must be None, a matplotlib Axes or a plotly Figure, "
@@ -767,16 +809,17 @@ def plot_marginal(
         raise ValueError(msg)
 
     # estimator = getattr(predict_callable, "__self__", None)
-    # y_pred = predict_callable(X)
-    # X_polars = pl.DataFrame(X)
 
     df = compute_marginal(
         y_obs=y_obs,
         y_pred=y_pred,
         X=X,
         feature_name=feature_name,
+        predict_function=predict_function,
         weights=weights,
         n_bins=n_bins,
+        n_max=n_max,
+        rng=rng,
     )
     feature_name = df.columns[0]
 
@@ -799,7 +842,7 @@ def plot_marginal(
         not is_categorical
         and (
             (bin_edges.arr.first() == bin_edges.arr.last())  # type: ignore
-            | (bin_edges.arr.last() == df_no_nulls.get_column("feature"))  # type: ignore
+            | (bin_edges.arr.last() == df_no_nulls.get_column(feature_name))  # type: ignore
         ).all()
     )
 
@@ -861,6 +904,7 @@ def plot_marginal(
         # Null values are plotted as rightmost point at x_null.
         if is_categorical:
             x_null = np.array([n_x - 1])
+            width = None  # matplotlib default = 0.8
         else:
             x_min = df[feature_name].min()
             x_max = df[feature_name].max()
@@ -871,28 +915,38 @@ def plot_marginal(
                 x_null = np.array([2 * x_max])
             else:
                 x_null = np.array([x_max + (x_max - x_min) / n_x])
+            width = x_null - bin_edges.arr.last().max()  # type: ignore
+            if width <= 0:
+                width = (x_max - x_min) / n_x / 2.0
 
         # Null value histogram
         if plot_backend == "matplotlib":
             ax2.bar(
                 x=x_null,
-                width=x_null - bin_edges.arr.last().max(),  # type: ignore
                 height=df_null["weights"] / df["weights"].sum(),
+                width=width,
                 color="lightgrey",
             )
         else:
             fig.add_bar(
                 x=x_null,
                 y=df_null["weights"] / df["weights"].sum(),
-                width=x_null - bin_edges.arr.last().max(),  # type: ignore
+                width=width,
                 marker={"color": "lightgrey"},
                 secondary_y=False,
                 showlegend=False,
             )
 
-    for i, m in enumerate(["y_obs_mean", "y_pred_mean"]):
-        label = {"y_obs_mean": "mean y_obs", "y_pred_mean": "mean y_pred"}[m]
-
+    plot_items = ["y_obs_mean", "y_pred_mean"]
+    if predict_function is not None:
+        plot_items.append("partial_dependence")
+    label_dict = {
+        "y_obs_mean": "mean y_obs",
+        "y_pred_mean": "mean y_pred",
+        "partial_dependence": "partial dependence",
+    }
+    for i, m in enumerate(plot_items):
+        label = label_dict[m]
         if is_categorical:
             # We x-shift a little for a better visual.
             x = np.arange(n_x - feature_has_nulls)
@@ -902,7 +956,6 @@ def plot_marginal(
                     df_no_nulls[m],
                     marker="o",
                     linestyle="None",
-                    capsize=4,
                     label=label,
                 )
             else:
@@ -918,7 +971,7 @@ def plot_marginal(
             ax.plot(
                 df[feature_name],
                 df[m],
-                linestyle="solid",
+                linestyle="dashed" if m == "partial_dependence" else "solid",
                 marker="o",
                 label=label,
             )
@@ -928,7 +981,10 @@ def plot_marginal(
                 y=df[m],
                 marker_symbol="circle",
                 mode="lines+markers",
-                line={"color": get_plotly_color(i)},
+                line={
+                    "color": get_plotly_color(i),
+                    "dash": "dash" if m == "partial_dependence" else None,
+                },
                 name=label,
                 secondary_y=True,
             )
