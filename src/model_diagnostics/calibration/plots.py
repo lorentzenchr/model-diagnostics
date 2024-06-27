@@ -316,6 +316,7 @@ def plot_bias(
     functional: str = "mean",
     level: float = 0.5,
     n_bins: int = 10,
+    bin_method: str = "quantile",
     confidence_level: float = 0.9,
     ax: Optional[mpl.axes.Axes] = None,
 ):
@@ -364,6 +365,11 @@ def plot_bias(
         frequent) categories shown for categorical features. Due to ties, the effective
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
+    bin_method : str
+        The method to use for finding bin edges (boundaries). Options are:
+
+        - "quantile"
+        - "uniform"
     confidence_level : float
         Confidence level for error bars. If 0, no error bars are plotted. Value must
         fulfil `0 <= confidence_level < 1`.
@@ -430,6 +436,7 @@ def plot_bias(
         functional=functional,
         level=level,
         n_bins=n_bins,
+        bin_method=bin_method,
     )
 
     if df["bias_stderr"].fill_nan(None).null_count() > 0 and with_errorbars:
@@ -634,7 +641,6 @@ def plot_bias(
 
     if is_categorical or is_string:
         if feature_has_nulls:
-            # print(f"{df_i=}")
             # Without cast to pl.Uft8, the following error might occur:
             # exceptions.ComputeError: cannot combine categorical under a global string
             # cache with a non cached categorical
@@ -705,6 +711,7 @@ def plot_marginal(
     weights: Optional[npt.ArrayLike] = None,
     *,
     n_bins: int = 10,
+    bin_method: str = "uniform",
     n_max: int = 1000,
     rng: Optional[Union[np.random.Generator, int]] = None,
     ax: Optional[mpl.axes.Axes] = None,
@@ -738,6 +745,11 @@ def plot_marginal(
         frequent) categories shown for categorical features. Due to ties, the effective
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
+    bin_method : str
+        The method to use for finding bin edges (boundaries). Options are:
+
+        - "quantile"
+        - "uniform"
     n_max : int or None
         Used only for partial dependence computation. The number of rows to subsample
         from X. This speeds up computation, in particular for slow predict functions.
@@ -818,6 +830,7 @@ def plot_marginal(
         predict_function=predict_function,
         weights=weights,
         n_bins=n_bins,
+        bin_method=bin_method,
         n_max=n_max,
         rng=rng,
     )
@@ -837,60 +850,81 @@ def plot_marginal(
     df_no_nulls = df.filter(pl.col(feature_name).is_not_null())
 
     # Numerical columns are sometimes better treated as categorical.
-    bin_edges = None if is_categorical else df_no_nulls.get_column("bin_edges")
-    num_as_cat = (
-        not is_categorical
-        and (
-            (bin_edges.arr.first() == bin_edges.arr.last())  # type: ignore
-            | (bin_edges.arr.last() == df_no_nulls.get_column(feature_name))  # type: ignore
+    num_as_cat = False
+    if not is_categorical:
+        bin_edges = df_no_nulls.get_column("bin_edges")
+        num_as_cat = (
+            # left bin edge = right bin edge
+            (bin_edges.arr.first() == bin_edges.arr.last())
+            # feature == left bin edge
+            | (bin_edges.arr.first() == df_no_nulls.get_column(feature_name))
+            # feature == right bin edge
+            | (bin_edges.arr.last() == df_no_nulls.get_column(feature_name))
         ).all()
-    )
 
     # First the histogram of weights on secondary y-axis.
     # Other graph elements should appear on top of it. For plotly, we therefore need to
     # plot the histogram on the primary y-axis and put primary to the right and
     # secondary to the left. All other plotly graphs are put on the secondary yaxis.
+    #
+    # We x-shift a little for a better visual.
+    x = (
+        np.arange(n_x - feature_has_nulls)
+        if is_categorical
+        else df_no_nulls[feature_name]
+    )
     if plot_backend == "matplotlib":
         ax2 = ax.twinx()
         if is_categorical or num_as_cat:
-            # We x-shift a little for a better visual.
-            x = (
-                np.arange(n_x - feature_has_nulls)
-                if is_categorical
-                else df_no_nulls[feature_name]
-            )
             ax2.bar(
                 x=x,
                 height=df_no_nulls["weights"] / df["weights"].sum(),
                 color="lightgrey",
             )
         else:
-            ax2.hist(
-                x=df_no_nulls[feature_name],
-                weights=df_no_nulls["weights"] / df["weights"].sum(),
-                bins=np.r_[bin_edges[0][0], bin_edges.arr.last()],  # type: ignore # n_bins_eff,
+            # We can't use
+            #   ax2.hist(
+            #       x=df_no_nulls[feature_name],
+            #       weights=df_no_nulls["weights"] / df["weights"].sum(),
+            #       bins=np.r_[bin_edges[0][0], bin_edges.arr.last()],  # n_bins_eff,
+            #       color="lightgrey",
+            #       edgecolor="grey",
+            #       rwidth=0.8 if n_bins_eff <= 2 else None,
+            #   )
+            # because we might have empty bins.
+            ax2.bar(
+                x=0.5 * (bin_edges.arr.last() + bin_edges.arr.first()),
+                height=df_no_nulls["weights"] / df["weights"].sum(),
+                width=(bin_edges.arr.last() - bin_edges.arr.first())
+                * (1 if n_bins_eff > 2 else 0.8),
                 color="lightgrey",
                 edgecolor="grey",
-                rwidth=0.8 if n_bins_eff <= 2 else None,
             )
         # https://stackoverflow.com/questions/30505616/how-to-arrange-plots-of-secondary-axis-to-be-below-plots-of-primary-axis-in-matp
         ax.set_zorder(ax2.get_zorder() + 1)
         ax.set_frame_on(False)
     else:
         if is_categorical or num_as_cat:
-            fig.add_histogram(
-                x=df_no_nulls[feature_name],
+            # fig.add_histogram(
+            #     x=x, # df_no_nulls[feature_name],
+            #     y=df_no_nulls["weights"] / df["weights"].sum(),
+            #     histfunc="sum",
+            #     marker={"color": "lightgrey"},
+            #     secondary_y=False,
+            #     showlegend=False,
+            # )
+            fig.add_bar(
+                x=x,
                 y=df_no_nulls["weights"] / df["weights"].sum(),
-                histfunc="sum",
                 marker={"color": "lightgrey"},
                 secondary_y=False,
                 showlegend=False,
             )
         else:
             fig.add_bar(
-                x=0.5 * (bin_edges.arr.last() + bin_edges.arr.first()),  # type: ignore
+                x=0.5 * (bin_edges.arr.last() + bin_edges.arr.first()),
                 y=df_no_nulls["weights"] / df["weights"].sum(),
-                width=bin_edges.arr.last() - bin_edges.arr.first(),  # type: ignore
+                width=bin_edges.arr.last() - bin_edges.arr.first(),
                 marker={"color": "lightgrey", "line": {"width": 1.0, "color": "grey"}},
                 secondary_y=False,
                 showlegend=False,
@@ -904,7 +938,8 @@ def plot_marginal(
         # Null values are plotted as rightmost point at x_null.
         if is_categorical:
             x_null = np.array([n_x - 1])
-            width = None  # matplotlib default = 0.8
+            # matplotlib default width = 0.8
+            width = 0.8 if plot_backend == "matplotlib" else None
         else:
             x_min = df[feature_name].min()
             x_max = df[feature_name].max()
@@ -915,8 +950,8 @@ def plot_marginal(
                 x_null = np.array([2 * x_max])
             else:
                 x_null = np.array([x_max + (x_max - x_min) / n_x])
-            width = x_null - bin_edges.arr.last().max()  # type: ignore
-            if width <= 0:
+            width = x_null - bin_edges.arr.last().max()
+            if width is not None and width <= 0:
                 width = (x_max - x_min) / n_x / 2.0
 
         # Null value histogram
@@ -1013,7 +1048,6 @@ def plot_marginal(
 
     if is_categorical:
         if df[feature_name].null_count() > 0:
-            # print(f"{df=}")
             # Without cast to pl.Uft8, the following error might occur:
             # exceptions.ComputeError: cannot combine categorical under a global string
             # cache with a non cached categorical
@@ -1036,11 +1070,6 @@ def plot_marginal(
     else:
         x_label = ""
 
-    # TODO: Clean up code
-    # if feature is None:
-    #     title = "Marginal Plot"
-    # else:
-    # TODO
     model_name = array_name(y_pred, default="")
     # test for empty string ""
     title = "Marginal Plot" if not model_name else "Marginal Plot " + model_name

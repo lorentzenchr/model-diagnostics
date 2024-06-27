@@ -130,6 +130,7 @@ def compute_bias(
     functional: str = "mean",
     level: float = 0.5,
     n_bins: int = 10,
+    bin_method: str = "quantile",
 ):
     r"""Compute generalised bias conditional on a feature.
 
@@ -174,6 +175,11 @@ def compute_bias(
         frequent) categories shown for categorical features. Due to ties, the effective
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
+    bin_method : str
+        The method to use for finding bin edges (boundaries). Options are:
+
+        - `"quantile"`
+        - `"uniform"`
 
     Returns
     -------
@@ -269,7 +275,13 @@ def compute_bias(
     df_list = []
     with pl.StringCache():
         feature, feature_name, is_categorical, is_string, n_bins, f_binned = (
-            bin_feature(feature=feature, feature_name=None, y_obs=y_obs, n_bins=n_bins)
+            bin_feature(
+                feature=feature,
+                feature_name=None,
+                y_obs=y_obs,
+                n_bins=n_bins,
+                bin_method=bin_method,
+            )
         )
 
         for i in range(len(pred_names)):
@@ -370,7 +382,7 @@ def compute_bias(
                     .sort("__priority", descending=True)
                     .head(n_bins)
                 )
-                # FIXME: When n_bins=0, the resut should be an empty dataframe
+                # FIXME: When n_bins=0, the result should be an empty dataframe
                 # (0 rows and some columns). For some unknown reason as of
                 # polars 0.20.20, the following sort neglects the head(0) statement.
                 # Therefore, we place an explicit collect here. This should not be
@@ -453,6 +465,7 @@ def compute_marginal(
     weights: Optional[npt.ArrayLike] = None,
     *,
     n_bins: int = 10,
+    bin_method: str = "uniform",
     n_max: int = 1000,
     rng: Optional[Union[np.random.Generator, int]] = None,
 ):
@@ -485,6 +498,11 @@ def compute_marginal(
         frequent) categories shown for categorical features. Due to ties, the effective
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
+    bin_method : str
+        The method to use for finding bin edges (boundaries). Options are:
+
+        - `"quantile"`
+        - `"uniform"`
     n_max : int or None
         Used only for partial dependence computation. The number of rows to subsample
         from X. This speeds up computation, in particular for slow predict functions.
@@ -615,6 +633,7 @@ def compute_marginal(
             feature_name=feature_name,
             y_obs=y_obs,
             n_bins=n_bins,
+            bin_method=bin_method,
         )
 
         for i in range(len(pred_names)):
@@ -731,7 +750,7 @@ def compute_marginal(
                     .sort("__priority", descending=True)
                     .head(n_bins)
                 )
-                # FIXME: When n_bins=0, the resut should be an empty dataframe
+                # FIXME: When n_bins=0, the result should be an empty dataframe
                 # (0 rows and some columns). For some unknown reason as of
                 # polars 0.20.20, the following sort neglects the head(0) statement.
                 # Therefore, we place an explicit collect here. This should not be

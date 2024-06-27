@@ -258,8 +258,9 @@ def test_compute_bias_numerical_feature():
     assert_frame_equal(df_bias, df_expected, check_exact=False)
 
 
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
 @pytest.mark.parametrize("n_bins", [2, 10])
-def test_compute_bias_n_bins_numerical_feature(n_bins):
+def test_compute_bias_n_bins_numerical_feature(bin_method, n_bins):
     """Test compute_bias returns right number of bins for a numerical feature."""
     n_obs = 10
     y_obs = np.linspace(-1, 1, num=n_obs, endpoint=False)
@@ -270,6 +271,7 @@ def test_compute_bias_n_bins_numerical_feature(n_bins):
         y_pred=y_pred,
         feature=feature,
         n_bins=n_bins,
+        bin_method=bin_method,
     )
     assert df_bias.shape[0] == np.min([n_bins, 4])
     assert df_bias["bias_count"].sum() == n_obs
@@ -528,6 +530,13 @@ def test_compute_bias_raises_weights_shape():
         compute_bias(y_obs, y_pred, weights=weights)
 
 
+def test_compute_bias_raises_bin_method():
+    y_obs, y_pred = np.arange(20), np.arange(20)
+    msg = "Parameter bin_method must be either 'quantile' or ''uniform'"
+    with pytest.raises(ValueError, match=msg):
+        compute_bias(y_obs, y_pred, n_bins=5, bin_method=None)
+
+
 @pytest.mark.parametrize(
     "list2array",
     [lambda x: x, np.asarray, pa_array, pd_Series, pl.Series],
@@ -641,6 +650,7 @@ def test_compute_marginal(feature, f_grouped, bin_edges):
             y_pred=df.get_column("y_pred"),
             X=df.select("feature"),
             feature_name="feature",
+            bin_method="quantile",
         )
         df_expected = pl.DataFrame(
             {
@@ -672,6 +682,7 @@ def test_compute_marginal(feature, f_grouped, bin_edges):
             weights=[2, 1.5, 1.5],
             X=pl.DataFrame({"feature": feature}),
             feature_name="feature",
+            bin_method="quantile",
         )
         df_expected = pl.DataFrame(
             {
@@ -743,7 +754,8 @@ def test_compute_marginal_feature_none():
 @pytest.mark.skipif(
     polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
 )
-def test_compute_marginal_numerical_feature():
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
+def test_compute_marginal_numerical_feature(bin_method):
     """Test compute_marginal for a numerical feature."""
     n_obs = 100
     n_bins = 10
@@ -761,6 +773,7 @@ def test_compute_marginal_numerical_feature():
         X=df.select("feature"),
         feature_name="feature",
         n_bins=n_bins,
+        bin_method=bin_method,
     )
     # FIXME: polars >= 0.19.20
     # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
@@ -787,7 +800,9 @@ def test_compute_marginal_numerical_feature():
                 [
                     [0, 0.09],
                     *[[x * 0.1 - 0.01, (x + 1) * 0.1 - 0.01] for x in range(1, 10)],
-                ],
+                ]
+                if bin_method == "quantile"
+                else [[0.099 * x, 0.099 * (x + 1)] for x in range(10)],
                 dtype=pl.Array(pl.Float64, 2),
             ),
         }
@@ -799,8 +814,9 @@ def test_compute_marginal_numerical_feature():
 @pytest.mark.skipif(
     polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
 )
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
 @pytest.mark.parametrize("n_bins", [2, 10])
-def test_compute_marginal_n_bins_numerical_feature(n_bins):
+def test_compute_marginal_n_bins_numerical_feature(bin_method, n_bins):
     """Test compute_marginal returns right number of bins for a numerical feature."""
     n_obs = 10
     y_obs = np.linspace(-1, 1, num=n_obs, endpoint=False)
@@ -812,6 +828,7 @@ def test_compute_marginal_n_bins_numerical_feature(n_bins):
         X=pl.DataFrame({"col": feature}),
         feature_name="col",
         n_bins=n_bins,
+        bin_method=bin_method,
     )
     assert df_marginal.shape[0] == np.min([n_bins, 4])
     assert df_marginal["count"].sum() == n_obs

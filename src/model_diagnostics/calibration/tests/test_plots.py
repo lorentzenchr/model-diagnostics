@@ -242,6 +242,11 @@ def test_plot_reliability_diagram_constant_prediction_transform_output():
             "XXX",
             "The ax argument must be None, a matplotlib Axes or a plotly Figure",
         ),
+        (
+            "bin_method",
+            "XXX",
+            "Parameter bin_method must be either 'quantile' or ''uniform'",
+        ),
     ],
 )
 def test_plot_bias_raises(param, value, msg):
@@ -277,10 +282,13 @@ def test_plot_bias_warning_for_null_stderr():
 @pytest.mark.parametrize(
     "feature_type", ["cat", "cat_pandas", "cat_physical", "enum", "num", "string"]
 )
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
 @pytest.mark.parametrize("confidence_level", [0, 0.95])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1], "plotly"])
 @pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
-def test_plot_bias(with_null_values, feature_type, confidence_level, ax, plot_backend):
+def test_plot_bias(
+    with_null_values, feature_type, bin_method, confidence_level, ax, plot_backend
+):
     """Test that plot_bias works."""
     if plot_backend == "plotly" or ax == "plotly":
         pytest.importorskip("plotly")
@@ -347,6 +355,7 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax, plot_ba
                 y_obs=y_test,
                 y_pred=clf.predict_proba(X_test)[:, 1],
                 feature=feature,
+                bin_method=bin_method,
                 confidence_level=confidence_level,
                 ax=ax,
             )
@@ -473,7 +482,7 @@ def test_plot_marginal_raises_polars_version():
 
 # FIXME: polars >= 0.20.16
 @pytest.mark.skipif(
-    polars_version >= Version("0.20.16"), reason="requires polars 0.20.15 or lower"
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
 )
 @pytest.mark.parametrize(
     ("param", "value", "msg"),
@@ -483,6 +492,11 @@ def test_plot_marginal_raises_polars_version():
             "XXX",
             "The ax argument must be None, a matplotlib Axes or a plotly Figure",
         ),
+        (
+            "bin_method",
+            "XXX",
+            "Parameter bin_method must be either 'quantile' or ''uniform'",
+        ),
     ],
 )
 def test_plot_marginal_raises(param, value, msg):
@@ -491,7 +505,6 @@ def test_plot_marginal_raises(param, value, msg):
     d = {param: value}
     with pytest.raises(ValueError, match=msg):
         plot_marginal(
-            # predict_callable=lambda x: x.shape[0],
             y_obs=y_obs,
             y_pred=y_obs,
             X=np.ones_like(y_obs)[:, None],
@@ -508,9 +521,10 @@ def test_plot_marginal_raises(param, value, msg):
 @pytest.mark.parametrize(
     "feature_type", ["cat", "cat_pandas", "cat_physical", "enum", "num", "string"]
 )
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1], "plotly"])
 @pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
-def test_plot_marginal(with_null_values, feature_type, ax, plot_backend):
+def test_plot_marginal(with_null_values, feature_type, bin_method, ax, plot_backend):
     """Test that plot_marginal works."""
     if plot_backend == "plotly" or ax == "plotly":
         pytest.importorskip("plotly")
@@ -594,10 +608,11 @@ def test_plot_marginal(with_null_values, feature_type, ax, plot_backend):
     with config_context(plot_backend=plot_backend):
         plt_ax = plot_marginal(
             y_obs=y,
-            y_pred=clf.predict_proba(X)[:, 1],
+            y_pred=pl.Series(name="modelX", values=clf.predict_proba(X)[:, 1]),
             X=X,
             feature_name="feature_0",
             predict_function=lambda x: clf.predict_proba(x)[:, 1],
+            bin_method=bin_method,
             ax=ax,
         )
 
@@ -610,7 +625,7 @@ def test_plot_marginal(with_null_values, feature_type, ax, plot_backend):
             assert get_xlabel(plt_ax) == "feature_0"
 
         assert get_ylabel(plt_ax, yaxis=2) == "y"
-        assert get_title(plt_ax) == "Marginal Plot"
+        assert get_title(plt_ax) == "Marginal Plot modelX"
 
         if (
             isinstance(ax, mpl.axes.Axes)
@@ -626,14 +641,3 @@ def test_plot_marginal(with_null_values, feature_type, ax, plot_backend):
         ):
             xtick_labels = plt_ax.xaxis.get_ticklabels()
             assert xtick_labels[-1].get_text() == "Null"
-
-    # with config_context(plot_backend=plot_backend):
-    #     plt_ax = plot_bias(
-    #         y_obs=y_test,
-    #         y_pred=pl.Series(
-    #             values=clf.predict_proba(X_test)[:, 1], name="simple"
-    #         ),
-    #         feature=feature,
-    #         ax=ax,
-    #     )
-    # assert get_title(plt_ax) == "Bias Plot simple"
