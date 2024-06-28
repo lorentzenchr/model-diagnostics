@@ -13,6 +13,7 @@ from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
     pa_DictionaryArray_from_arrays,
+    pd_DataFrame,
     pd_Series,
 )
 from model_diagnostics.calibration import compute_bias, identification_function
@@ -889,6 +890,99 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
                 df.select(["feature", "y_obs_mean", "y_pred_mean", "count"]),
                 df_expected,
             )
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
+def test_compute_marginal_multiple_predictions(feature_type):
+    """Test compute_bias for multiple predictions."""
+    with pl.StringCache():
+        n_obs = 10
+        y_obs = np.ones(n_obs)
+        y_obs[: 10 // 2] = 2
+        y_pred = pl.DataFrame(
+            {"model_1": np.ones(n_obs), "model_2": 3 * np.ones(n_obs)}
+        )
+        if feature_type == "cat":
+            feature = pd_DataFrame(
+                pd_Series(y_obs.astype("=U8"), dtype="category", name="nice_feature")
+            )
+        elif feature_type == "string":
+            feature = pd_DataFrame(pd_Series(y_obs.astype("=U8"), name="nice_feature"))
+        else:
+            feature = pl.Series(values=y_obs, name="nice_feature").to_frame()
+
+        if isinstance(feature, SkipContainer):
+            pytest.skip("Module for data container not imported.")
+
+        df_marginal = compute_marginal(
+            y_obs=y_obs,
+            y_pred=y_pred,
+            X=feature,
+            feature_name="nice_feature",
+        ).drop(["y_obs_stderr", "y_pred_stderr", "weights", "bin_edges"])
+        f_expected = [1.0, 2, 1, 2]
+        df_expected = pl.DataFrame(
+            {
+                "model": ["model_1", "model_1", "model_2", "model_2"],
+                "nice_feature": f_expected,
+                "y_obs_mean": [1.0, 2, 1, 2],
+                "y_pred_mean": [1.0, 1.0, 3, 3],
+                "count": pl.Series(values=[5] * 4, dtype=pl.UInt32),
+            }
+        )
+
+        if feature_type == "cat":
+            df_expected = df_expected.with_columns(
+                df_expected["nice_feature"]
+                .cast(pl.Utf8)
+                .cast(pl.Categorical)
+                .alias("nice_feature"),
+            )
+        elif feature_type == "string":
+            df_expected = df_expected.with_columns(
+                df_expected["nice_feature"].cast(pl.Utf8).alias("nice_feature")
+            )
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+        # Same for pure numpy input.
+        feature_np = feature.to_numpy()
+        if feature_type == "cat":
+            # convert object to pd.Categorical
+            feature_np = pd_DataFrame(pd_Series(feature_np.squeeze(), dtype="category"))
+        elif feature_type == "string":
+            feature_np = feature_np.astype("=U8")  # to_numpy gives dtype=object
+        df_marginal = compute_marginal(
+            y_obs=y_obs,
+            y_pred=y_pred.to_numpy(),
+            X=feature_np,
+            feature_name=0,
+        ).drop(["y_obs_stderr", "y_pred_stderr", "weights", "bin_edges"])
+        df_expected = df_expected.with_columns(
+            pl.Series(["0", "0", "1", "1"]).alias("model")
+        )
+        df_expected = df_expected.rename({"nice_feature": "feature 0"})
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+        # Model and feature name clash.
+        if isinstance(feature, pl.DataFrame):
+            feature = feature.rename({"nice_feature": "model"})
+        else:
+            feature = feature.rename(columns={"nice_feature": "model"})
+        df_marginal = compute_marginal(
+            y_obs=y_obs,
+            y_pred=y_pred,
+            X=feature,
+            feature_name="model",
+        ).drop(["y_obs_stderr", "y_pred_stderr", "weights", "bin_edges"])
+        df_expected = df_expected.rename({"model": "model_", "feature 0": "model"})
+        df_expected = df_expected.with_columns(
+            pl.Series(["model_1", "model_1", "model_2", "model_2"]).alias("model_")
+        )
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
 
 
 # TODO: We could also add test for compute_marginal like

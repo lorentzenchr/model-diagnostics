@@ -517,6 +517,23 @@ def test_plot_marginal_raises(param, value, msg):
 @pytest.mark.skipif(
     polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
 )
+def test_plot_marginal_raises_more_than_one_model():
+    msg = (
+        r"Parameter y_pred has shape \(n_obs, 3\), but only \(n_obs\) and \(n_obs, 1\)"
+    )
+    with pytest.raises(ValueError, match=msg):
+        plot_marginal(
+            y_obs=[1, 2],
+            y_pred=[[1, 2, 3], [10, 20, 30]],
+            X=np.ones(2)[:, None],
+            feature_name=0,
+        )
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
 @pytest.mark.parametrize("with_null_values", [False, True])
 @pytest.mark.parametrize(
     "feature_type", ["cat", "cat_pandas", "cat_physical", "enum", "num", "string"]

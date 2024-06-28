@@ -821,6 +821,13 @@ def plot_marginal(
         raise ValueError(msg)
 
     # estimator = getattr(predict_callable, "__self__", None)
+    n_pred = length_of_second_dimension(y_pred)
+    if n_pred > 1:
+        msg = (
+            f"Parameter y_pred has shape (n_obs, {n_pred}), but only "
+            "(n_obs) and (n_obs, 1) are allowd."
+        )
+        raise ValueError(msg)
 
     df = compute_marginal(
         y_obs=y_obs,
