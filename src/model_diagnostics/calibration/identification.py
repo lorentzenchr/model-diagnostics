@@ -530,7 +530,8 @@ def compute_marginal(
 
         If `feature` is numerical, one also has:
 
-        - `bin_edges`: The edges of the bins.
+        - `bin_edges`: The edges and standard deviation of the bins, i.e.
+          (min, std, max).
 
     Notes
     -----
@@ -698,8 +699,11 @@ def compute_marginal(
                         [f_binned.get_column("bin"), f_binned.get_column("bin_edges")]
                     )
                     groupby_name = "bin"
+                    # TODO: add pl.col(feature_name).std() and add it as middle element
+                    # in bin_edges.
                     agg_list += [
                         pl.col(feature_name).mean(),
+                        pl.col(feature_name).std(ddof=0).alias("__feature_std"),
                         pl.col("bin_edges").first(),
                     ]
 
@@ -769,8 +773,22 @@ def compute_marginal(
                         pl.col("weights_sum").alias("weights"),
                         pl.col("count"),
                     ]
-                    + ([] if is_categorical or is_string else [pl.col("bin_edges")])
+                    + (
+                        []
+                        if is_categorical or is_string
+                        else [pl.col("bin_edges"), pl.col("__feature_std")]
+                    )
                 ).collect()
+
+                if not is_categorical and not is_string:
+                    df = df.with_columns(
+                        pl.col("bin_edges")
+                        .arr.first()
+                        .list.concat(pl.col("__feature_std"))
+                        .list.concat(pl.col("bin_edges").arr.last())
+                        .list.to_array(3)
+                        .alias("bin_edges")
+                    )
 
             # Add column "model".
             if n_pred > 0:
@@ -791,7 +809,9 @@ def compute_marginal(
                     n_max=n_max,
                     rng=rng,
                 )
-                df = df.with_columns(pl.Series("partial_dependence", pd_values))
+                df = df.with_columns(
+                    pl.Series(name="partial_dependence", values=pd_values)
+                )
 
             # Select the columns in the correct order.
             col_selection = []

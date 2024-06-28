@@ -867,6 +867,8 @@ def plot_marginal(
             | (bin_edges.arr.first() == df_no_nulls.get_column(feature_name))
             # feature == right bin edge
             | (bin_edges.arr.last() == df_no_nulls.get_column(feature_name))
+            # standard deviation of feature in bin == 0
+            | (bin_edges.arr.get(1) == 0)
         ).all()
 
     # First the histogram of weights on secondary y-axis.

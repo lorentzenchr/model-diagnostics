@@ -583,7 +583,9 @@ def test_compute_bias_1d_array_like(list2array):
             # FIXME: polars >= 0.20.16
             None
             if polars_version < Version("0.20.16")
-            else pl.Series([[0.1, 0.1], [0.1, 0.9]], dtype=pl.Array(pl.Float64, 2)),
+            else pl.Series(
+                [[0.1, 0, 0.1], [0.1, 0, 0.9]], dtype=pl.Array(pl.Float64, 3)
+            ),
         ),
         (
             pl.Series([None, np.nan, 1.0, 1, 1]),
@@ -591,7 +593,7 @@ def test_compute_bias_1d_array_like(list2array):
             # FIXME: polars >= 0.20.16
             None
             if polars_version < Version("0.20.16")
-            else pl.Series([None, [1.0, 1.0]], dtype=pl.Array(pl.Float64, 2)),
+            else pl.Series([[None] * 3, [1.0, 0, 1.0]], dtype=pl.Array(pl.Float64, 3)),
         ),
         (
             pl.Series(["a", "a", None, None, None]),
@@ -609,7 +611,9 @@ def test_compute_bias_1d_array_like(list2array):
             # FIXME: polars >= 0.20.16
             None
             if polars_version < Version("0.20.16")
-            else pl.Series([[0.1, 0.1], [0.1, 0.9]], dtype=pl.Array(pl.Float64, 2)),
+            else pl.Series(
+                [[0.1, 0, 0.1], [0.1, 0, 0.9]], dtype=pl.Array(pl.Float64, 3)
+            ),
         ),
         (
             pa_array([None, np.nan, 1.0, 1, 1]),
@@ -617,7 +621,7 @@ def test_compute_bias_1d_array_like(list2array):
             # FIXME: polars >= 0.20.16
             None
             if polars_version < Version("0.20.16")
-            else pl.Series([None, [1.0, 1.0]], dtype=pl.Array(pl.Float64, 2)),
+            else pl.Series([[None] * 3, [1.0, 0, 1.0]], dtype=pl.Array(pl.Float64, 3)),
         ),
         (
             pa_array(["a", "a", None, None, None]),
@@ -782,6 +786,7 @@ def test_compute_marginal_numerical_feature(bin_method):
     # The Windows CI runner with python 3.10, polars 0.19.19 and numpy1.22.0 seems to
     # have a bug in to_numpy, as bias[0] = 2.854484e-311 instead of 1. Therefore, we
     # use to_list instead of to_numpy.
+    f_std = np.linspace(0, 1, 10, endpoint=False).std(ddof=0) / n_bins
     df_expected = pl.DataFrame(
         {
             "feature": 0.045 + 0.1 * np.arange(10),
@@ -798,13 +803,17 @@ def test_compute_marginal_numerical_feature(bin_method):
             "count": n_steps * np.ones(n_bins, dtype=np.uint32),
             "weights": [n_obs / n_bins] * n_bins,
             "bin_edges": pl.Series(
+                # min, std, max
                 [
-                    [0, 0.09],
-                    *[[x * 0.1 - 0.01, (x + 1) * 0.1 - 0.01] for x in range(1, 10)],
+                    [0, f_std, 0.09],
+                    *[
+                        [x * 0.1 - 0.01, f_std, (x + 1) * 0.1 - 0.01]
+                        for x in range(1, 10)
+                    ],
                 ]
                 if bin_method == "quantile"
-                else [[0.099 * x, 0.099 * (x + 1)] for x in range(10)],
-                dtype=pl.Array(pl.Float64, 2),
+                else [[0.099 * x, f_std, 0.099 * (x + 1)] for x in range(10)],
+                dtype=pl.Array(pl.Float64, 3),
             ),
         }
     )
