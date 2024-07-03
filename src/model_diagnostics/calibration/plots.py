@@ -782,7 +782,7 @@ def plot_marginal(
     elif is_plotly_figure(ax):
         plot_backend = "plotly"
         fig = ax
-        # Take care to mimick make_suplits for secondary y axis.
+        # Take care to mimick make_subplots for secondary y axis.
         # The following code is by comparing
         #   make_subplots(specs=[[{"secondary_y": True}]])
         # vs

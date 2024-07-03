@@ -250,8 +250,14 @@ def safe_assign_column(x, values, column_index):
         #     values = pd.api.interchange.from_dataframe(
         #               pl.DataFrame(values)).iloc[:, 0]
         try:
-            x.iloc[:, column_index] = (
-                values.to_pandas() if isinstance(values, pl.Series) else values
+            # Avoid deprecation warning of pandas by handling dtype explicitly.
+            #   Setting an item of incompatible dtype is deprecated and will raise in a
+            #   future error of pandas.
+            pd = sys.modules["pandas"]
+            dtype = x.dtypes.iloc[column_index]
+            x.iloc[:, column_index] = pd.Series(
+                data=(values.to_pandas() if isinstance(values, pl.Series) else values),
+                dtype=dtype,
             )
         except Exception as e:
             # FIXME: pyarrow version XXX
