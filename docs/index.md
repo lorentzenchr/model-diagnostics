@@ -12,10 +12,11 @@
 Highlights:
 
 - All common point predictions covered: mean, median, quantiles, expectiles.
-- Assess model calibration with [identification functions][model_diagnostics.calibration.identification.identification_function] (generalized residuals) and [compute_bias][model_diagnostics.calibration.identification.compute_bias].
+- Assess model calibration with [identification functions][model_diagnostics.calibration.identification.identification_function] (generalized residuals), [compute_bias][model_diagnostics.calibration.identification.compute_bias] and [compute_marginal][model_diagnostics.calibration.identification.compute_marginal].
 - Assess calibration and bias graphically
     - [reliability diagrams][model_diagnostics.calibration.plots.plot_reliability_diagram] for auto-calibration
     - [bias plots][model_diagnostics.calibration.plots.plot_bias] for conditional calibration
+    - [marginal plots][model_diagnostics.calibration.plots.plot_marginal] for average `y_obs`, `y_pred` and partial dependence for one feature
 - Assess the predictive performance of models
     - strictly consistent, homogeneous [scoring functions][model_diagnostics.scoring.scoring]
     - [score decomposition][model_diagnostics.scoring.decompose] into miscalibration, discrimination and uncertainty

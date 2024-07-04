@@ -472,7 +472,7 @@ def compute_marginal(
     r"""Compute the marginal expectation conditional on a single feature.
 
     This function computes the (weighted) average of observed response and predictions
-    conditioned on a given feature.
+    conditional on a given feature.
 
     Parameters
     ----------

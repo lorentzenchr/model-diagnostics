@@ -85,7 +85,8 @@ plugins:
             # Other
             show_bases: false
             show_source: true
-  - mkdocs-jupyter
+  - mkdocs-jupyter:
+      include_requirejs: true  # needed for plotly
 
 markdown_extensions:
 
