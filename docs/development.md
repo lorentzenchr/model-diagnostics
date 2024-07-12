@@ -24,6 +24,11 @@ Apart from the default environment are `docs`, `jupyter`, `lint` and `test`
    updates immediately. Press Control+C to stop.
 - `hatch run jupyter:lab` to start a jupyter lab server
 
+Some more commands concering testing are:
+- `hatch run test:versions` prints package versions per test matrix
+- `hatch run cov-erase` remove coverage report, i.e. "clean cache"
+- `hatch run test:cov --cov-report=xml` run test matrix and generate coverage report
+
 ## Hatch config
 
 If you work with, e.g., VSCode and want to detect the python executable, one way to do
