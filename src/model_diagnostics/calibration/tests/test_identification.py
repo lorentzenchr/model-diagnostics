@@ -907,7 +907,7 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
 )
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
 def test_compute_marginal_multiple_predictions(feature_type):
-    """Test compute_bias for multiple predictions."""
+    """Test compute_marginal for multiple predictions."""
     with pl.StringCache():
         n_obs = 10
         y_obs = np.ones(n_obs)
@@ -932,7 +932,9 @@ def test_compute_marginal_multiple_predictions(feature_type):
             y_pred=y_pred,
             X=feature,
             feature_name="nice_feature",
-        ).drop(["y_obs_stderr", "y_pred_stderr", "weights", "bin_edges"])
+        ).drop(["y_obs_stderr", "y_pred_stderr", "weights"])
+        if "bin_edges" in df_marginal.columns:
+            df_marginal = df_marginal.drop("bin_edges")
         f_expected = [1.0, 2, 1, 2]
         df_expected = pl.DataFrame(
             {
@@ -1045,3 +1047,20 @@ def test_compute_marginal_with_partial_dependence(weights):
         }
     )
     assert_frame_equal(df, df_expected)
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+def test_compute_marginal_raises_X_None():
+    """Test that compute_marginal raises if X=None but feature_name not None."""
+    n_obs = 5
+    msg = "X must be a data container like*."
+    with pytest.raises(ValueError, match=msg):
+        compute_marginal(
+            y_obs=np.zeros(n_obs),
+            y_pred=np.ones(n_obs),
+            X=None,
+            feature_name="a",
+        )

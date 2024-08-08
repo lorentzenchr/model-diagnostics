@@ -459,8 +459,8 @@ def compute_bias(
 def compute_marginal(
     y_obs: npt.ArrayLike,
     y_pred: npt.ArrayLike,
-    X: npt.ArrayLike,
-    feature_name: Optional[Union[str, int]],
+    X: Optional[npt.ArrayLike] = None,
+    feature_name: Optional[Union[str, int]] = None,
     predict_function: Optional[Callable] = None,
     weights: Optional[npt.ArrayLike] = None,
     *,
@@ -482,7 +482,7 @@ def compute_marginal(
     y_pred : array-like of shape (n_obs) or (n_obs, n_models)
         Predicted values, e.g. for the conditional expectation of the response,
         `E(Y|X)`.
-    X : array-like of shape (n_obs, n_features)
+    X : array-like of shape (n_obs, n_features) or None
         The dataframe or array of features to be passed to the model predict function.
     feature_name : int, str or None
         Column name (str) or index (int) of feature in `X`. If None, the total marginal
@@ -556,34 +556,34 @@ def compute_marginal(
 
     Examples
     --------
-    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2])                                      # doctest: +SKIP
-    shape: (1, 6)                                                                                       # doctest: +SKIP
-    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐                       # doctest: +SKIP
-    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │                       # doctest: +SKIP
-    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │                       # doctest: +SKIP
-    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │                       # doctest: +SKIP
-    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡                       # doctest: +SKIP
-    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │                       # doctest: +SKIP
-    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘                       # doctest: +SKIP
-    >>> from sklearn.linear_model import Ridge                                                          # doctest: +SKIP
-    >>> y_obs, X =[0, 0, 1, 1], [[0, 1], [1, 1], [1, 2], [2, 2]]                                        # doctest: +SKIP
-    >>> m = Ridge().fit(X, y_obs)                                                                       # doctest: +SKIP
-    >>> compute_marginal(y_obs=y_obs, y_pred=m.predict(X), X=X, feature_name=0,                         # doctest: +SKIP
-    ... predict_function=m.predict)                                                                     # doctest: +SKIP
-    shape: (3, 9)                                                                                       # doctest: +SKIP
-    ┌───────────┬────────────┬────────────┬────────────┬───┬───────┬─────────┬───────────┬───────────┐  # doctest: +SKIP
-    │ feature 0 ┆ y_obs_mean ┆ y_pred_mea ┆ y_obs_stde ┆ … ┆ count ┆ weights ┆ bin_edges ┆ partial_d │  # doctest: +SKIP
-    │ ---       ┆ ---        ┆ n          ┆ rr         ┆   ┆ ---   ┆ ---     ┆ ---       ┆ ependence │  # doctest: +SKIP
-    │ f64       ┆ f64        ┆ ---        ┆ ---        ┆   ┆ u32   ┆ f64     ┆ array[f64 ┆ ---       │  # doctest: +SKIP
-    │           ┆            ┆ f64        ┆ f64        ┆   ┆       ┆         ┆ , 2]      ┆ f64       │  # doctest: +SKIP
-    ╞═══════════╪════════════╪════════════╪════════════╪═══╪═══════╪═════════╪═══════════╪═══════════╡  # doctest: +SKIP
-    │ 0.0       ┆ 0.0        ┆ 0.1        ┆ 0.0        ┆ … ┆ 1     ┆ 1.0     ┆ [0.0,     ┆ 0.3       │  # doctest: +SKIP
-    │           ┆            ┆            ┆            ┆   ┆       ┆         ┆ 0.0]      ┆           │  # doctest: +SKIP
-    │ 1.0       ┆ 0.5        ┆ 0.5        ┆ 0.5        ┆ … ┆ 2     ┆ 2.0     ┆ [0.0,     ┆ 0.5       │  # doctest: +SKIP
-    │           ┆            ┆            ┆            ┆   ┆       ┆         ┆ 1.0]      ┆           │  # doctest: +SKIP
-    │ 2.0       ┆ 1.0        ┆ 0.9        ┆ 0.0        ┆ … ┆ 1     ┆ 1.0     ┆ [1.0,     ┆ 0.7       │  # doctest: +SKIP
-    │           ┆            ┆            ┆            ┆   ┆       ┆         ┆ 2.0]      ┆           │  # doctest: +SKIP
-    └───────────┴────────────┴────────────┴────────────┴───┴───────┴─────────┴───────────┴───────────┘  # doctest: +SKIP
+    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2])                                    # doctest: +SKIP
+    shape: (1, 6)                                                                                     # doctest: +SKIP
+    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐                     # doctest: +SKIP
+    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │                     # doctest: +SKIP
+    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │                     # doctest: +SKIP
+    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │                     # doctest: +SKIP
+    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡                     # doctest: +SKIP
+    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │                     # doctest: +SKIP
+    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘                     # doctest: +SKIP
+    >>> from sklearn.linear_model import Ridge                                                        # doctest: +SKIP
+    >>> y_obs, X =[0, 0, 1, 1], [[0, 1], [1, 1], [1, 2], [2, 2]]                                      # doctest: +SKIP
+    >>> m = Ridge().fit(X, y_obs)                                                                     # doctest: +SKIP
+    >>> compute_marginal(y_obs=y_obs, y_pred=m.predict(X), X=X, feature_name=0,                       # doctest: +SKIP
+    ... predict_function=m.predict)                                                                   # doctest: +SKIP
+    shape: (3, 9)                                                                                     # doctest: +SKIP
+    ┌───────────┬────────────┬───────────┬───────────┬───┬───────┬─────────┬───────────┬───────────┐  # doctest: +SKIP
+    │ feature 0 ┆ y_obs_mean ┆ y_pred_me ┆ y_obs_std ┆ … ┆ count ┆ weights ┆ bin_edges ┆ partial_d │  # doctest: +SKIP
+    │ ---       ┆ ---        ┆ an        ┆ err       ┆   ┆ ---   ┆ ---     ┆ ---       ┆ ependence │  # doctest: +SKIP
+    │ f64       ┆ f64        ┆ ---       ┆ ---       ┆   ┆ u32   ┆ f64     ┆ array[f64 ┆ ---       │  # doctest: +SKIP
+    │           ┆            ┆ f64       ┆ f64       ┆   ┆       ┆         ┆ , 3]      ┆ f64       │  # doctest: +SKIP
+    ╞═══════════╪════════════╪═══════════╪═══════════╪═══╪═══════╪═════════╪═══════════╪═══════════╡  # doctest: +SKIP
+    │ 0.0       ┆ 0.0        ┆ 0.1       ┆ 0.0       ┆ … ┆ 1     ┆ 1.0     ┆ [0.0,     ┆ 0.3       │  # doctest: +SKIP
+    │           ┆            ┆           ┆           ┆   ┆       ┆         ┆ 0.0, 0.2] ┆           │  # doctest: +SKIP
+    │ 1.0       ┆ 0.5        ┆ 0.5       ┆ 0.5       ┆ … ┆ 2     ┆ 2.0     ┆ [0.8,     ┆ 0.5       │  # doctest: +SKIP
+    │           ┆            ┆           ┆           ┆   ┆       ┆         ┆ 0.0, 1.0] ┆           │  # doctest: +SKIP
+    │ 2.0       ┆ 1.0        ┆ 0.9       ┆ 0.0       ┆ … ┆ 1     ┆ 1.0     ┆ [1.8,     ┆ 0.7       │  # doctest: +SKIP
+    │           ┆            ┆           ┆           ┆   ┆       ┆         ┆ 0.0, 2.0] ┆           │  # doctest: +SKIP
+    └───────────┴────────────┴───────────┴───────────┴───┴───────┴─────────┴───────────┴───────────┘  # doctest: +SKIP
     """  # noqa: E501
     # FIXME: polars >= 0.20.16
     # Also remove the doctest: +SKIP above.
@@ -608,10 +608,16 @@ def compute_marginal(
         w = np.ones_like(y_obs, dtype=float)
 
     if feature_name is None:
+        # X is completely ignored.
         feature_input = None
+    elif X is None:
+        msg = (
+            "X must be a data container like a (polars) dataframe or an (numpy) array."
+        )
+        raise ValueError(msg)
     elif not isinstance(feature_name, (int, str)):
         msg = f"The argument 'feature_name' must be an int or str; got {feature_name}"
-        ValueError(msg)
+        raise ValueError(msg)
     elif isinstance(feature_name, int):
         feature_index = feature_name
         feature_input = get_second_dimension(X, feature_name)
@@ -699,8 +705,6 @@ def compute_marginal(
                         [f_binned.get_column("bin"), f_binned.get_column("bin_edges")]
                     )
                     groupby_name = "bin"
-                    # TODO: add pl.col(feature_name).std() and add it as middle element
-                    # in bin_edges.
                     agg_list += [
                         pl.col(feature_name).mean(),
                         pl.col(feature_name).std(ddof=0).alias("__feature_std"),
@@ -802,7 +806,7 @@ def compute_marginal(
             if with_pd:
                 pd_values = compute_partial_dependence(
                     pred_fun=predict_function,  # type: ignore
-                    X=X,
+                    X=X,  # type: ignore
                     feature_index=feature_index,
                     grid=df.get_column(feature_name),
                     weights=weights,
