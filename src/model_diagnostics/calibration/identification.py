@@ -1,4 +1,5 @@
-from typing import Optional, Union
+from itertools import chain
+from typing import Callable, Optional, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -15,6 +16,7 @@ from model_diagnostics._utils.array import (
     validate_same_first_dimension,
 )
 from model_diagnostics._utils.binning import bin_feature
+from model_diagnostics._utils.partial_dependence import compute_partial_dependence
 
 
 def identification_function(
@@ -128,6 +130,7 @@ def compute_bias(
     functional: str = "mean",
     level: float = 0.5,
     n_bins: int = 10,
+    bin_method: str = "quantile",
 ):
     r"""Compute generalised bias conditional on a feature.
 
@@ -172,6 +175,11 @@ def compute_bias(
         frequent) categories shown for categorical features. Due to ties, the effective
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
+    bin_method : str
+        The method to use for finding bin edges (boundaries). Options are:
+
+        - `"quantile"`
+        - `"uniform"`
 
     Returns
     -------
@@ -184,6 +192,11 @@ def compute_bias(
         - `bias_stderr`: Standard error, i.e. standard deviation of `bias_mean`
         - `p_value`: p-value of the 2-sided t-test with null hypothesis:
           `bias_mean = 0`
+
+        If `feautre ` is not None, then there is also the column:
+
+        - `feature_name`: The actual name of the feature with the (binned) feature
+          values.
 
     Notes
     -----
@@ -262,7 +275,13 @@ def compute_bias(
     df_list = []
     with pl.StringCache():
         feature, feature_name, is_categorical, is_string, n_bins, f_binned = (
-            bin_feature(feature=feature, y_obs=y_obs, n_bins=n_bins)
+            bin_feature(
+                feature=feature,
+                feature_name=None,
+                y_obs=y_obs,
+                n_bins=n_bins,
+                bin_method=bin_method,
+            )
         )
 
         for i in range(len(pred_names)):
@@ -319,8 +338,7 @@ def compute_bias(
                 if is_categorical or is_string:
                     groupby_name = feature_name
                 else:
-                    # See above for the creation of the binned feature f_binned.
-                    df = df.hstack([f_binned])
+                    df = df.hstack([f_binned.get_column("bin")])
                     groupby_name = "bin"
                     agg_list.append(pl.col(feature_name).mean())
 
@@ -364,7 +382,7 @@ def compute_bias(
                     .sort("__priority", descending=True)
                     .head(n_bins)
                 )
-                # FIXME: When n_bins=0, the resut should be an empty dataframe
+                # FIXME: When n_bins=0, the result should be an empty dataframe
                 # (0 rows and some columns). For some unknown reason as of
                 # polars 0.20.20, the following sort neglects the head(0) statement.
                 # Therefore, we place an explicit collect here. This should not be
@@ -432,6 +450,391 @@ def compute_bias(
                 "bias_stderr",
                 "p_value",
             ]
+            df_list.append(df.select(col_selection))
+
+        df = pl.concat(df_list)
+    return df
+
+
+def compute_marginal(
+    y_obs: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    X: Optional[npt.ArrayLike] = None,
+    feature_name: Optional[Union[str, int]] = None,
+    predict_function: Optional[Callable] = None,
+    weights: Optional[npt.ArrayLike] = None,
+    *,
+    n_bins: int = 10,
+    bin_method: str = "uniform",
+    n_max: int = 1000,
+    rng: Optional[Union[np.random.Generator, int]] = None,
+):
+    r"""Compute the marginal expectation conditional on a single feature.
+
+    This function computes the (weighted) average of observed response and predictions
+    conditional on a given feature.
+
+    Parameters
+    ----------
+    y_obs : array-like of shape (n_obs)
+        Observed values of the response variable.
+        For binary classification, y_obs is expected to be in the interval [0, 1].
+    y_pred : array-like of shape (n_obs) or (n_obs, n_models)
+        Predicted values, e.g. for the conditional expectation of the response,
+        `E(Y|X)`.
+    X : array-like of shape (n_obs, n_features) or None
+        The dataframe or array of features to be passed to the model predict function.
+    feature_name : int, str or None
+        Column name (str) or index (int) of feature in `X`. If None, the total marginal
+        is computed.
+    predict_function : callable or None
+        A callable to get prediction, i.e. `predict_function(X)`. Used to compute
+        partial dependence. If `None`, partial dependence is omitted.
+    weights : array-like of shape (n_obs) or None
+        Case weights. If given, the bias is calculated as weighted average of the
+        identification function with these weights.
+    n_bins : int
+        The number of bins for numerical features and the maximal number of (most
+        frequent) categories shown for categorical features. Due to ties, the effective
+        number of bins might be smaller than `n_bins`. Null values are always included
+        in the output, accounting for one bin. NaN values are treated as null values.
+    bin_method : str
+        The method to use for finding bin edges (boundaries). Options are:
+
+        - `"quantile"`
+        - `"uniform"`
+    n_max : int or None
+        Used only for partial dependence computation. The number of rows to subsample
+        from X. This speeds up computation, in particular for slow predict functions.
+    rng : np.random.Generator, int or None
+        Used only for partial dependence computation. The random number generator used
+        for subsampling of `n_max` rows. The input is internally wrapped by
+        `np.random.default_rng(rng)`.
+
+    Returns
+    -------
+    df : polars.DataFrame
+        The result table contains at least the columns:
+
+        - `y_obs_mean`: Mean of `y_obs`
+        - `y_pred_mean`: Mean of `y_pred`
+        - `y_obs_stderr`: Standard error, i.e. standard deviation of `y_obs_mean`
+        - `y_pred_stderr`: Standard error, i.e. standard deviation of `y_pred_mean`
+        - `count`: Number of data rows
+        - `weights`: Sum of weights
+
+        If `feature ` is not None, then there is also the column:
+
+        - `feature_name`: The actual name of the feature with the (binned) feature
+          values.
+
+        If `feature` is numerical, one also has:
+
+        - `bin_edges`: The edges and standard deviation of the bins, i.e.
+          (min, std, max).
+
+    Notes
+    -----
+    The marginal values iare computed as an estimation of:
+
+        - `y_obs`: \(\mathbb{E}(Y|features)\).
+        - `y_pred`: \(\mathbb{E}(m(X)|features)\).
+
+    Computationally that is more or less a group-by operation on a dataset.
+
+    The standard error for both are calculated in the standard way as
+    \(\mathrm{SE} = \sqrt{\operatorname{Var}(\bar{Y})} = \frac{\sigma}{\sqrt{n}}\) and
+    the standard variance estimator for \(\sigma^2\) with Bessel correction, i.e.
+    division by \(n-1\) instead of \(n\).
+
+    With case weights, the variance estimator becomes \(\operatorname{Var}(\bar{Y})
+    = \frac{1}{n-1} \frac{1}{\sum_i w_i} \sum_i w_i (y_i - \bar{y})^2\) with
+    the implied relation \(\operatorname{Var}(y_i) \sim \frac{1}{w_i} \).
+    If your weights are for repeated observations, so-called frequency weights, then
+    the above estimate is conservative because it uses \(n - 1\) instead
+    of \((\sum_i w_i) - 1\).
+
+    Examples
+    --------
+    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2])                                    # doctest: +SKIP
+    shape: (1, 6)                                                                                     # doctest: +SKIP
+    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐                     # doctest: +SKIP
+    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │                     # doctest: +SKIP
+    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │                     # doctest: +SKIP
+    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │                     # doctest: +SKIP
+    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡                     # doctest: +SKIP
+    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │                     # doctest: +SKIP
+    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘                     # doctest: +SKIP
+    >>> from sklearn.linear_model import Ridge                                                        # doctest: +SKIP
+    >>> y_obs, X =[0, 0, 1, 1], [[0, 1], [1, 1], [1, 2], [2, 2]]                                      # doctest: +SKIP
+    >>> m = Ridge().fit(X, y_obs)                                                                     # doctest: +SKIP
+    >>> compute_marginal(y_obs=y_obs, y_pred=m.predict(X), X=X, feature_name=0,                       # doctest: +SKIP
+    ... predict_function=m.predict)                                                                   # doctest: +SKIP
+    shape: (3, 9)                                                                                     # doctest: +SKIP
+    ┌───────────┬────────────┬───────────┬───────────┬───┬───────┬─────────┬───────────┬───────────┐  # doctest: +SKIP
+    │ feature 0 ┆ y_obs_mean ┆ y_pred_me ┆ y_obs_std ┆ … ┆ count ┆ weights ┆ bin_edges ┆ partial_d │  # doctest: +SKIP
+    │ ---       ┆ ---        ┆ an        ┆ err       ┆   ┆ ---   ┆ ---     ┆ ---       ┆ ependence │  # doctest: +SKIP
+    │ f64       ┆ f64        ┆ ---       ┆ ---       ┆   ┆ u32   ┆ f64     ┆ array[f64 ┆ ---       │  # doctest: +SKIP
+    │           ┆            ┆ f64       ┆ f64       ┆   ┆       ┆         ┆ , 3]      ┆ f64       │  # doctest: +SKIP
+    ╞═══════════╪════════════╪═══════════╪═══════════╪═══╪═══════╪═════════╪═══════════╪═══════════╡  # doctest: +SKIP
+    │ 0.0       ┆ 0.0        ┆ 0.1       ┆ 0.0       ┆ … ┆ 1     ┆ 1.0     ┆ [0.0,     ┆ 0.3       │  # doctest: +SKIP
+    │           ┆            ┆           ┆           ┆   ┆       ┆         ┆ 0.0, 0.2] ┆           │  # doctest: +SKIP
+    │ 1.0       ┆ 0.5        ┆ 0.5       ┆ 0.5       ┆ … ┆ 2     ┆ 2.0     ┆ [0.8,     ┆ 0.5       │  # doctest: +SKIP
+    │           ┆            ┆           ┆           ┆   ┆       ┆         ┆ 0.0, 1.0] ┆           │  # doctest: +SKIP
+    │ 2.0       ┆ 1.0        ┆ 0.9       ┆ 0.0       ┆ … ┆ 1     ┆ 1.0     ┆ [1.8,     ┆ 0.7       │  # doctest: +SKIP
+    │           ┆            ┆           ┆           ┆   ┆       ┆         ┆ 0.0, 2.0] ┆           │  # doctest: +SKIP
+    └───────────┴────────────┴───────────┴───────────┴───┴───────┴─────────┴───────────┴───────────┘  # doctest: +SKIP
+    """  # noqa: E501
+    # FIXME: polars >= 0.20.16
+    # Also remove the doctest: +SKIP above.
+    if polars_version < Version("0.20.16"):
+        msg = (
+            "The function plot_marginal requires polars >= 0.20.16. "
+            f" You have {polars_version}."
+        )
+        raise ValueError(msg)
+    validate_same_first_dimension(y_obs, y_pred)
+    n_pred = length_of_second_dimension(y_pred)
+    pred_names, _ = get_sorted_array_names(y_pred)
+    y_obs = np.asarray(y_obs)
+
+    if weights is not None:
+        validate_same_first_dimension(weights, y_obs)
+        w = np.asarray(weights)
+        if w.ndim > 1:
+            msg = f"The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
+            raise ValueError(msg)
+    else:
+        w = np.ones_like(y_obs, dtype=float)
+
+    if feature_name is None:
+        # X is completely ignored.
+        feature_input = None
+    elif X is None:
+        msg = (
+            "X must be a data container like a (polars) dataframe or an (numpy) array."
+        )
+        raise ValueError(msg)
+    elif not isinstance(feature_name, (int, str)):
+        msg = f"The argument 'feature_name' must be an int or str; got {feature_name}"
+        raise ValueError(msg)
+    elif isinstance(feature_name, int):
+        feature_index = feature_name
+        feature_input = get_second_dimension(X, feature_name)
+    else:
+        X_names, _ = get_sorted_array_names(X)
+        feature_index = X_names.index(feature_name)
+        feature_input = get_second_dimension(X, feature_index)
+
+    df_list = []
+    with pl.StringCache():
+        (
+            feature,
+            feature_name,
+            is_categorical,
+            is_string,
+            n_bins,
+            f_binned,
+        ) = bin_feature(
+            feature=feature_input,
+            feature_name=feature_name,
+            y_obs=y_obs,
+            n_bins=n_bins,
+            bin_method=bin_method,
+        )
+
+        for i in range(len(pred_names)):
+            # Loop over columns of y_pred.
+            x = np.asarray(y_pred if n_pred == 0 else get_second_dimension(y_pred, i))
+
+            if feature is None:
+                y_obs_mean = np.average(y_obs, weights=w)
+                y_pred_mean = np.average(x, weights=w)
+                weights_sum = np.sum(w)
+                count = y_obs.shape[0]
+                # Note: with Bessel correction
+                y_obs_stddev = np.average(
+                    (y_obs - y_obs_mean) ** 2, weights=w
+                ) / np.amax([1, count - 1])
+                y_pred_stddev = np.average((x - y_pred_mean) ** 2, weights=w) / np.amax(
+                    [1, count - 1]
+                )
+                df = pl.DataFrame(
+                    {
+                        "y_obs_mean": [y_obs_mean],
+                        "y_pred_mean": [y_pred_mean],
+                        "count": pl.Series([count], dtype=pl.UInt32),
+                        "weights": [weights_sum],
+                        "y_obs_stderr": [np.sqrt(y_obs_stddev)],
+                        "y_pred_stderr": [np.sqrt(y_pred_stddev)],
+                    }
+                )
+            else:
+                df = pl.DataFrame(
+                    {
+                        "y_obs": y_obs,
+                        "y_pred": x,
+                        feature_name: feature,
+                        "weights": w,
+                    }
+                )
+
+                agg_list = [
+                    pl.count("y_obs").alias("count"),
+                    pl.col("weights").sum().alias("weights_sum"),
+                    *chain.from_iterable(
+                        [
+                            pl.col(c + "_mean").first(),
+                            (
+                                (
+                                    pl.col("weights")
+                                    * ((pl.col(c) - pl.col(c + "_mean")) ** 2)
+                                ).sum()
+                                / pl.col("weights").sum()
+                            ).alias(c + "_variance"),
+                        ]
+                        for c in ["y_obs", "y_pred"]
+                    ),
+                ]
+
+                if is_categorical or is_string:
+                    groupby_name = feature_name
+                else:
+                    # We also add the bin edges.
+                    df = df.hstack(
+                        [f_binned.get_column("bin"), f_binned.get_column("bin_edges")]
+                    )
+                    groupby_name = "bin"
+                    agg_list += [
+                        pl.col(feature_name).mean(),
+                        pl.col(feature_name).std(ddof=0).alias("__feature_std"),
+                        pl.col("bin_edges").first(),
+                    ]
+
+                df = df.lazy().select(
+                    [
+                        pl.all(),
+                        (
+                            (pl.col("weights") * pl.col("y_obs"))
+                            .sum()
+                            .over(groupby_name)
+                            / pl.col("weights").sum().over(groupby_name)
+                        ).alias("y_obs_mean"),
+                        (
+                            (pl.col("weights") * pl.col("y_pred"))
+                            .sum()
+                            .over(groupby_name)
+                            / pl.col("weights").sum().over(groupby_name)
+                        ).alias("y_pred_mean"),
+                    ]
+                )
+                # FIXME: polars >= 0.19
+                if polars_version >= Version("0.19.0"):
+                    df = df.group_by(groupby_name)
+                else:
+                    df = df.groupby(groupby_name)
+                df = (
+                    df.agg(agg_list)
+                    .with_columns(
+                        [
+                            pl.when(pl.col("count") > 1)
+                            .then(pl.col(c + "_variance") / (pl.col("count") - 1))
+                            .otherwise(pl.col(c + "_variance"))
+                            .sqrt()
+                            .alias(c + "_stderr")
+                            for c in ("y_obs", "y_pred")
+                        ]
+                    )
+                    # With sort and head alone, we could lose the null value, but we
+                    # want to keep it.
+                    # .sort("bias_count", descending=True)
+                    # .head(n_bins)
+                    .with_columns(
+                        pl.when(pl.col(feature_name).is_null())
+                        .then(pl.max("count") + 1)
+                        .otherwise(pl.col("count"))
+                        .alias("__priority")
+                    )
+                    .sort("__priority", descending=True)
+                    .head(n_bins)
+                )
+                # FIXME: When n_bins=0, the result should be an empty dataframe
+                # (0 rows and some columns). For some unknown reason as of
+                # polars 0.20.20, the following sort neglects the head(0) statement.
+                # Therefore, we place an explicit collect here. This should not be
+                # needed!
+                if n_bins == 0 or feature.null_count() >= 1:
+                    df = df.collect().lazy()
+                df = df.sort(feature_name, descending=False)
+
+                df = df.select(
+                    [
+                        pl.col(feature_name),
+                        pl.col("y_obs_mean"),
+                        pl.col("y_pred_mean"),
+                        pl.col("y_obs_stderr"),
+                        pl.col("y_pred_stderr"),
+                        pl.col("weights_sum").alias("weights"),
+                        pl.col("count"),
+                    ]
+                    + (
+                        []
+                        if is_categorical or is_string
+                        else [pl.col("bin_edges"), pl.col("__feature_std")]
+                    )
+                ).collect()
+
+                if not is_categorical and not is_string:
+                    df = df.with_columns(
+                        pl.col("bin_edges")
+                        .arr.first()
+                        .list.concat(pl.col("__feature_std"))
+                        .list.concat(pl.col("bin_edges").arr.last())
+                        .list.to_array(3)
+                        .alias("bin_edges")
+                    )
+
+            # Add column "model".
+            if n_pred > 0:
+                model_col_name = "model_" if feature_name == "model" else "model"
+                df = df.with_columns(
+                    pl.Series(model_col_name, [pred_names[i]] * df.shape[0])
+                )
+
+            # Add partial dependence.
+            with_pd = predict_function is not None and feature_name is not None
+            if with_pd:
+                pd_values = compute_partial_dependence(
+                    pred_fun=predict_function,  # type: ignore
+                    X=X,  # type: ignore
+                    feature_index=feature_index,
+                    grid=df.get_column(feature_name),
+                    weights=weights,
+                    n_max=n_max,
+                    rng=rng,
+                )
+                df = df.with_columns(
+                    pl.Series(name="partial_dependence", values=pd_values)
+                )
+
+            # Select the columns in the correct order.
+            col_selection = []
+            if n_pred > 0:
+                col_selection.append(model_col_name)
+            if feature_name is not None and feature_name in df.columns:
+                col_selection.append(str(feature_name))
+            col_selection += [
+                "y_obs_mean",
+                "y_pred_mean",
+                "y_obs_stderr",
+                "y_pred_stderr",
+                "count",
+                "weights",
+            ]
+            if feature_name in df.columns and not is_categorical and not is_string:
+                col_selection += ["bin_edges"]
+            if with_pd:
+                col_selection += ["partial_dependence"]
             df_list.append(df.select(col_selection))
 
         df = pl.concat(df_list)

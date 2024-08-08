@@ -4,9 +4,13 @@ import numpy as np
 import polars as pl
 import pytest
 from packaging.version import Version
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.compose import ColumnTransformer
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder
 
 from model_diagnostics import config_context, polars_version
 from model_diagnostics._utils.plot_helper import (
@@ -22,7 +26,11 @@ from model_diagnostics._utils.test_helper import (
     pd_available,
     pd_Series,
 )
-from model_diagnostics.calibration import plot_bias, plot_reliability_diagram
+from model_diagnostics.calibration import (
+    plot_bias,
+    plot_marginal,
+    plot_reliability_diagram,
+)
 
 
 @pytest.mark.parametrize(
@@ -234,6 +242,11 @@ def test_plot_reliability_diagram_constant_prediction_transform_output():
             "XXX",
             "The ax argument must be None, a matplotlib Axes or a plotly Figure",
         ),
+        (
+            "bin_method",
+            "XXX",
+            "Parameter bin_method must be either 'quantile' or ''uniform'",
+        ),
     ],
 )
 def test_plot_bias_raises(param, value, msg):
@@ -269,10 +282,13 @@ def test_plot_bias_warning_for_null_stderr():
 @pytest.mark.parametrize(
     "feature_type", ["cat", "cat_pandas", "cat_physical", "enum", "num", "string"]
 )
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
 @pytest.mark.parametrize("confidence_level", [0, 0.95])
 @pytest.mark.parametrize("ax", [None, plt.subplots()[1], "plotly"])
 @pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
-def test_plot_bias(with_null_values, feature_type, confidence_level, ax, plot_backend):
+def test_plot_bias(
+    with_null_values, feature_type, bin_method, confidence_level, ax, plot_backend
+):
     """Test that plot_bias works."""
     if plot_backend == "plotly" or ax == "plotly":
         pytest.importorskip("plotly")
@@ -339,6 +355,7 @@ def test_plot_bias(with_null_values, feature_type, confidence_level, ax, plot_ba
                 y_obs=y_test,
                 y_pred=clf.predict_proba(X_test)[:, 1],
                 feature=feature,
+                bin_method=bin_method,
                 confidence_level=confidence_level,
                 ax=ax,
             )
@@ -446,3 +463,219 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_leve
     assert legend_text[2].get_text() == "model_2"
     if with_null:
         assert legend_text[3].get_text() == "Null values"
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version >= Version("0.20.16"), reason="requires polars 0.20.15 or lower"
+)
+def test_plot_marginal_raises_polars_version():
+    msg = "The function plot_marginal requires polars >= 0.20.16."
+    with pytest.raises(ValueError, match=msg):
+        plot_marginal(
+            y_obs=np.arange(2),
+            y_pred=np.arange(2),
+            X=np.arange(4).reshape(2, 2),
+            feature_name=0,
+        )
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize(
+    ("param", "value", "msg"),
+    [
+        (
+            "ax",
+            "XXX",
+            "The ax argument must be None, a matplotlib Axes or a plotly Figure",
+        ),
+        (
+            "bin_method",
+            "XXX",
+            "Parameter bin_method must be either 'quantile' or ''uniform'",
+        ),
+    ],
+)
+def test_plot_marginal_raises(param, value, msg):
+    """Test that plot_marginal raises errors."""
+    y_obs = [0, 1, 2]
+    d = {param: value}
+    with pytest.raises(ValueError, match=msg):
+        plot_marginal(
+            y_obs=y_obs,
+            y_pred=y_obs,
+            X=np.ones_like(y_obs)[:, None],
+            feature_name=0,
+            **d,
+        )
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+def test_plot_marginal_raises_more_than_one_model():
+    msg = (
+        r"Parameter y_pred has shape \(n_obs, 3\), but only \(n_obs\) and \(n_obs, 1\)"
+    )
+    with pytest.raises(ValueError, match=msg):
+        plot_marginal(
+            y_obs=[1, 2],
+            y_pred=[[1, 2, 3], [10, 20, 30]],
+            X=np.ones(2)[:, None],
+            feature_name=0,
+        )
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize("with_null_values", [False, True])
+@pytest.mark.parametrize(
+    "feature_type", ["cat", "cat_pandas", "cat_physical", "enum", "num", "string"]
+)
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
+@pytest.mark.parametrize("ax", [None, plt.subplots()[1], "plotly"])
+@pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
+def test_plot_marginal(with_null_values, feature_type, bin_method, ax, plot_backend):
+    """Test that plot_marginal works."""
+    if plot_backend == "plotly" or ax == "plotly":
+        pytest.importorskip("plotly")
+        import plotly.graph_objects as go
+
+    if ax == "plotly":
+        ax = go.Figure()
+
+    if feature_type in ["cat_physical", "enum"] and polars_version < Version("0.20.0"):
+        pytest.skip("Test needs polars >= 0.20.0")
+    X, y = make_classification(
+        n_samples=100,
+        n_features=10,
+        random_state=42,
+    )
+    feature = X[:, 0]
+    if feature_type != "num":
+        bins = np.quantile(feature, [0.2, 0.5, 0.8])
+        feature = np.digitize(feature, bins=bins).astype("=U8")
+        if feature_type == "cat_pandas":
+            # Note that feature is already converted to string as polars does not like
+            # pandas.categorical with non-string values.
+            feature = pd_Series(feature, dtype="category")
+            dtype = pl.Categorical
+        elif feature_type == "cat":
+            dtype = pl.Categorical
+        elif feature_type == "cat_physical":
+            dtype = pl.Categorical(ordering="physical")
+        elif feature_type == "enum":
+            dtype = pl.Enum(categories=np.unique(feature))
+        else:
+            dtype = pl.Utf8
+
+        if feature_type in ["cat", "cat_physical", "enum"]:
+            feature = pl.Series(feature, dtype=dtype)
+
+    if isinstance(feature, SkipContainer):
+        pytest.skip("Module for data container not imported.")
+
+    if with_null_values:
+        with pl.StringCache():
+            if feature_type == "cat_pandas":
+                feature[0] = None
+            elif feature_type in ["cat", "cat_physical", "enum"]:
+                feature = pl.Series(feature).cast(str).scatter(0, None).cast(dtype)
+            else:
+                feature = pl.Series(feature).scatter(0, None)
+
+    if feature_type in ["cat_pandas"]:
+        import pandas as pd
+
+        X = pd.DataFrame(X[:, 1:], columns=[str(i) for i in range(1, X.shape[1])])
+        X.insert(0, "feature_0", feature)
+    else:
+        X = pl.DataFrame(X[:, 1:])
+        X = X.insert_column(0, pl.Series(name="feature_0", values=feature))
+
+    class TransformToString(TransformerMixin, BaseEstimator):
+        def fit(self, X, y=None):
+            self.__sklearn_is_fitted__ = True
+            return self
+
+        def transform(self, X, y=None):
+            if isinstance(X, pl.DataFrame):
+                return X.with_columns(pl.all().cast(pl.Utf8))
+            elif hasattr(X, "iloc"):
+                return X.astype(str)
+            else:
+                return X
+
+    safe_ohe = make_pipeline(
+        TransformToString(), OneHotEncoder(sparse_output=False, handle_unknown="ignore")
+    )
+
+    clf = make_pipeline(
+        ColumnTransformer([("ohe", safe_ohe, [0])], remainder="passthrough"),
+        LogisticRegression(solver="lbfgs"),
+    )
+    clf.fit(X, y)
+
+    with config_context(plot_backend=plot_backend):
+        plt_ax = plot_marginal(
+            y_obs=y,
+            y_pred=pl.Series(name="modelX", values=clf.predict_proba(X)[:, 1]),
+            X=X,
+            feature_name="feature_0",
+            predict_function=lambda x: clf.predict_proba(x)[:, 1],
+            bin_method=bin_method,
+            ax=ax,
+        )
+
+    if ax is not None:
+        assert ax is plt_ax
+
+    if feature_type == "num":
+        assert get_xlabel(plt_ax) == "binned feature_0"
+    else:
+        assert get_xlabel(plt_ax) == "feature_0"
+
+    assert get_ylabel(plt_ax, yaxis=2) == "y"
+    assert get_title(plt_ax) == "Marginal Plot modelX"
+
+    if (
+        isinstance(ax, mpl.axes.Axes)
+        and with_null_values
+        and feature_type
+        in [
+            "cat",
+            "cat_pandas",
+            "cat_physical",
+            "enum",
+            "string",
+        ]
+    ):
+        xtick_labels = plt_ax.xaxis.get_ticklabels()
+        assert xtick_labels[-1].get_text() == "Null"
+
+    legend_text = get_legend_list(plt_ax)
+    # TODO: It is not 100% clear why legend_text has most often more entries than 3 or
+    # 4. We therefor test >= instead of ==.
+    # It is also unclear why for matplotlib the order varies.
+    if with_null_values:
+        assert len(legend_text) >= 4
+    else:
+        assert len(legend_text) >= 3
+    if plot_backend == "matplotlib":
+        assert "mean y_obs" in legend_text
+        assert "mean y_pred" in legend_text
+        assert "partial dependence" in legend_text
+        if with_null_values:
+            assert "Null values" in legend_text
+    else:
+        assert legend_text[0] == "mean y_obs"
+        assert legend_text[1] == "mean y_pred"
+        assert legend_text[2] == "partial dependence"
+        if with_null_values:
+            assert legend_text[-1] == "Null values"

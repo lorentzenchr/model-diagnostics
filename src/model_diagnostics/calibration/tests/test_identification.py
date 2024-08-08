@@ -13,9 +13,11 @@ from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
     pa_DictionaryArray_from_arrays,
+    pd_DataFrame,
     pd_Series,
 )
 from model_diagnostics.calibration import compute_bias, identification_function
+from model_diagnostics.calibration.identification import compute_marginal
 
 
 @pytest.mark.parametrize(
@@ -231,6 +233,7 @@ def test_compute_bias_numerical_feature():
         feature=df.get_column("feature"),
         n_bins=n_bins,
     )
+    # FIXME: polars >= 0.19.20
     # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
     # of numpy array. Therefore, we add the np.asarray().
     # The Windows CI runner with python 3.10, polars 0.19.19 and numpy1.22.0 seems to
@@ -256,8 +259,9 @@ def test_compute_bias_numerical_feature():
     assert_frame_equal(df_bias, df_expected, check_exact=False)
 
 
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
 @pytest.mark.parametrize("n_bins", [2, 10])
-def test_compute_bias_n_bins_numerical_feature(n_bins):
+def test_compute_bias_n_bins_numerical_feature(bin_method, n_bins):
     """Test compute_bias returns right number of bins for a numerical feature."""
     n_obs = 10
     y_obs = np.linspace(-1, 1, num=n_obs, endpoint=False)
@@ -268,13 +272,14 @@ def test_compute_bias_n_bins_numerical_feature(n_bins):
         y_pred=y_pred,
         feature=feature,
         n_bins=n_bins,
+        bin_method=bin_method,
     )
     assert df_bias.shape[0] == np.min([n_bins, 4])
     assert df_bias["bias_count"].sum() == n_obs
 
 
 @pytest.mark.parametrize("feature_type", ["cat", "cat_physical", "enum", "string"])
-def test_compute_n_bins_string_like_feature(feature_type):
+def test_compute_bias_n_bins_string_like_feature(feature_type):
     """Test compute_bias returns right number of bins and sorted for string feature."""
     if feature_type == "cat":
         dtype = pl.Categorical
@@ -526,12 +531,19 @@ def test_compute_bias_raises_weights_shape():
         compute_bias(y_obs, y_pred, weights=weights)
 
 
+def test_compute_bias_raises_bin_method():
+    y_obs, y_pred = np.arange(20), np.arange(20)
+    msg = "Parameter bin_method must be either 'quantile' or ''uniform'"
+    with pytest.raises(ValueError, match=msg):
+        compute_bias(y_obs, y_pred, n_bins=5, bin_method=None)
+
+
 @pytest.mark.parametrize(
     "list2array",
     [lambda x: x, np.asarray, pa_array, pd_Series, pl.Series],
 )
 def test_compute_bias_1d_array_like(list2array):
-    """Test that plot_reliability_diagram workds for 1d array-likes."""
+    """Test that compute_bias workds for 1d array-likes."""
     y_obs = list2array([0, 1, 2, 3])
     y_pred = list2array([-1, 1, 0, 2])
     feature = list2array([0, 1, 0, 1])
@@ -551,3 +563,504 @@ def test_compute_bias_1d_array_like(list2array):
         }
     )
     assert_frame_equal(df_bias, df_expected, check_exact=False)
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize(
+    ("feature", "f_grouped", "bin_edges"),
+    [
+        (
+            pl.Series(["a", "a", "b", "b", "b"]),
+            pl.Series(["a", "b"]),
+            None,
+        ),
+        (
+            pl.Series([0.1, 0.1, 0.9, 0.9, 0.9]),
+            pl.Series([0.1, 0.9]),
+            # FIXME: polars >= 0.20.16
+            None
+            if polars_version < Version("0.20.16")
+            else pl.Series(
+                [[0.1, 0, 0.1], [0.1, 0, 0.9]], dtype=pl.Array(pl.Float64, 3)
+            ),
+        ),
+        (
+            pl.Series([None, np.nan, 1.0, 1, 1]),
+            pl.Series([None, 1.0]),
+            # FIXME: polars >= 0.20.16
+            None
+            if polars_version < Version("0.20.16")
+            else pl.Series([[None] * 3, [1.0, 0, 1.0]], dtype=pl.Array(pl.Float64, 3)),
+        ),
+        (
+            pl.Series(["a", "a", None, None, None]),
+            pl.Series(["a", None]),
+            None,
+        ),
+        (
+            pa_array(["a", "a", "b", "b", "b"]),
+            pa_array(["a", "b"]),
+            None,
+        ),
+        (
+            pa_array([0.1, 0.1, 0.9, 0.9, 0.9]),
+            pa_array([0.1, 0.9]),
+            # FIXME: polars >= 0.20.16
+            None
+            if polars_version < Version("0.20.16")
+            else pl.Series(
+                [[0.1, 0, 0.1], [0.1, 0, 0.9]], dtype=pl.Array(pl.Float64, 3)
+            ),
+        ),
+        (
+            pa_array([None, np.nan, 1.0, 1, 1]),
+            pa_array([None, 1.0]),
+            # FIXME: polars >= 0.20.16
+            None
+            if polars_version < Version("0.20.16")
+            else pl.Series([[None] * 3, [1.0, 0, 1.0]], dtype=pl.Array(pl.Float64, 3)),
+        ),
+        (
+            pa_array(["a", "a", None, None, None]),
+            pa_array(["a", None]),
+            None,
+        ),
+        (
+            pa_DictionaryArray_from_arrays([0, 0, 1, 1, 1], ["b", "a"]),
+            pa_DictionaryArray_from_arrays(np.array([0, 1], dtype=np.int8), ["b", "a"]),
+            None,
+        ),
+    ],
+)
+def test_compute_marginal(feature, f_grouped, bin_edges):
+    """Test compute_marginal on simple data."""
+    if isinstance(feature, SkipContainer):
+        pytest.skip("Module for data container not imported.")
+    with pl.StringCache():
+        # The string cache is needed to avoid the following error message:
+        # exceptions.ComputeError: Cannot compare categoricals originating from
+        # different sources. Consider setting a global string cache.
+        df = pl.DataFrame(
+            {
+                "y_obs": [0, 1, 2, 4, 3],
+                "y_pred": [1, 1, 2, 2, 2],
+                "feature": feature,
+            }
+        )
+        df_marginal = compute_marginal(
+            y_obs=df.get_column("y_obs"),
+            y_pred=df.get_column("y_pred"),
+            X=df.select("feature"),
+            feature_name="feature",
+            bin_method="quantile",
+        )
+        df_expected = pl.DataFrame(
+            {
+                "feature": f_grouped,
+                "y_obs_mean": [0.5, 3],
+                "y_pred_mean": [1.0, 2.0],
+                "y_obs_stderr": np.sqrt([0.25 + 0.25, (1 + 1 + 0) / 2])
+                / np.sqrt([2, 3]),
+                "y_pred_stderr": [0.0, 0.0],
+                "count": pl.Series(values=[2, 3], dtype=pl.UInt32),
+                "weights": pl.Series(values=[2, 3], dtype=pl.Float64),
+            }
+        )
+        if bin_edges is not None:
+            df_expected = df_expected.hstack([bin_edges.alias("bin_edges")])
+        df_expected = df_expected.sort("feature")
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+        # Same with weights.
+        # FIXME: polars >= 0.19.14
+        if polars_version >= Version("0.19.14"):
+            feature = pl.Series(values=feature).gather([0, 4, 4]).alias("feature")
+        else:
+            feature = pl.Series(values=feature).take([0, 4, 4]).alias("feature")
+        df_marginal = compute_marginal(
+            # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
+            y_obs=[0.5, 8 / 3, 10 / 3],
+            y_pred=[1, 2, 2],
+            weights=[2, 1.5, 1.5],
+            X=pl.DataFrame({"feature": feature}),
+            feature_name="feature",
+            bin_method="quantile",
+        )
+        df_expected = pl.DataFrame(
+            {
+                "feature": f_grouped,
+                "y_obs_mean": [0.5, 3.0],
+                "y_pred_mean": [1.0, 2.0],
+                "y_obs_stderr": [0.0, np.sqrt((1 / 9 + 1 / 9) / 1 / 2)],
+                "y_pred_stderr": [0.0, 0.0],
+                "count": pl.Series(values=[1, 2], dtype=pl.UInt32),
+                "weights": pl.Series(values=[2, 3], dtype=pl.Float64),
+            }
+        )
+        if bin_edges is not None:
+            df_expected = df_expected.hstack([bin_edges.alias("bin_edges")])
+        df_expected = df_expected.sort("feature")
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+def test_compute_marginal_feature_none():
+    """Test compute_marginal for feature = None."""
+    df = pl.DataFrame(
+        {
+            "y_obs": [0, 1, 2, 4, 3],
+            "y_pred": [1, 1, 2, 2, 2],
+        }
+    )
+    df_marginal = compute_marginal(
+        y_obs=df.get_column("y_obs"),
+        y_pred=df.get_column("y_pred"),
+        X=None,
+        feature_name=None,
+    )
+    df_expected = pl.DataFrame(
+        {
+            "y_obs_mean": [2.0],
+            "y_pred_mean": [8 / 5],
+            "y_obs_stderr": [np.sqrt(2.5 / 5)],
+            "y_pred_stderr": [np.sqrt((9 + 9 + 4 + 4 + 4) / 25 / 4 / 5)],
+            "count": pl.Series(values=[5], dtype=pl.UInt32),
+            "weights": [5.0],
+        }
+    )
+    assert_frame_equal(df_marginal, df_expected)
+
+    # Same with weights.
+    df_marginal = compute_marginal(
+        # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
+        y_obs=[0.5, 8 / 3, 10 / 3],
+        y_pred=[1, 2, 2],
+        weights=[2, 1.5, 1.5],
+        X=None,
+        feature_name=None,
+    )
+    df_expected = df_expected.with_columns(
+        pl.Series(values=[3], dtype=pl.UInt32).alias("count"),
+        pl.Series(values=[np.sqrt((9 / 2 + 2 / 3 + 8 / 3) / 5 / 2)]).alias(
+            "y_obs_stderr"
+        ),
+        pl.Series(values=[np.sqrt(1.2 / 5 / 2)]).alias("y_pred_stderr"),
+    )
+    assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
+def test_compute_marginal_numerical_feature(bin_method):
+    """Test compute_marginal for a numerical feature."""
+    n_obs = 100
+    n_bins = 10
+    n_steps = n_obs // n_bins
+    df = pl.DataFrame(
+        {
+            "y_obs": (y_obs := 2 * np.linspace(-0.5, 0.5, num=n_obs, endpoint=False)),
+            "y_pred": (y_pred := np.linspace(0, 1, num=n_obs, endpoint=False)),
+            "feature": np.linspace(0, 1, num=n_obs, endpoint=False),
+        }
+    )
+    df_marginal = compute_marginal(
+        y_obs=df.get_column("y_obs"),
+        y_pred=df.get_column("y_pred"),
+        X=df.select("feature"),
+        feature_name="feature",
+        n_bins=n_bins,
+        bin_method=bin_method,
+    )
+    # FIXME: polars >= 0.19.20
+    # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
+    # of numpy array. Therefore, we add the np.asarray().
+    # The Windows CI runner with python 3.10, polars 0.19.19 and numpy1.22.0 seems to
+    # have a bug in to_numpy, as bias[0] = 2.854484e-311 instead of 1. Therefore, we
+    # use to_list instead of to_numpy.
+    f_std = np.linspace(0, 1, 10, endpoint=False).std(ddof=0) / n_bins
+    df_expected = pl.DataFrame(
+        {
+            "feature": 0.045 + 0.1 * np.arange(10),
+            "y_obs_mean": -0.91 + 0.2 * np.arange(10),
+            "y_pred_mean": 0.045 + 0.1 * np.arange(10),
+            "y_obs_stderr": [
+                np.std(y_obs[n : n + n_steps], ddof=1) / np.sqrt(n_steps)
+                for n in range(0, n_obs, n_steps)
+            ],
+            "y_pred_stderr": [
+                np.std(y_pred[n : n + n_steps], ddof=1) / np.sqrt(n_steps)
+                for n in range(0, n_obs, n_steps)
+            ],
+            "count": n_steps * np.ones(n_bins, dtype=np.uint32),
+            "weights": [n_obs / n_bins] * n_bins,
+            "bin_edges": pl.Series(
+                # min, std, max
+                [
+                    [0, f_std, 0.09],
+                    *[
+                        [x * 0.1 - 0.01, f_std, (x + 1) * 0.1 - 0.01]
+                        for x in range(1, 10)
+                    ],
+                ]
+                if bin_method == "quantile"
+                else [[0.099 * x, f_std, 0.099 * (x + 1)] for x in range(10)],
+                dtype=pl.Array(pl.Float64, 3),
+            ),
+        }
+    )
+    assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
+@pytest.mark.parametrize("n_bins", [2, 10])
+def test_compute_marginal_n_bins_numerical_feature(bin_method, n_bins):
+    """Test compute_marginal returns right number of bins for a numerical feature."""
+    n_obs = 10
+    y_obs = np.linspace(-1, 1, num=n_obs, endpoint=False)
+    y_pred = y_obs**2
+    feature = [4, 4, 4, 4, 3, 3, 3, 2, 2, 11]
+    df_marginal = compute_marginal(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        X=pl.DataFrame({"col": feature}),
+        feature_name="col",
+        n_bins=n_bins,
+        bin_method=bin_method,
+    )
+    assert df_marginal.shape[0] == np.min([n_bins, 4])
+    assert df_marginal["count"].sum() == n_obs
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize("feature_type", ["cat", "cat_physical", "enum", "string"])
+def test_compute_marginal_n_bins_string_like_feature(feature_type):
+    """Test compute_marginal returns right number of bins and sorted string feature."""
+    if feature_type == "cat":
+        dtype = pl.Categorical
+    elif feature_type == "cat_physical":
+        if polars_version >= Version("0.20.0"):
+            dtype = pl.Categorical(ordering="physical")
+        else:
+            pytest.skip("Test needs polars >= 0.20.0")
+    elif feature_type == "enum":
+        if polars_version >= Version("0.20.0"):
+            dtype = pl.Enum(categories=["b", "a", "c"])
+        else:
+            pytest.skip("Test needs polars >= 0.20.0")
+    else:
+        dtype = pl.Utf8
+
+    with pl.StringCache():
+        n_bins = 3
+        n_obs = 6
+        y_obs = np.array([1, 1, 0, 2, 2, 3])
+        y_pred = np.zeros(n_obs)
+        feature = pl.Series("feature", ["a", "a", None, "b", "b", "c"], dtype=dtype)
+
+        df_expected = pl.DataFrame(
+            {
+                "feature": pl.Series(
+                    [None, "b", "a"] if feature_type == "enum" else [None, "a", "b"],
+                    dtype=dtype,
+                ),
+                "y_obs_mean": [0.0, 2, 1] if feature_type == "enum" else [0.0, 1, 2],
+                "y_pred_mean": 0.0,
+                "count": pl.Series([1, 2, 2], dtype=pl.UInt32),
+            }
+        )
+        for _i in range(10):
+            # The default args in polars group_by(..., maintain_order=False) returns
+            # non-deterministic ordering which compute_bias should take care of such
+            # that compute_bias is deterministic.
+            df = compute_marginal(
+                y_obs=y_obs,
+                y_pred=y_pred,
+                X=pl.DataFrame({"feature": feature}),
+                feature_name=0,
+                n_bins=n_bins,
+            )
+            assert_frame_equal(
+                df.select(["feature", "y_obs_mean", "y_pred_mean", "count"]),
+                df_expected,
+            )
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
+def test_compute_marginal_multiple_predictions(feature_type):
+    """Test compute_marginal for multiple predictions."""
+    with pl.StringCache():
+        n_obs = 10
+        y_obs = np.ones(n_obs)
+        y_obs[: 10 // 2] = 2
+        y_pred = pl.DataFrame(
+            {"model_1": np.ones(n_obs), "model_2": 3 * np.ones(n_obs)}
+        )
+        if feature_type == "cat":
+            feature = pd_DataFrame(
+                pd_Series(y_obs.astype("=U8"), dtype="category", name="nice_feature")
+            )
+        elif feature_type == "string":
+            feature = pd_DataFrame(pd_Series(y_obs.astype("=U8"), name="nice_feature"))
+        else:
+            feature = pl.Series(values=y_obs, name="nice_feature").to_frame()
+
+        if isinstance(feature, SkipContainer):
+            pytest.skip("Module for data container not imported.")
+
+        df_marginal = compute_marginal(
+            y_obs=y_obs,
+            y_pred=y_pred,
+            X=feature,
+            feature_name="nice_feature",
+        ).drop(["y_obs_stderr", "y_pred_stderr", "weights"])
+        if "bin_edges" in df_marginal.columns:
+            df_marginal = df_marginal.drop("bin_edges")
+        f_expected = [1.0, 2, 1, 2]
+        df_expected = pl.DataFrame(
+            {
+                "model": ["model_1", "model_1", "model_2", "model_2"],
+                "nice_feature": f_expected,
+                "y_obs_mean": [1.0, 2, 1, 2],
+                "y_pred_mean": [1.0, 1.0, 3, 3],
+                "count": pl.Series(values=[5] * 4, dtype=pl.UInt32),
+            }
+        )
+
+        if feature_type == "cat":
+            df_expected = df_expected.with_columns(
+                df_expected["nice_feature"]
+                .cast(pl.Utf8)
+                .cast(pl.Categorical)
+                .alias("nice_feature"),
+            )
+        elif feature_type == "string":
+            df_expected = df_expected.with_columns(
+                df_expected["nice_feature"].cast(pl.Utf8).alias("nice_feature")
+            )
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+        # Same for pure numpy input.
+        feature_np = feature.to_numpy()
+        if feature_type == "cat":
+            # convert object to pd.Categorical
+            feature_np = pd_DataFrame(pd_Series(feature_np.squeeze(), dtype="category"))
+        elif feature_type == "string":
+            feature_np = feature_np.astype("=U8")  # to_numpy gives dtype=object
+        df_marginal = compute_marginal(
+            y_obs=y_obs,
+            y_pred=y_pred.to_numpy(),
+            X=feature_np,
+            feature_name=0,
+        ).drop(["y_obs_stderr", "y_pred_stderr", "weights", "bin_edges"])
+        df_expected = df_expected.with_columns(
+            pl.Series(["0", "0", "1", "1"]).alias("model")
+        )
+        df_expected = df_expected.rename({"nice_feature": "feature 0"})
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+        # Model and feature name clash.
+        if isinstance(feature, pl.DataFrame):
+            feature = feature.rename({"nice_feature": "model"})
+        else:
+            feature = feature.rename(columns={"nice_feature": "model"})
+        df_marginal = compute_marginal(
+            y_obs=y_obs,
+            y_pred=y_pred,
+            X=feature,
+            feature_name="model",
+        ).drop(["y_obs_stderr", "y_pred_stderr", "weights", "bin_edges"])
+        df_expected = df_expected.rename({"model": "model_", "feature 0": "model"})
+        df_expected = df_expected.with_columns(
+            pl.Series(["model_1", "model_1", "model_2", "model_2"]).alias("model_")
+        )
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+
+# TODO: We could also add test for compute_marginal like
+# - test_compute_bias_keeps_null_values
+# - test_compute_bias_warning_for_n_bins
+# - test_compute_bias_raises_weights_shape
+# - test_compute_bias_1d_array_like
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+@pytest.mark.parametrize("weights", [None, True])
+def test_compute_marginal_with_partial_dependence(weights):
+    """Test partial_dependence values in compute_marginal."""
+    n_obs = 20
+    n_bins = 5
+    X = pl.DataFrame(
+        {
+            "a": np.arange(n_obs) % n_bins,
+            "b": -(np.arange(n_obs) % n_bins),
+        }
+    )
+    if weights is not None:
+        weights = np.ones(n_obs)
+
+    def predict(X):
+        a = X.get_column("a")
+        b = X.get_column("b")
+        return a + b - 2 * a * b
+
+    df = compute_marginal(
+        y_obs=np.zeros(n_obs),
+        y_pred=predict(X),
+        X=X,
+        feature_name="a",
+        predict_function=predict,
+        weights=weights,
+        n_bins=100,
+        n_max=n_obs,
+        rng=123,
+    ).select(["a", "y_obs_mean", "y_pred_mean", "partial_dependence"])
+
+    df_expected = pl.DataFrame(
+        {
+            "a": pl.Series(np.arange(n_bins), dtype=pl.Float64),
+            "y_obs_mean": 0.0,
+            "y_pred_mean": 2.0 * np.arange(n_bins) ** 2,
+            "partial_dependence": 5.0 * np.arange(n_bins) - 2,
+        }
+    )
+    assert_frame_equal(df, df_expected)
+
+
+# FIXME: polars >= 0.20.16
+@pytest.mark.skipif(
+    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
+)
+def test_compute_marginal_raises_X_None():
+    """Test that compute_marginal raises if X=None but feature_name not None."""
+    n_obs = 5
+    msg = "X must be a data container like*."
+    with pytest.raises(ValueError, match=msg):
+        compute_marginal(
+            y_obs=np.zeros(n_obs),
+            y_pred=np.ones(n_obs),
+            X=None,
+            feature_name="a",
+        )

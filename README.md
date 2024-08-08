@@ -12,10 +12,11 @@
 Highlights:
 
 - All common point predictions covered: mean, median, quantiles, expectiles.
-- Assess model calibration with [identification functions](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/identification/#model_diagnostics.calibration.identification.identification_function) (generalized residuals) and [compute_bias](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/identification/#model_diagnostics.calibration.identification.compute_bias).
+- Assess model calibration with [identification functions](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/identification/#model_diagnostics.calibration.identification.identification_function) (generalized residuals), [compute_bias](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/identification/#model_diagnostics.calibration.identification.compute_bias) and [compute_marginal](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/identification/#model_diagnostics.calibration.identification.compute_marginal).
 - Assess calibration and bias graphically
     - [reliability diagrams](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/plots/#model_diagnostics.calibration.plots.plot_reliability_diagram) for auto-calibration
     - [bias plots](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/plots/#model_diagnostics.calibration.plots.plot_bias) for conditional calibration
+    - [marginal plots](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/plots/#model_diagnostics.calibration.plots.plot_marginal) for average `y_obs`, `y_pred` and partial dependence for one feature
 - Assess the predictive performance of models
     - strictly consistent, homogeneous [scoring functions](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/scoring/scoring/)
     - [score decomposition](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/scoring/scoring/#model_diagnostics.scoring.scoring.decompose) into miscalibration, discrimination and uncertainty
