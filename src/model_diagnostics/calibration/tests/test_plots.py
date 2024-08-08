@@ -633,28 +633,49 @@ def test_plot_marginal(with_null_values, feature_type, bin_method, ax, plot_back
             ax=ax,
         )
 
-        if ax is not None:
-            assert ax is plt_ax
+    if ax is not None:
+        assert ax is plt_ax
 
-        if feature_type == "num":
-            assert get_xlabel(plt_ax) == "binned feature_0"
-        else:
-            assert get_xlabel(plt_ax) == "feature_0"
+    if feature_type == "num":
+        assert get_xlabel(plt_ax) == "binned feature_0"
+    else:
+        assert get_xlabel(plt_ax) == "feature_0"
 
-        assert get_ylabel(plt_ax, yaxis=2) == "y"
-        assert get_title(plt_ax) == "Marginal Plot modelX"
+    assert get_ylabel(plt_ax, yaxis=2) == "y"
+    assert get_title(plt_ax) == "Marginal Plot modelX"
 
-        if (
-            isinstance(ax, mpl.axes.Axes)
-            and with_null_values
-            and feature_type
-            in [
-                "cat",
-                "cat_pandas",
-                "cat_physical",
-                "enum",
-                "string",
-            ]
-        ):
-            xtick_labels = plt_ax.xaxis.get_ticklabels()
-            assert xtick_labels[-1].get_text() == "Null"
+    if (
+        isinstance(ax, mpl.axes.Axes)
+        and with_null_values
+        and feature_type
+        in [
+            "cat",
+            "cat_pandas",
+            "cat_physical",
+            "enum",
+            "string",
+        ]
+    ):
+        xtick_labels = plt_ax.xaxis.get_ticklabels()
+        assert xtick_labels[-1].get_text() == "Null"
+
+    legend_text = get_legend_list(plt_ax)
+    # TODO: It is not 100% clear why legend_text has most often more entries than 3 or
+    # 4. We therefor test >= instead of ==.
+    # It is also unclear why for matplotlib the order varies.
+    if with_null_values:
+        assert len(legend_text) >= 4
+    else:
+        assert len(legend_text) >= 3
+    if plot_backend == "matplotlib":
+        assert "mean y_obs" in legend_text
+        assert "mean y_pred" in legend_text
+        assert "partial dependence" in legend_text
+        if with_null_values:
+            assert "Null values" in legend_text
+    else:
+        assert legend_text[0] == "mean y_obs"
+        assert legend_text[1] == "mean y_pred"
+        assert legend_text[2] == "partial dependence"
+        if with_null_values:
+            assert legend_text[-1] == "Null values"

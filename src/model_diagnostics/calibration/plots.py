@@ -1008,7 +1008,7 @@ def plot_marginal(
                     y=df_no_nulls[m],
                     marker={"color": get_plotly_color(i)},
                     mode="markers",
-                    name="mean y_obs",
+                    name=label,
                     secondary_y=True,
                 )
         elif plot_backend == "matplotlib":
