@@ -3,12 +3,10 @@ from functools import partial
 import numpy as np
 import polars as pl
 import pytest
-from packaging.version import Version
 from polars.testing import assert_frame_equal, assert_series_equal
 from scipy.special import stdtr
 from scipy.stats import expectile, ttest_1samp
 
-from model_diagnostics import polars_version
 from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
@@ -274,15 +272,9 @@ def test_compute_bias_n_bins_string_like_feature(feature_type):
     if feature_type == "cat":
         dtype = pl.Categorical
     elif feature_type == "cat_physical":
-        if polars_version >= Version("0.20.0"):
-            dtype = pl.Categorical(ordering="physical")
-        else:
-            pytest.skip("Test needs polars >= 0.20.0")
+        dtype = pl.Categorical(ordering="physical")
     elif feature_type == "enum":
-        if polars_version >= Version("0.20.0"):
-            dtype = pl.Enum(categories=["b", "a", "c"])
-        else:
-            pytest.skip("Test needs polars >= 0.20.0")
+        dtype = pl.Enum(categories=["b", "a", "c"])
     else:
         dtype = pl.Utf8
 
@@ -798,15 +790,9 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
     if feature_type == "cat":
         dtype = pl.Categorical
     elif feature_type == "cat_physical":
-        if polars_version >= Version("0.20.0"):
-            dtype = pl.Categorical(ordering="physical")
-        else:
-            pytest.skip("Test needs polars >= 0.20.0")
+        dtype = pl.Categorical(ordering="physical")
     elif feature_type == "enum":
-        if polars_version >= Version("0.20.0"):
-            dtype = pl.Enum(categories=["b", "a", "c"])
-        else:
-            pytest.skip("Test needs polars >= 0.20.0")
+        dtype = pl.Enum(categories=["b", "a", "c"])
     else:
         dtype = pl.Utf8
 
