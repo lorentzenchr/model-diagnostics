@@ -310,7 +310,7 @@ def test_get_sorted_array_names():
 
 def test_safe_index_rows_raises():
     """Test that safe_index_rows raises errors."""
-    msg = "Only integer indives are allowed for indexing rows."
+    msg = "Only integer indices are allowed for indexing rows."
     with pytest.raises(ValueError, match=msg):
         safe_index_rows(np.arange(2), "asd")
 
