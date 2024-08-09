@@ -527,12 +527,13 @@ def compute_marginal(
 
     Notes
     -----
-    The marginal values iare computed as an estimation of:
+    The marginal values are computed as an estimation of:
 
-        - `y_obs`: \(\mathbb{E}(Y|features)\).
-        - `y_pred`: \(\mathbb{E}(m(X)|features)\).
+    - `y_obs`: \(\mathbb{E}(Y|feature)\)
+    - `y_pred`: \(\mathbb{E}(m(X)|feature)\)
 
-    Computationally that is more or less a group-by operation on a dataset.
+    with \(feature\) the column specified by `feature_name`.
+    Computationally that is more or less a group-by-aggregate operation on a dataset.
 
     The standard error for both are calculated in the standard way as
     \(\mathrm{SE} = \sqrt{\operatorname{Var}(\bar{Y})} = \frac{\sigma}{\sqrt{n}}\) and
