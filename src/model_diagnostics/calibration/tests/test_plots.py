@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import pytest
-from packaging.version import Version
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.datasets import make_classification
@@ -12,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-from model_diagnostics import config_context, polars_version
+from model_diagnostics import config_context
 from model_diagnostics._utils.plot_helper import (
     get_legend_list,
     get_title,
@@ -297,8 +296,6 @@ def test_plot_bias(
     if ax == "plotly":
         ax = go.Figure()
 
-    if feature_type in ["cat_physical", "enum"] and polars_version < Version("0.20.0"):
-        pytest.skip("Test needs polars >= 0.20.0")
     X, y = make_classification(
         n_samples=100,
         n_features=10,
@@ -509,8 +506,6 @@ def test_plot_marginal(with_null_values, feature_type, bin_method, ax, plot_back
     if ax == "plotly":
         ax = go.Figure()
 
-    if feature_type in ["cat_physical", "enum"] and polars_version < Version("0.20.0"):
-        pytest.skip("Test needs polars >= 0.20.0")
     X, y = make_classification(
         n_samples=100,
         n_features=10,

@@ -5,12 +5,10 @@ import numpy as np
 import polars as pl
 import pytest
 from numpy.testing import assert_allclose, assert_equal
-from packaging.version import Version
 from polars.testing import assert_frame_equal
 from sklearn.base import RegressorMixin
 from sklearn.inspection import partial_dependence
 
-from model_diagnostics import polars_version
 from model_diagnostics._utils.array import get_second_dimension, safe_index_rows
 from model_diagnostics._utils.partial_dependence import compute_partial_dependence
 
@@ -33,12 +31,6 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
         pytest.skip()
     if data_container == "pyarrow" and pyarrow is None:
         pytest.skip()
-    if (
-        feature_type == "cat"
-        and data_container == "pandas"
-        and polars_version < Version("1.0.0b")
-    ):
-        pytest.skip()
 
     n_obs = 100
     n_bins = 10
@@ -53,12 +45,9 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
         X = X.with_columns(pl.col("a").cast(pl.Utf8).cast(dtype))
         cat_index = [0]
     elif feature_type == "enum":
-        if polars_version >= Version("0.20.0"):
-            dtype = pl.Enum(categories=X.get_column("a").unique().cast(pl.Utf8))
-            X = X.with_columns(pl.col("a").cast(dtype))
-            cat_index = [0]
-        else:
-            pytest.skip("Test needs polars >= 0.20.0")
+        dtype = pl.Enum(categories=X.get_column("a").unique().cast(pl.Utf8))
+        X = X.with_columns(pl.col("a").cast(dtype))
+        cat_index = [0]
     elif feature_type == "string":
         dtype = pl.Utf8
         X = X.with_columns(pl.col("a").cast(dtype))
