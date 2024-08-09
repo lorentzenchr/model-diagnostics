@@ -336,6 +336,10 @@ def test_safe_index_rows(a):
     if isinstance(a, SkipContainer):
         pytest.skip("Module for data container not imported.")
 
+    # ruff: noqa: T201
+    print(f"{type(a)=}")
+    print(f"{a=}")
+
     a_sub = safe_index_rows(a, [0, 2])
 
     if is_pyarrow_table(a):
