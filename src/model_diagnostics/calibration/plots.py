@@ -102,7 +102,7 @@ def plot_reliability_diagram(
         - Optimal selection of bins
         - Statistical consistent estimator
 
-    For details, refer to [Dimitriadis2021].
+    For details, refer to `[Dimitriadis2021]`.
 
     References
     ----------
@@ -326,7 +326,7 @@ def plot_bias(
     identification function, versus a feature. This is a good way to assess whether
     a model is conditionally calibrated or not. Well calibrated models have bias terms
     around zero.
-    See Notes for further details.
+    See [Notes](#notes) for further details.
 
     For numerical features, NaN are treated as Null values. Null values are always
     plotted as rightmost value on the x-axis and marked with a diamond instead of a
@@ -386,9 +386,10 @@ def plot_bias(
 
     Notes
     -----
+    [](){#notes}
     A model \(m(X)\) is conditionally calibrated iff \(E(V(m(X), Y))=0\) a.s. The
     empirical version, given some data, reads \(\frac{1}{n}\sum_i V(m(x_i), y_i)\).
-    See [FLM2022]`.
+    See `[FLM2022]`.
 
     References
     ----------
