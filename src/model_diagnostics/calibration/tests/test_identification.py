@@ -971,7 +971,9 @@ def test_compute_marginal_multiple_predictions(feature_type):
             y_pred=y_pred.to_numpy(),
             X=feature_np,
             feature_name=0,
-        ).drop(["y_obs_stderr", "y_pred_stderr", "weights", "bin_edges"])
+        ).drop(["y_obs_stderr", "y_pred_stderr", "weights"])
+        if "bin_edges" in df_marginal.columns:
+            df_marginal = df_marginal.drop("bin_edges")
         df_expected = df_expected.with_columns(
             pl.Series(["0", "0", "1", "1"]).alias("model")
         )
@@ -988,7 +990,9 @@ def test_compute_marginal_multiple_predictions(feature_type):
             y_pred=y_pred,
             X=feature,
             feature_name="model",
-        ).drop(["y_obs_stderr", "y_pred_stderr", "weights", "bin_edges"])
+        ).drop(["y_obs_stderr", "y_pred_stderr", "weights"])
+        if "bin_edges" in df_marginal.columns:
+            df_marginal = df_marginal.drop("bin_edges")
         df_expected = df_expected.rename({"model": "model_", "feature 0": "model"})
         df_expected = df_expected.with_columns(
             pl.Series(["model_1", "model_1", "model_2", "model_2"]).alias("model_")
