@@ -137,11 +137,7 @@ def test_compute_bias(feature, f_grouped):
         assert_frame_equal(df_bias, df_expected, check_exact=False)
 
         # Same with weights.
-        # FIXME: polars >= 0.19.14
-        if polars_version >= Version("0.19.14"):
-            feature = pl.Series(values=feature).gather([0, 4, 4]).alias("feature")
-        else:
-            feature = pl.Series(values=feature).take([0, 4, 4]).alias("feature")
+        feature = pl.Series(values=feature).gather([0, 4, 4]).alias("feature")
         df_bias = compute_bias(
             # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
             y_obs=[0.5, 8 / 3, 10 / 3],
@@ -233,13 +229,7 @@ def test_compute_bias_numerical_feature():
         feature=df.get_column("feature"),
         n_bins=n_bins,
     )
-    # FIXME: polars >= 0.19.20
-    # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
-    # of numpy array. Therefore, we add the np.asarray().
-    # The Windows CI runner with python 3.10, polars 0.19.19 and numpy1.22.0 seems to
-    # have a bug in to_numpy, as bias[0] = 2.854484e-311 instead of 1. Therefore, we
-    # use to_list instead of to_numpy.
-    bias = np.asarray((df.get_column("y_pred") - df.get_column("y_obs")).to_list())
+    bias = (df.get_column("y_pred") - df.get_column("y_obs")).to_numpy()
     df_expected = pl.DataFrame(
         {
             "feature": 0.045 + 0.1 * np.arange(10),
@@ -565,10 +555,6 @@ def test_compute_bias_1d_array_like(list2array):
     assert_frame_equal(df_bias, df_expected, check_exact=False)
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 @pytest.mark.parametrize(
     ("feature", "f_grouped", "bin_edges"),
     [
@@ -580,20 +566,12 @@ def test_compute_bias_1d_array_like(list2array):
         (
             pl.Series([0.1, 0.1, 0.9, 0.9, 0.9]),
             pl.Series([0.1, 0.9]),
-            # FIXME: polars >= 0.20.16
-            None
-            if polars_version < Version("0.20.16")
-            else pl.Series(
-                [[0.1, 0, 0.1], [0.1, 0, 0.9]], dtype=pl.Array(pl.Float64, 3)
-            ),
+            pl.Series([[0.1, 0, 0.1], [0.1, 0, 0.9]], dtype=pl.Array(pl.Float64, 3)),
         ),
         (
             pl.Series([None, np.nan, 1.0, 1, 1]),
             pl.Series([None, 1.0]),
-            # FIXME: polars >= 0.20.16
-            None
-            if polars_version < Version("0.20.16")
-            else pl.Series([[None] * 3, [1.0, 0, 1.0]], dtype=pl.Array(pl.Float64, 3)),
+            pl.Series([[None] * 3, [1.0, 0, 1.0]], dtype=pl.Array(pl.Float64, 3)),
         ),
         (
             pl.Series(["a", "a", None, None, None]),
@@ -608,20 +586,12 @@ def test_compute_bias_1d_array_like(list2array):
         (
             pa_array([0.1, 0.1, 0.9, 0.9, 0.9]),
             pa_array([0.1, 0.9]),
-            # FIXME: polars >= 0.20.16
-            None
-            if polars_version < Version("0.20.16")
-            else pl.Series(
-                [[0.1, 0, 0.1], [0.1, 0, 0.9]], dtype=pl.Array(pl.Float64, 3)
-            ),
+            pl.Series([[0.1, 0, 0.1], [0.1, 0, 0.9]], dtype=pl.Array(pl.Float64, 3)),
         ),
         (
             pa_array([None, np.nan, 1.0, 1, 1]),
             pa_array([None, 1.0]),
-            # FIXME: polars >= 0.20.16
-            None
-            if polars_version < Version("0.20.16")
-            else pl.Series([[None] * 3, [1.0, 0, 1.0]], dtype=pl.Array(pl.Float64, 3)),
+            pl.Series([[None] * 3, [1.0, 0, 1.0]], dtype=pl.Array(pl.Float64, 3)),
         ),
         (
             pa_array(["a", "a", None, None, None]),
@@ -675,11 +645,7 @@ def test_compute_marginal(feature, f_grouped, bin_edges):
         assert_frame_equal(df_marginal, df_expected, check_exact=False)
 
         # Same with weights.
-        # FIXME: polars >= 0.19.14
-        if polars_version >= Version("0.19.14"):
-            feature = pl.Series(values=feature).gather([0, 4, 4]).alias("feature")
-        else:
-            feature = pl.Series(values=feature).take([0, 4, 4]).alias("feature")
+        feature = pl.Series(values=feature).gather([0, 4, 4]).alias("feature")
         df_marginal = compute_marginal(
             # y_obs=[0.5, (1 * 2 + 0.5 * 4) / 1.5, (0.5 * 4 + 3) / 1.5]
             y_obs=[0.5, 8 / 3, 10 / 3],
@@ -706,10 +672,6 @@ def test_compute_marginal(feature, f_grouped, bin_edges):
         assert_frame_equal(df_marginal, df_expected, check_exact=False)
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 def test_compute_marginal_feature_none():
     """Test compute_marginal for feature = None."""
     df = pl.DataFrame(
@@ -755,10 +717,6 @@ def test_compute_marginal_feature_none():
     assert_frame_equal(df_marginal, df_expected, check_exact=False)
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 @pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
 def test_compute_marginal_numerical_feature(bin_method):
     """Test compute_marginal for a numerical feature."""
@@ -780,12 +738,6 @@ def test_compute_marginal_numerical_feature(bin_method):
         n_bins=n_bins,
         bin_method=bin_method,
     )
-    # FIXME: polars >= 0.19.20
-    # With polars==0.19.19, to_numpy() returns polars.series._numpy.SeriesView instead
-    # of numpy array. Therefore, we add the np.asarray().
-    # The Windows CI runner with python 3.10, polars 0.19.19 and numpy1.22.0 seems to
-    # have a bug in to_numpy, as bias[0] = 2.854484e-311 instead of 1. Therefore, we
-    # use to_list instead of to_numpy.
     f_std = np.linspace(0, 1, 10, endpoint=False).std(ddof=0) / n_bins
     df_expected = pl.DataFrame(
         {
@@ -820,10 +772,6 @@ def test_compute_marginal_numerical_feature(bin_method):
     assert_frame_equal(df_marginal, df_expected, check_exact=False)
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 @pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
 @pytest.mark.parametrize("n_bins", [2, 10])
 def test_compute_marginal_n_bins_numerical_feature(bin_method, n_bins):
@@ -844,10 +792,6 @@ def test_compute_marginal_n_bins_numerical_feature(bin_method, n_bins):
     assert df_marginal["count"].sum() == n_obs
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 @pytest.mark.parametrize("feature_type", ["cat", "cat_physical", "enum", "string"])
 def test_compute_marginal_n_bins_string_like_feature(feature_type):
     """Test compute_marginal returns right number of bins and sorted string feature."""
@@ -901,10 +845,6 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
             )
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
 def test_compute_marginal_multiple_predictions(feature_type):
     """Test compute_marginal for multiple predictions."""
@@ -1007,10 +947,6 @@ def test_compute_marginal_multiple_predictions(feature_type):
 # - test_compute_bias_1d_array_like
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 @pytest.mark.parametrize("weights", [None, True])
 def test_compute_marginal_with_partial_dependence(weights):
     """Test partial_dependence values in compute_marginal."""
@@ -1053,10 +989,6 @@ def test_compute_marginal_with_partial_dependence(weights):
     assert_frame_equal(df, df_expected)
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 def test_compute_marginal_raises_X_None():
     """Test that compute_marginal raises if X=None but feature_name not None."""
     n_obs = 5
