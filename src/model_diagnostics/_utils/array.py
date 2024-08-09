@@ -296,7 +296,7 @@ def safe_index_rows(x, indices):
     """
     index = np.asarray(indices)
     if index.dtype.kind not in ("i", "u"):
-        msg = "Only integer indives are allowed for indexing rows."
+        msg = "Only integer indices are allowed for indexing rows."
         raise ValueError(msg)
 
     if is_pyarrow_table(x) or is_pyarrow_array(x):
