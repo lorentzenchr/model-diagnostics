@@ -558,12 +558,11 @@ def plot_bias(
                         alpha=0.1,
                     )
                 else:
-                    # plotly has not equivalent of fill_between and needs a bit more
+                    # plotly has no equivalent of fill_between and needs a bit more
                     # coding
-                    # FIXME: polars >= 0.20.0 use df_i[::-1, feature_name]
                     color = get_plotly_color(i)
                     fig.add_scatter(
-                        x=pl.concat([df_i[feature_name], df_i[feature_name][::-1]]),
+                        x=pl.concat([df_i[feature_name], df_i[::-1, feature_name]]),
                         y=pl.concat([lower, upper[::-1]]),
                         fill="toself",
                         fillcolor=color,

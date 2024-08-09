@@ -138,8 +138,6 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
     assert_allclose(pd_values, pd_sklearn["average"][0])
 
     # Check that X was not modified on the way.
-    # FIXME: polars >= 0.20
-    if polars_version >= Version("0.20.0"):
-        assert_frame_equal(
-            X_orig, pl.DataFrame(X, schema=["a", "b"], orient="row"), check_dtypes=False
-        )
+    assert_frame_equal(
+        X_orig, pl.DataFrame(X, schema=["a", "b"], orient="row"), check_dtypes=False
+    )

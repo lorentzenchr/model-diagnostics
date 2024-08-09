@@ -4,10 +4,8 @@ from typing import Callable, Optional, Union
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-from packaging.version import Version
 from scipy import special
 
-from model_diagnostics import polars_version
 from model_diagnostics._utils.array import (
     get_second_dimension,
     get_sorted_array_names,
@@ -342,8 +340,9 @@ def compute_bias(
                     groupby_name = "bin"
                     agg_list.append(pl.col(feature_name).mean())
 
-                df = df.lazy().select(
-                    [
+                df = (
+                    df.lazy()
+                    .select(
                         pl.all(),
                         (
                             (pl.col("weights") * pl.col("bias"))
@@ -351,15 +350,9 @@ def compute_bias(
                             .over(groupby_name)
                             / pl.col("weights").sum().over(groupby_name)
                         ).alias("bias_mean"),
-                    ]
-                )
-                # FIXME: polars >= 0.19
-                if polars_version >= Version("0.19.0"):
-                    df = df.group_by(groupby_name)
-                else:
-                    df = df.groupby(groupby_name)
-                df = (
-                    df.agg(agg_list)
+                    )
+                    .group_by(groupby_name)
+                    .agg(agg_list)
                     .with_columns(
                         [
                             pl.when(pl.col("bias_count") > 1)
@@ -403,8 +396,7 @@ def compute_bias(
 
                 # if is_categorical:
                 #     # Pyarrow does not yet support sorting dictionary type arrays,
-                #     # see
-                #     # https://issues.apache.org/jira/browse/ARROW-14314
+                #     # see https://github.com/apache/arrow/issues/29887
                 #     # We resort to pandas instead.
                 #     import pyarrow as pa
                 #     df = df.to_pandas().sort_values(feature_name)
@@ -556,43 +548,42 @@ def compute_marginal(
 
     Examples
     --------
-    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2])                                    # doctest: +SKIP
-    shape: (1, 6)                                                                                     # doctest: +SKIP
-    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐                     # doctest: +SKIP
-    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │                     # doctest: +SKIP
-    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │                     # doctest: +SKIP
-    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │                     # doctest: +SKIP
-    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡                     # doctest: +SKIP
-    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │                     # doctest: +SKIP
-    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘                     # doctest: +SKIP
-    >>> from sklearn.linear_model import Ridge                                                        # doctest: +SKIP
-    >>> y_obs, X =[0, 0, 1, 1], [[0, 1], [1, 1], [1, 2], [2, 2]]                                      # doctest: +SKIP
-    >>> m = Ridge().fit(X, y_obs)                                                                     # doctest: +SKIP
-    >>> compute_marginal(y_obs=y_obs, y_pred=m.predict(X), X=X, feature_name=0,                       # doctest: +SKIP
-    ... predict_function=m.predict)                                                                   # doctest: +SKIP
-    shape: (3, 9)                                                                                     # doctest: +SKIP
-    ┌───────────┬────────────┬───────────┬───────────┬───┬───────┬─────────┬───────────┬───────────┐  # doctest: +SKIP
-    │ feature 0 ┆ y_obs_mean ┆ y_pred_me ┆ y_obs_std ┆ … ┆ count ┆ weights ┆ bin_edges ┆ partial_d │  # doctest: +SKIP
-    │ ---       ┆ ---        ┆ an        ┆ err       ┆   ┆ ---   ┆ ---     ┆ ---       ┆ ependence │  # doctest: +SKIP
-    │ f64       ┆ f64        ┆ ---       ┆ ---       ┆   ┆ u32   ┆ f64     ┆ array[f64 ┆ ---       │  # doctest: +SKIP
-    │           ┆            ┆ f64       ┆ f64       ┆   ┆       ┆         ┆ , 3]      ┆ f64       │  # doctest: +SKIP
-    ╞═══════════╪════════════╪═══════════╪═══════════╪═══╪═══════╪═════════╪═══════════╪═══════════╡  # doctest: +SKIP
-    │ 0.0       ┆ 0.0        ┆ 0.1       ┆ 0.0       ┆ … ┆ 1     ┆ 1.0     ┆ [0.0,     ┆ 0.3       │  # doctest: +SKIP
-    │           ┆            ┆           ┆           ┆   ┆       ┆         ┆ 0.0, 0.2] ┆           │  # doctest: +SKIP
-    │ 1.0       ┆ 0.5        ┆ 0.5       ┆ 0.5       ┆ … ┆ 2     ┆ 2.0     ┆ [0.8,     ┆ 0.5       │  # doctest: +SKIP
-    │           ┆            ┆           ┆           ┆   ┆       ┆         ┆ 0.0, 1.0] ┆           │  # doctest: +SKIP
-    │ 2.0       ┆ 1.0        ┆ 0.9       ┆ 0.0       ┆ … ┆ 1     ┆ 1.0     ┆ [1.8,     ┆ 0.7       │  # doctest: +SKIP
-    │           ┆            ┆           ┆           ┆   ┆       ┆         ┆ 0.0, 2.0] ┆           │  # doctest: +SKIP
-    └───────────┴────────────┴───────────┴───────────┴───┴───────┴─────────┴───────────┴───────────┘  # doctest: +SKIP
-    """  # noqa: E501
-    # FIXME: polars >= 0.20.16
-    # Also remove the doctest: +SKIP above.
-    if polars_version < Version("0.20.16"):
-        msg = (
-            "The function plot_marginal requires polars >= 0.20.16. "
-            f" You have {polars_version}."
-        )
-        raise ValueError(msg)
+    >>> compute_marginal(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2])
+    shape: (1, 6)
+    ┌────────────┬─────────────┬──────────────┬───────────────┬───────┬─────────┐
+    │ y_obs_mean ┆ y_pred_mean ┆ y_obs_stderr ┆ y_pred_stderr ┆ count ┆ weights │
+    │ ---        ┆ ---         ┆ ---          ┆ ---           ┆ ---   ┆ ---     │
+    │ f64        ┆ f64         ┆ f64          ┆ f64           ┆ u32   ┆ f64     │
+    ╞════════════╪═════════════╪══════════════╪═══════════════╪═══════╪═════════╡
+    │ 0.5        ┆ 0.75        ┆ 0.288675     ┆ 0.629153      ┆ 4     ┆ 4.0     │
+    └────────────┴─────────────┴──────────────┴───────────────┴───────┴─────────┘
+    >>> import polars as pl
+    >>> from sklearn.linear_model import Ridge
+    >>> pl.Config.set_tbl_width_chars(84)  # doctest: +ELLIPSIS
+    <class 'polars.config.Config'>
+    >>> y_obs, X =[0, 0, 1, 1], [[0, 1], [1, 1], [1, 2], [2, 2]]
+    >>> m = Ridge().fit(X, y_obs)
+    >>> compute_marginal(y_obs=y_obs, y_pred=m.predict(X), X=X, feature_name=0,
+    ... predict_function=m.predict)
+    shape: (3, 9)
+    ┌──────────┬─────────┬─────────┬─────────┬───┬───────┬─────────┬─────────┬─────────┐
+    │ feature  ┆ y_obs_m ┆ y_pred_ ┆ y_obs_s ┆ … ┆ count ┆ weights ┆ bin_edg ┆ partial │
+    │ 0        ┆ ean     ┆ mean    ┆ tderr   ┆   ┆ ---   ┆ ---     ┆ es      ┆ _depend │
+    │ ---      ┆ ---     ┆ ---     ┆ ---     ┆   ┆ u32   ┆ f64     ┆ ---     ┆ ence    │
+    │ f64      ┆ f64     ┆ f64     ┆ f64     ┆   ┆       ┆         ┆ array[f ┆ ---     │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 64, 3]  ┆ f64     │
+    ╞══════════╪═════════╪═════════╪═════════╪═══╪═══════╪═════════╪═════════╪═════════╡
+    │ 0.0      ┆ 0.0     ┆ 0.1     ┆ 0.0     ┆ … ┆ 1     ┆ 1.0     ┆ [0.0,   ┆ 0.3     │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.0,    ┆         │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.2]    ┆         │
+    │ 1.0      ┆ 0.5     ┆ 0.5     ┆ 0.5     ┆ … ┆ 2     ┆ 2.0     ┆ [0.8,   ┆ 0.5     │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.0,    ┆         │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 1.0]    ┆         │
+    │ 2.0      ┆ 1.0     ┆ 0.9     ┆ 0.0     ┆ … ┆ 1     ┆ 1.0     ┆ [1.8,   ┆ 0.7     │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.0,    ┆         │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 2.0]    ┆         │
+    └──────────┴─────────┴─────────┴─────────┴───┴───────┴─────────┴─────────┴─────────┘
+    """
     validate_same_first_dimension(y_obs, y_pred)
     n_pred = length_of_second_dimension(y_pred)
     pred_names, _ = get_sorted_array_names(y_pred)
@@ -711,8 +702,9 @@ def compute_marginal(
                         pl.col("bin_edges").first(),
                     ]
 
-                df = df.lazy().select(
-                    [
+                df = (
+                    df.lazy()
+                    .select(
                         pl.all(),
                         (
                             (pl.col("weights") * pl.col("y_obs"))
@@ -726,15 +718,9 @@ def compute_marginal(
                             .over(groupby_name)
                             / pl.col("weights").sum().over(groupby_name)
                         ).alias("y_pred_mean"),
-                    ]
-                )
-                # FIXME: polars >= 0.19
-                if polars_version >= Version("0.19.0"):
-                    df = df.group_by(groupby_name)
-                else:
-                    df = df.groupby(groupby_name)
-                df = (
-                    df.agg(agg_list)
+                    )
+                    .group_by(groupby_name)
+                    .agg(agg_list)
                     .with_columns(
                         [
                             pl.when(pl.col("count") > 1)
