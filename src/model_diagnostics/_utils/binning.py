@@ -4,9 +4,7 @@ from typing import Optional, Union
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-from packaging.version import Version
 
-from model_diagnostics import polars_version
 from model_diagnostics._utils.array import array_name, validate_same_first_dimension
 
 
@@ -84,19 +82,12 @@ def bin_feature(
         # MUST be under the StringCache context manager!
         feature = pl.Series(name=feature_name, values=feature)
         validate_same_first_dimension(y_obs, feature)
-        if (feature.dtype == pl.Categorical) or (
-            polars_version >= Version("0.20.0") and feature.dtype == pl.Enum
-        ):
-            # FIXME: polars >= 0.20.0
+        if feature.dtype in [pl.Categorical, pl.Enum]:
             is_categorical = True
         elif feature.dtype in [pl.Utf8, pl.Object]:
             # We could convert strings to categoricals.
             is_string = True
-        # FIXME: polars >= 0.19.14
-        # Then, just use Series.dtype.is_float()
-        elif (hasattr(feature.dtype, "is_float") and feature.dtype.is_float()) or (
-            not hasattr(feature.dtype, "is_float") and feature.is_float()
-        ):
+        elif feature.dtype.is_float():
             # We treat NaN as Null values, numpy will see a Null as a NaN.
             feature = feature.fill_nan(None)
         else:
@@ -125,11 +116,7 @@ def bin_feature(
             if n_bins_ef >= value_count.shape[0]:
                 n_bins = value_count.shape[0]
             else:
-                # FIXME: polars >= 0.20
-                if polars_version >= Version("0.20.0"):
-                    count_name = "count"
-                else:
-                    count_name = "counts"
+                count_name = "count"
                 n = value_count[count_name][n_bins_ef]
                 n_bins_tmp = value_count.filter(pl.col(count_name) >= n).shape[0]
                 if n_bins_tmp > n_bins_ef:
@@ -187,17 +174,10 @@ def bin_feature(
                     [
                         feature,
                         pl.Series("__f_binned", f_binned, dtype=feature.dtype),
-                        # FIXME: polars >= 0.20.16
-                        *(
-                            []
-                            if polars_version < Version("0.20.16")
-                            else [
-                                pl.Series(
-                                    "__bin_edges",
-                                    bin_edges[f_binned],
-                                    dtype=pl.Array(pl.Float64, 2),
-                                )
-                            ]
+                        pl.Series(
+                            "__bin_edges",
+                            bin_edges[f_binned],
+                            dtype=pl.Array(pl.Float64, 2),
                         ),
                     ]
                 )
@@ -206,17 +186,10 @@ def bin_feature(
                     .then(None)
                     .otherwise(pl.col("__f_binned"))
                     .alias("bin"),
-                    # FIXME: polars >= 0.20.16
-                    *(
-                        []
-                        if polars_version < Version("0.20.16")
-                        else [
-                            pl.when(pl.col(feature_name).is_null())
-                            .then(None)
-                            .otherwise(pl.col("__bin_edges"))
-                            .alias("bin_edges"),
-                        ]
-                    ),
+                    pl.when(pl.col(feature_name).is_null())
+                    .then(None)
+                    .otherwise(pl.col("__bin_edges"))
+                    .alias("bin_edges"),
                 )
                 .collect()
             )

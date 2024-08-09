@@ -24,7 +24,7 @@ dependencies = [
   "matplotlib>=3.6.1",
   "numpy>=1.22",  # type annotations and method arg in quantile
   "packaging>=23.1",
-  "polars>=0.17.15",
+  "polars>=1.0.0",
   "scikit-learn>=1.2.0",  # We rely on the set_output API.
   "scipy>=1.10",  # scipy.stats.expectile
 ]
@@ -248,7 +248,7 @@ python = ["3.9", "3.10", "3.11"]
 # but including pandas and pyarrow
 name."py3.9".set-extra-dependencies = [
   "numpy==1.22",
-  "polars==0.17.15",
+  "polars==1.0.0",
   "scipy==1.10",
   "pandas==1.5.*",
   "pyarrow==11.0.*"
@@ -256,13 +256,13 @@ name."py3.9".set-extra-dependencies = [
 # Minimal versions without pandas and pyarrow 
 name."py3.10".set-extra-dependencies = [
   "numpy==1.22",
-  "polars==0.19.19",
+  "polars==1.0.0",
   "scipy==1.10",
 ]
 # latest versions, with plotly
 name."py3.11".set-extra-dependencies = [
   "numpy>=2.0.0",
-  "polars>=1.0.0b1",
+  "polars>=1.4.1",
   "scipy",
   "pandas",
   "plotly",

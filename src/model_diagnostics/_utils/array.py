@@ -1,10 +1,13 @@
 import copy
 import sys
+import warnings
+from importlib.metadata import version
 from typing import Optional, Union
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from packaging.version import Version, parse
 
 AL_or_polars = Union[npt.ArrayLike, pl.Series]
 
@@ -255,10 +258,39 @@ def safe_assign_column(x, values, column_index):
             #   future error of pandas.
             pd = sys.modules["pandas"]
             dtype = x.dtypes.iloc[column_index]
-            x.iloc[:, column_index] = pd.Series(
-                data=(values.to_pandas() if isinstance(values, pl.Series) else values),
-                dtype=dtype,
-            )
+            if parse(version("pandas")) < Version("2.0.0") and isinstance(
+                dtype, pd.CategoricalDtype
+            ):
+                # FIXME: pandas >= 2.0 (<2.0 means 1.5.*)
+                # We the following DeprecationWarning of pandas:
+                #   In a future version, `df.iloc[:, i] = newvals` will attempt to set
+                #   the values inplace instead of always setting a new array. To retain
+                #   the old behavior, use either `df[df.columns[i]] = newvals` or, if
+                #   columns are non-unique, `df.isetitem(i, newvals)`
+                with warnings.catch_warnings():
+                    msg = (
+                        r"In a future version, `df.iloc\[:, i\] = newvals` will "
+                        r"attempt to set the values inplace instead of always "
+                        r"setting a new array"
+                    )
+                    warnings.filterwarnings(
+                        "ignore", category=DeprecationWarning, message=msg
+                    )
+                    x.iloc[:, column_index] = pd.Series(
+                        data=(
+                            values.to_pandas()
+                            if isinstance(values, pl.Series)
+                            else values
+                        ),
+                        dtype=dtype,
+                    )
+            else:
+                x.iloc[:, column_index] = pd.Series(
+                    data=(
+                        values.to_pandas() if isinstance(values, pl.Series) else values
+                    ),
+                    dtype=dtype,
+                )
         except Exception as e:
             # FIXME: pyarrow version XXX
             # Older pyarrow versions of AttributeError do not have a 'add_note' method.

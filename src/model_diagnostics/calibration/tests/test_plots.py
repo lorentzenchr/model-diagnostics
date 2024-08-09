@@ -336,19 +336,9 @@ def test_plot_bias(
             if feature_type == "cat_pandas":
                 feature[0] = None
             elif feature_type in ["cat", "cat_physical", "enum"]:
-                # FIXME: polars >= 0.19.14
-                if polars_version >= Version("0.19.14"):
-                    feature = pl.Series(feature).cast(str).scatter(0, None).cast(dtype)
-                else:
-                    feature = (
-                        pl.Series(feature).cast(str).set_at_idx(0, None).cast(dtype)
-                    )
-            else:  # noqa: PLR5501
-                # FIXME: polars >= 0.19.14
-                if polars_version >= Version("0.19.14"):
-                    feature = pl.Series(feature).scatter(0, None)
-                else:
-                    feature = pl.Series(feature).set_at_idx(0, None)
+                feature = pl.Series(feature).cast(str).scatter(0, None).cast(dtype)
+            else:
+                feature = pl.Series(feature).scatter(0, None)
 
         with config_context(plot_backend=plot_backend):
             plt_ax = plot_bias(
@@ -442,11 +432,7 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_leve
         feature = feature.astype(str)
 
     if with_null:
-        # FIXME: polars >= 0.19.14
-        if polars_version >= Version("0.19.14"):
-            feature = pl.Series(feature).scatter([0, 5], None)
-        else:
-            feature = pl.Series(feature).set_at_idx([0, 5], None)
+        feature = pl.Series(feature).scatter([0, 5], None)
 
     fig, ax = plt.subplots()
     ax = plot_bias(
@@ -465,25 +451,6 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_leve
         assert legend_text[3].get_text() == "Null values"
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version >= Version("0.20.16"), reason="requires polars 0.20.15 or lower"
-)
-def test_plot_marginal_raises_polars_version():
-    msg = "The function plot_marginal requires polars >= 0.20.16."
-    with pytest.raises(ValueError, match=msg):
-        plot_marginal(
-            y_obs=np.arange(2),
-            y_pred=np.arange(2),
-            X=np.arange(4).reshape(2, 2),
-            feature_name=0,
-        )
-
-
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 @pytest.mark.parametrize(
     ("param", "value", "msg"),
     [
@@ -513,10 +480,6 @@ def test_plot_marginal_raises(param, value, msg):
         )
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 def test_plot_marginal_raises_more_than_one_model():
     msg = (
         r"Parameter y_pred has shape \(n_obs, 3\), but only \(n_obs\) and \(n_obs, 1\)"
@@ -530,10 +493,6 @@ def test_plot_marginal_raises_more_than_one_model():
         )
 
 
-# FIXME: polars >= 0.20.16
-@pytest.mark.skipif(
-    polars_version < Version("0.20.16"), reason="requires polars 0.20.16 or higher"
-)
 @pytest.mark.parametrize("with_null_values", [False, True])
 @pytest.mark.parametrize(
     "feature_type", ["cat", "cat_pandas", "cat_physical", "enum", "num", "string"]
