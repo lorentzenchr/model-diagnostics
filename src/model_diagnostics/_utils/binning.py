@@ -1,3 +1,4 @@
+import sys
 import warnings
 from typing import Optional, Union
 
@@ -5,7 +6,11 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from model_diagnostics._utils.array import array_name, validate_same_first_dimension
+from model_diagnostics._utils.array import (
+    array_name,
+    is_pandas_series,
+    validate_same_first_dimension,
+)
 
 
 def bin_feature(
@@ -80,7 +85,25 @@ def bin_feature(
         feature_name = array_name(feature, default=default)
         # The following statement, i.e. possibly the creation of a pl.Categorical,
         # MUST be under the StringCache context manager!
-        feature = pl.Series(name=feature_name, values=feature)
+        try:
+            feature = pl.Series(name=feature_name, values=feature)
+        except ImportError:
+            # FIXME: pyarrow not installed
+            # For non numpy-backed columns, pyarrow is needed. Here we handle the case
+            # where pyarrow is not installed and such a pandas extention array is
+            # passed, e.g. with CategoricalDtype.
+            if is_pandas_series(feature):
+                pandas = sys.modules["pandas"]
+                is_pandas_categorical = pandas.api.types.is_categorical_dtype(feature)
+                # dataframe = feature.to_frame(name="0").__dataframe__()
+                # feature = pl.from_dataframe(dataframe)[:, 0]
+                feature = pl.from_dataframe(feature.to_frame(name="0"))[:, 0]  # type: ignore
+                if is_pandas_categorical and isinstance(feature.dtype, pl.Enum):
+                    # Pandas categoricals usually get mapped to polars categoricals.
+                    # But this code path gives pl.Enum.
+                    feature = feature.cast(pl.Categorical)
+            else:
+                raise  # re-raises the ImportError
         validate_same_first_dimension(y_obs, feature)
         if feature.dtype in [pl.Categorical, pl.Enum]:
             is_categorical = True

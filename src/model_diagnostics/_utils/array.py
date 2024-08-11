@@ -170,6 +170,15 @@ def get_sorted_array_names(y_pred: Union[npt.ArrayLike, pl.Series, pl.DataFrame]
     return pred_names, sorted_indices
 
 
+def is_pandas_series(x):
+    """Return True if the x is a pandas Series."""
+    try:
+        pd = sys.modules["pandas"]
+    except KeyError:
+        return False
+    return isinstance(x, pd.Series)
+
+
 def is_pandas_df(x):
     """Return True if the x is a pandas DataFrame."""
     try:
