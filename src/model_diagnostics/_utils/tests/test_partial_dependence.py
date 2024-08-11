@@ -9,7 +9,12 @@ from polars.testing import assert_frame_equal
 from sklearn.base import RegressorMixin
 from sklearn.inspection import partial_dependence
 
-from model_diagnostics._utils.array import get_second_dimension, safe_index_rows
+from model_diagnostics._utils.array import (
+    get_second_dimension,
+    is_pandas_df,
+    is_pyarrow_table,
+    safe_index_rows,
+)
 from model_diagnostics._utils.partial_dependence import compute_partial_dependence
 
 
@@ -56,24 +61,61 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
         cat_index = None
 
     X_orig = X.clone()
-    # Convert X to something scikit-learn can work with.
+    # FIXME: scikit-learn >= 1.5
+    # Because of https://github.com/scikit-learn/scikit-learn/pull/28521, 1.4 is not
+    # enough.
+    # Convert X to something scikit-learn can work with, i.e. numpy and pandas.
     if pandas is None:
         if feature_type in ["cat", "enum"]:
             pytest.skip()
         else:
             X_skl = X.to_numpy()
     elif pyarrow is None:
-        X_skl = pandas.api.interchange.from_dataframe(X)
+        if feature_type in ["cat", "enum"]:
+            # FIXME: pyarrow not installed
+            # pytest.skip()
+            X_skl = pandas.DataFrame(
+                {
+                    "a": pandas.Series(
+                        X["a"].cast(pl.Utf8).to_numpy(), dtype="category"
+                    ),
+                    "b": X["b"].to_numpy(),
+                }
+            )
+        elif feature_type == "string":
+            # TODO: With pandas 2.0.3, this does not work for strings. Get
+            # AssertionError from polars in string_column_to_ndarray.
+            # X_skl = pandas.api.interchange.from_dataframe(X). So we do it manually.
+            X_skl = pandas.DataFrame(
+                {
+                    "a": X["a"].to_numpy(),
+                    "b": X["b"].to_numpy(),
+                }
+            )
+        else:
+            X_skl = pandas.api.interchange.from_dataframe(X)
     else:
         X_skl = X.to_pandas()
-    grid = X.get_column("a").unique().sort()
 
+    grid = X.get_column("a").unique().sort()
+    # Make sure grid is the same data container as X.
     if data_container == "list":
         X = [list(row.values()) for row in X.to_dicts()]
+        grid = grid.to_list()
     elif data_container == "pandas":
-        X = X.to_pandas()
+        X = X_skl
+        if pyarrow is None:
+            grid = X_skl["a"].unique()
+            # Distunguish numpy array and ExtensionArray.
+            if isinstance(grid, np.ndarray):
+                grid.sort()
+            else:
+                grid = grid.sort_values()
+        else:
+            grid = grid.to_pandas()
     elif data_container == "pyarrow":
         X = X.to_arrow()
+        grid = grid.to_arrow()
 
     if weights is not None:
         weights = np.ones(n_obs)
@@ -81,6 +123,8 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
     def predict(X):
         a = get_second_dimension(X, 0)
         b = get_second_dimension(X, 1)
+        if is_pyarrow_table(X) and feature_type in ["cat", "enum"]:
+            a = a.cast(pyarrow.float64())
         if hasattr(a, "to_numpy"):
             a = a.to_numpy()
             b = b.to_numpy()
@@ -127,6 +171,7 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
     assert_allclose(pd_values, pd_sklearn["average"][0])
 
     # Check that X was not modified on the way.
-    assert_frame_equal(
-        X_orig, pl.DataFrame(X, schema=["a", "b"], orient="row"), check_dtypes=False
-    )
+    if not (is_pandas_df(X) and isinstance(X["a"].dtype, pandas.CategoricalDtype)):
+        assert_frame_equal(
+            X_orig, pl.DataFrame(X, schema=["a", "b"], orient="row"), check_dtypes=False
+        )

@@ -170,6 +170,15 @@ def get_sorted_array_names(y_pred: Union[npt.ArrayLike, pl.Series, pl.DataFrame]
     return pred_names, sorted_indices
 
 
+def is_pandas_series(x):
+    """Return True if the x is a pandas Series."""
+    try:
+        pd = sys.modules["pandas"]
+    except KeyError:
+        return False
+    return isinstance(x, pd.Series)
+
+
 def is_pandas_df(x):
     """Return True if the x is a pandas DataFrame."""
     try:
@@ -247,50 +256,51 @@ def safe_assign_column(x, values, column_index):
             row[column_index] = values[i]
             x[i] = row
     elif is_pandas_df(x):
-        # Possible fix for older versions
-        # if isinstance(values, pl.Series):
-        #     pd = sys.modules["pandas"]
-        #     values = pd.api.interchange.from_dataframe(
-        #               pl.DataFrame(values)).iloc[:, 0]
         try:
             # Avoid deprecation warning of pandas by handling dtype explicitly.
             #   Setting an item of incompatible dtype is deprecated and will raise in a
             #   future error of pandas.
+            # Also, assigning with a different index makes troubles.
             pd = sys.modules["pandas"]
             dtype = x.dtypes.iloc[column_index]
-            if parse(version("pandas")) < Version("2.0.0") and isinstance(
-                dtype, pd.CategoricalDtype
+            if isinstance(values, pl.Series) and isinstance(
+                values.dtype, pl.Categorical
             ):
+                # FIXME: pyarrow not installed
+                pd_values = pd.Series(
+                    data=values.cast(pl.Utf8).to_numpy(),
+                    dtype=dtype,
+                )
+            else:
+                pd_values = pd.Series(
+                    data=values.to_pandas()
+                    if isinstance(values, pl.Series)
+                    else values,
+                    dtype=dtype,
+                )
+            if parse(version("pandas")) < Version("2.0.0"):
                 # FIXME: pandas >= 2.0 (<2.0 means 1.5.*)
-                # We the following DeprecationWarning of pandas:
-                #   In a future version, `df.iloc[:, i] = newvals` will attempt to set
-                #   the values inplace instead of always setting a new array. To retain
-                #   the old behavior, use either `df[df.columns[i]] = newvals` or, if
-                #   columns are non-unique, `df.isetitem(i, newvals)`
                 with warnings.catch_warnings():
                     msg = (
                         r"In a future version, `df.iloc\[:, i\] = newvals` will "
                         r"attempt to set the values inplace instead of always "
-                        r"setting a new array"
+                        r"setting a new array. To retain the old behavior, use either "
+                        r"`df\[df.columns\[i\]\] = newvals` or, if columns are "
+                        r"non-unique, `df.isetitem\(i, newvals\)`"
                     )
                     warnings.filterwarnings(
                         "ignore", category=DeprecationWarning, message=msg
                     )
-                    x.iloc[:, column_index] = pd.Series(
-                        data=(
-                            values.to_pandas()
-                            if isinstance(values, pl.Series)
-                            else values
-                        ),
-                        dtype=dtype,
-                    )
+                    if not x.index.is_unique:
+                        # Pandas might error with:
+                        #   cannot reindex on an axis with duplicate labels
+                        # Try reindexing ourselves.
+                        x = x.reset_index()
+                    if not pd_values.index.is_unique:
+                        pd_values = pd_values.reset_index()
+                    x.iloc[:, column_index] = pd_values
             else:
-                x.iloc[:, column_index] = pd.Series(
-                    data=(
-                        values.to_pandas() if isinstance(values, pl.Series) else values
-                    ),
-                    dtype=dtype,
-                )
+                x.iloc[:, column_index] = pd_values
         except Exception as e:
             # FIXME: pyarrow version XXX
             # Older pyarrow versions of AttributeError do not have a 'add_note' method.
