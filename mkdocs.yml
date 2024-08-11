@@ -74,6 +74,7 @@ plugins:
             filters:
               - "!^_[^_]"  # this is the default
               - "!^test"
+            inherited_members: true
             show_submodules: false  # this is the default
             # Headings
             show_root_heading: true
