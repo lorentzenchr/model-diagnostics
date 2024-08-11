@@ -291,13 +291,6 @@ def safe_assign_column(x, values, column_index):
                     warnings.filterwarnings(
                         "ignore", category=DeprecationWarning, message=msg
                     )
-                    msg = (
-                        "reindexing with a non-unique Index is deprecated and will "
-                        "raise in a future version."
-                    )
-                    warnings.filterwarnings(
-                        "ignore", category=FutureWarning, message=msg
-                    )
                     if not x.index.is_unique:
                         # Pandas might error with:
                         #   cannot reindex on an axis with duplicate labels
