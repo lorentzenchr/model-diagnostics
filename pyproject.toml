@@ -259,7 +259,7 @@ name."py3.10".set-extra-dependencies = [
   "polars==1.0.0",
   "scipy==1.10",
 ]
-# Some intermediate versions
+# Some intermediate versions, with pandads but without pyarrow
 name."py3.11".set-extra-dependencies = [
   "numpy==1.26.*",
   "polars==1.0.*",
