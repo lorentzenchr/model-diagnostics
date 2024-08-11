@@ -94,9 +94,10 @@ def bin_feature(
             # passed, e.g. with CategoricalDtype.
             if is_pandas_series(feature):
                 pandas = sys.modules["pandas"]
-                is_pandas_categorical = pandas.api.types.is_categorical_dtype(feature)
-                # dataframe = feature.to_frame(name="0").__dataframe__()
-                # feature = pl.from_dataframe(dataframe)[:, 0]
+                is_pandas_categorical = isinstance(
+                    feature.dtype,  # type: ignore
+                    pandas.CategoricalDtype,
+                )
                 feature = pl.from_dataframe(feature.to_frame(name="0"))[:, 0]  # type: ignore
                 if is_pandas_categorical and isinstance(feature.dtype, pl.Enum):
                     # Pandas categoricals usually get mapped to polars categoricals.
