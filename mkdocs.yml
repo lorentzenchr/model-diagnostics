@@ -74,6 +74,7 @@ plugins:
             filters:
               - "!^_[^_]"  # this is the default
               - "!^test"
+            inherited_members: true
             show_submodules: false  # this is the default
             # Headings
             show_root_heading: true
@@ -99,6 +100,7 @@ markdown_extensions:
   - md_in_html
   - toc:
       permalink: true
+      toc_depth: 3  # default = 3
 
   # Python Markdown Extensions
   - pymdownx.arithmatex:
