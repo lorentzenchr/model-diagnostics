@@ -166,7 +166,7 @@ no-cov = "cov --no-cov"
 
 [tool.hatch.envs.docs]
 dependencies = [
-  "mkdocs-material~=9.5.23",
+  "mkdocs-material~=9.5.31",
   "mkdocstrings[python]>=0.25.1",
   "mkdocs-gen-files>=0.5.0",
   "mkdocs-literate-nav>=0.6.1",
