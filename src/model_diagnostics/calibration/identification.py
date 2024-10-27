@@ -374,24 +374,14 @@ def compute_bias(
                     )
                     .sort("__priority", descending=True)
                     .head(n_bins)
-                )
-                # FIXME: When n_bins=0, the result should be an empty dataframe
-                # (0 rows and some columns). For some unknown reason as of
-                # polars 0.20.20, the following sort neglects the head(0) statement.
-                # Therefore, we place an explicit collect here. This should not be
-                # needed!
-                if n_bins == 0 or feature.null_count() >= 1:
-                    df = df.collect().lazy()
-                df = df.sort(feature_name, descending=False)
-
-                df = df.select(
-                    [
+                    .sort(feature_name, descending=False)
+                    .select(
                         pl.col(feature_name),
                         pl.col("bias_mean"),
                         pl.col("bias_count"),
                         pl.col("bias_weights"),
                         pl.col("bias_stderr"),
-                    ]
+                    )
                 ).collect()
 
                 # if is_categorical:
