@@ -737,18 +737,8 @@ def compute_marginal(
                     )
                     .sort("__priority", descending=True)
                     .head(n_bins)
-                )
-                # FIXME: When n_bins=0, the result should be an empty dataframe
-                # (0 rows and some columns). For some unknown reason as of
-                # polars 0.20.20, the following sort neglects the head(0) statement.
-                # Therefore, we place an explicit collect here. This should not be
-                # needed!
-                if n_bins == 0 or feature.null_count() >= 1:
-                    df = df.collect().lazy()
-                df = df.sort(feature_name, descending=False)
-
-                df = df.select(
-                    [
+                    .sort(feature_name, descending=False)
+                    .select(
                         pl.col(feature_name),
                         pl.col("y_obs_mean"),
                         pl.col("y_pred_mean"),
@@ -756,11 +746,11 @@ def compute_marginal(
                         pl.col("y_pred_stderr"),
                         pl.col("weights_sum").alias("weights"),
                         pl.col("count"),
-                    ]
-                    + (
-                        []
-                        if is_cat_or_string
-                        else [pl.col("bin_edges"), pl.col("__feature_std")]
+                        *(
+                            []
+                            if is_cat_or_string
+                            else [pl.col("bin_edges"), pl.col("__feature_std")]
+                        ),
                     )
                 ).collect()
 
