@@ -3,6 +3,7 @@ from functools import partial
 import numpy as np
 import polars as pl
 import pytest
+from packaging.version import Version
 from polars.testing import assert_frame_equal, assert_series_equal
 from scipy.special import stdtr
 from scipy.stats import expectile, ttest_1samp
@@ -633,6 +634,11 @@ def test_compute_marginal(feature, f_grouped, bin_edges):
         )
         if bin_edges is not None:
             df_expected = df_expected.hstack([bin_edges.alias("bin_edges")])
+
+            if Version("1.11.0") <= Version(pl.__version__) <= Version("1.12"):
+                # See https://github.com/pola-rs/polars/issues/19482
+                pytest.skip()
+
         df_expected = df_expected.sort("feature")
         assert_frame_equal(df_marginal, df_expected, check_exact=False)
 
