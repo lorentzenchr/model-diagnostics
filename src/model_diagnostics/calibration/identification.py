@@ -9,6 +9,7 @@ from scipy import special
 from model_diagnostics._utils.array import (
     get_second_dimension,
     get_sorted_array_names,
+    length_of_first_dimension,
     length_of_second_dimension,
     validate_2_arrays,
     validate_same_first_dimension,
@@ -270,17 +271,25 @@ def compute_bias(
     else:
         w = np.ones_like(y_obs, dtype=float)
 
+    n_obs = length_of_first_dimension(y_pred)
     df_list = []
     with pl.StringCache():
-        feature, feature_name, is_categorical, is_string, n_bins, f_binned = (
-            bin_feature(
+        feature_name = None
+        if feature is not None:
+            feature, n_bins, f_binned = bin_feature(
                 feature=feature,
                 feature_name=None,
-                y_obs=y_obs,
+                n_obs=n_obs,
                 n_bins=n_bins,
                 bin_method=bin_method,
             )
-        )
+            feature_name = feature.name
+            is_cat_or_string = feature.dtype in [
+                pl.Categorical,
+                pl.Enum,
+                pl.Utf8,
+                pl.Object,
+            ]
 
         for i in range(len(pred_names)):
             # Loop over columns of y_pred.
@@ -333,7 +342,7 @@ def compute_bias(
                     ).alias("variance"),
                 ]
 
-                if is_categorical or is_string:
+                if is_cat_or_string:
                     groupby_name = feature_name
                 else:
                     df = df.hstack([f_binned.get_column("bin")])
@@ -383,14 +392,6 @@ def compute_bias(
                         pl.col("bias_stderr"),
                     )
                 ).collect()
-
-                # if is_categorical:
-                #     # Pyarrow does not yet support sorting dictionary type arrays,
-                #     # see https://github.com/apache/arrow/issues/29887
-                #     # We resort to pandas instead.
-                #     import pyarrow as pa
-                #     df = df.to_pandas().sort_values(feature_name)
-                #     df = pa.Table.from_pandas(df)
 
             # Add column with p-value of 2-sided t-test.
             # We explicitly convert "to_numpy", because otherwise we get:
@@ -591,7 +592,7 @@ def compute_marginal(
 
     if feature_name is None:
         # X is completely ignored.
-        feature_input = None
+        feature_input = feature = None
     elif X is None:
         msg = (
             "X must be a data container like a (polars) dataframe or an (numpy) array."
@@ -608,22 +609,24 @@ def compute_marginal(
         feature_index = X_names.index(feature_name)
         feature_input = get_second_dimension(X, feature_index)
 
+    n_obs = length_of_first_dimension(y_pred)
     df_list = []
     with pl.StringCache():
-        (
-            feature,
-            feature_name,
-            is_categorical,
-            is_string,
-            n_bins,
-            f_binned,
-        ) = bin_feature(
-            feature=feature_input,
-            feature_name=feature_name,
-            y_obs=y_obs,
-            n_bins=n_bins,
-            bin_method=bin_method,
-        )
+        if feature_input is not None:
+            feature, n_bins, f_binned = bin_feature(
+                feature=feature_input,
+                feature_name=feature_name,
+                n_obs=n_obs,
+                n_bins=n_bins,
+                bin_method=bin_method,
+            )
+            feature_name = feature.name
+            is_cat_or_string = feature.dtype in [
+                pl.Categorical,
+                pl.Enum,
+                pl.Utf8,
+                pl.Object,
+            ]
 
         for i in range(len(pred_names)):
             # Loop over columns of y_pred.
@@ -679,7 +682,7 @@ def compute_marginal(
                     ),
                 ]
 
-                if is_categorical or is_string:
+                if is_cat_or_string:
                     groupby_name = feature_name
                 else:
                     # We also add the bin edges.
@@ -756,12 +759,12 @@ def compute_marginal(
                     ]
                     + (
                         []
-                        if is_categorical or is_string
+                        if is_cat_or_string
                         else [pl.col("bin_edges"), pl.col("__feature_std")]
                     )
                 ).collect()
 
-                if not is_categorical and not is_string:
+                if not is_cat_or_string:
                     df = df.with_columns(
                         pl.col("bin_edges")
                         .arr.first()
@@ -808,7 +811,7 @@ def compute_marginal(
                 "count",
                 "weights",
             ]
-            if feature_name in df.columns and not is_categorical and not is_string:
+            if feature_name in df.columns and not is_cat_or_string:
                 col_selection += ["bin_edges"]
             if with_pd:
                 col_selection += ["partial_dependence"]

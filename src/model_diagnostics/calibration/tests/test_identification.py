@@ -515,10 +515,10 @@ def test_compute_bias_raises_weights_shape():
 
 
 def test_compute_bias_raises_bin_method():
-    y_obs, y_pred = np.arange(20), np.arange(20)
+    y_obs, y_pred, feature = np.arange(5), np.arange(5), np.arange(5)
     msg = "Parameter bin_method must be either 'quantile' or ''uniform'"
     with pytest.raises(ValueError, match=msg):
-        compute_bias(y_obs, y_pred, n_bins=5, bin_method=None)
+        compute_bias(y_obs, y_pred, feature, n_bins=5, bin_method=None)
 
 
 @pytest.mark.parametrize(
