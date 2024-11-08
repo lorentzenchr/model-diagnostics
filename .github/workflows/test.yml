@@ -19,8 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Switch back to macos-latest, once macos-14 has become macos-latest.
-        os: [ubuntu-latest, windows-latest, macos-14]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.11']  # hatch env defines its own matrix with python versions
     env:
       # https://github.com/microsoft/azure-pipelines-tasks/issues/16426
