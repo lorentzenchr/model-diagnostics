@@ -461,6 +461,7 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_leve
             "XXX",
             "Parameter bin_method must be either 'quantile' or ''uniform'",
         ),
+        ("show_lines", 2, "The argument show_lines mut be 'all' or 'auto'"),
     ],
 )
 def test_plot_marginal_raises(param, value, msg):
@@ -633,3 +634,27 @@ def test_plot_marginal(with_null_values, feature_type, bin_method, ax, plot_back
         assert legend_text[2] == "partial dependence"
         if with_null_values:
             assert legend_text[-1] == "Null values"
+
+
+@pytest.mark.parametrize("show_lines", ["all", "auto"])
+@pytest.mark.parametrize("feature_type", ["num", "string"])
+@pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
+def test_plot_marginal_show_lines(show_lines, feature_type, plot_backend):
+    """Test that plot_marginal works with different show_lines settings."""
+    # TODO: What should we test for except that it works without error?
+    if plot_backend == "plotly":
+        pytest.importorskip("plotly")
+
+    if feature_type == "num":
+        x = np.arange(4)
+    elif feature_type == "string":
+        x = np.array(list("abcd"))
+    with config_context(plot_backend=plot_backend):
+        plot_marginal(
+            y_obs=np.arange(4),
+            y_pred=np.arange(4),
+            X=x[:, None],
+            feature_name=0,
+            predict_function=lambda x: np.arange(len(x)),
+            show_lines=show_lines,
+        )
