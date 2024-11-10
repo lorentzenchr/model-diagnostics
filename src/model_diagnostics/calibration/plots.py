@@ -712,7 +712,7 @@ def plot_marginal(
     n_max: int = 1000,
     rng: Optional[Union[np.random.Generator, int]] = None,
     ax: Optional[mpl.axes.Axes] = None,
-    show_lines: str = "auto",
+    show_lines: str = "numerical",
 ):
     """Plot marginal observed and predicted conditional on a feature.
 
@@ -760,9 +760,9 @@ def plot_marginal(
     show_lines : str
         Option for how to display mean values and partial dependence:
 
-        - "auto": String and categorical features are drawn as points, numerical ones
-          as lines.
-        - "all": All types of features are drawn as lines.
+        - "always": Always draw lines.
+        - "numerical": String and categorical features are drawn as points, numerical
+          ones as lines.
 
     Returns
     -------
@@ -824,8 +824,10 @@ def plot_marginal(
         )
         raise ValueError(msg)
 
-    if show_lines not in ("all", "auto"):
-        msg = f"The argument show_lines mut be 'all' or 'auto'; got {show_lines}."
+    if show_lines not in ("always", "numerical"):
+        msg = (
+            f"The argument show_lines mut be 'always' or 'numerical'; got {show_lines}."
+        )
         raise ValueError(msg)
 
     # estimator = getattr(predict_callable, "__self__", None)
@@ -1014,7 +1016,7 @@ def plot_marginal(
                     x,
                     df_no_nulls[m],
                     marker="o",
-                    linestyle="None" if show_lines == "auto" else linestyle,
+                    linestyle="None" if show_lines == "numerical" else linestyle,
                     label=label,
                 )
             else:
@@ -1022,8 +1024,8 @@ def plot_marginal(
                     x=x,
                     y=df_no_nulls[m],
                     marker={"color": get_plotly_color(i)},
-                    mode="markers" if show_lines == "auto" else "lines+markers",
-                    line=None if show_lines == "auto" else line,
+                    mode="markers" if show_lines == "numerical" else "lines+markers",
+                    line=None if show_lines == "numerical" else line,
                     name=label,
                     secondary_y=True,
                 )
