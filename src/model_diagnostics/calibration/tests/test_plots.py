@@ -461,6 +461,7 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_leve
             "XXX",
             "Parameter bin_method must be either 'quantile' or ''uniform'",
         ),
+        ("show_lines", 2, "The argument show_lines mut be 'always' or 'numerical'"),
     ],
 )
 def test_plot_marginal_raises(param, value, msg):
@@ -633,3 +634,52 @@ def test_plot_marginal(with_null_values, feature_type, bin_method, ax, plot_back
         assert legend_text[2] == "partial dependence"
         if with_null_values:
             assert legend_text[-1] == "Null values"
+
+
+@pytest.mark.parametrize("show_lines", ["always", "numerical"])
+@pytest.mark.parametrize("feature_type", ["num", "string"])
+@pytest.mark.parametrize("plot_backend", ["matplotlib", "plotly"])
+def test_plot_marginal_show_lines(show_lines, feature_type, plot_backend):
+    """Test that plot_marginal works with different show_lines settings."""
+    if plot_backend == "plotly":
+        pytest.importorskip("plotly")
+
+    if feature_type == "num":
+        x = np.arange(4)
+    elif feature_type == "string":
+        x = np.array(list("abcd"))
+    with config_context(plot_backend=plot_backend):
+        ax = plot_marginal(
+            y_obs=np.arange(4),
+            y_pred=np.arange(4),
+            X=x[:, None],
+            feature_name=0,
+            predict_function=lambda x: np.arange(len(x)),
+            show_lines=show_lines,
+        )
+
+    if plot_backend == "matplotlib":
+        from matplotlib.lines import Line2D
+
+        # Filter 3 Line2d children for the 3 lines for mean y_obs, mean y_pred, pd
+        lines = [x for x in ax.get_children() if isinstance(x, Line2D)]
+        assert len(lines) == 3
+        if show_lines == "always" or feature_type == "num":
+            assert lines[0].get_linestyle() == "-"
+            assert lines[1].get_linestyle() == "-"
+            assert lines[2].get_linestyle() == "--"
+        else:
+            for i in range(3):
+                assert lines[i].get_linestyle() == "None"
+    else:
+        from plotly.graph_objs import Scatter
+
+        mode = (
+            "lines+markers"
+            if show_lines == "always" or feature_type == "num"
+            else "markers"
+        )
+        # Data elements 1, 2, 3 are the lines for mean y_obs, mean y_pred, pd
+        for i in range(1, 1 + 3):
+            assert isinstance(ax.data[i], Scatter)
+            assert ax.data[i].mode == mode

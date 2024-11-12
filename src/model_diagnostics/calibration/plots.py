@@ -712,6 +712,7 @@ def plot_marginal(
     n_max: int = 1000,
     rng: Optional[Union[np.random.Generator, int]] = None,
     ax: Optional[mpl.axes.Axes] = None,
+    show_lines: str = "numerical",
 ):
     """Plot marginal observed and predicted conditional on a feature.
 
@@ -756,6 +757,12 @@ def plot_marginal(
         `np.random.default_rng(rng)`.
     ax : matplotlib.axes.Axes or plotly Figure
         Axes object to draw the plot onto, otherwise uses the current Axes.
+    show_lines : str
+        Option for how to display mean values and partial dependence:
+
+        - "always": Always draw lines.
+        - "numerical": String and categorical features are drawn as points, numerical
+          ones as lines.
 
     Returns
     -------
@@ -814,6 +821,12 @@ def plot_marginal(
         msg = (
             "The ax argument must be None, a matplotlib Axes or a plotly Figure, "
             f"got {type(ax)}."
+        )
+        raise ValueError(msg)
+
+    if show_lines not in ("always", "numerical"):
+        msg = (
+            f"The argument show_lines mut be 'always' or 'numerical'; got {show_lines}."
         )
         raise ValueError(msg)
 
@@ -988,6 +1001,13 @@ def plot_marginal(
     }
     for i, m in enumerate(plot_items):
         label = label_dict[m]
+        if plot_backend == "matplotlib":
+            linestyle = "dashed" if m == "partial_dependence" else "solid"
+        else:
+            line = {
+                "color": get_plotly_color(i),
+                "dash": "dash" if m == "partial_dependence" else None,
+            }
         if is_categorical:
             # We x-shift a little for a better visual.
             x = np.arange(n_x - feature_has_nulls)
@@ -996,7 +1016,7 @@ def plot_marginal(
                     x,
                     df_no_nulls[m],
                     marker="o",
-                    linestyle="None",
+                    linestyle="None" if show_lines == "numerical" else linestyle,
                     label=label,
                 )
             else:
@@ -1004,7 +1024,8 @@ def plot_marginal(
                     x=x,
                     y=df_no_nulls[m],
                     marker={"color": get_plotly_color(i)},
-                    mode="markers",
+                    mode="markers" if show_lines == "numerical" else "lines+markers",
+                    line=None if show_lines == "numerical" else line,
                     name=label,
                     secondary_y=True,
                 )
@@ -1012,7 +1033,7 @@ def plot_marginal(
             ax.plot(
                 df[feature_name],
                 df[m],
-                linestyle="dashed" if m == "partial_dependence" else "solid",
+                linestyle=linestyle,
                 marker="o",
                 label=label,
             )
@@ -1022,10 +1043,7 @@ def plot_marginal(
                 y=df[m],
                 marker_symbol="circle",
                 mode="lines+markers",
-                line={
-                    "color": get_plotly_color(i),
-                    "dash": "dash" if m == "partial_dependence" else None,
-                },
+                line=line,
                 name=label,
                 secondary_y=True,
             )
