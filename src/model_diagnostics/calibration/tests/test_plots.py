@@ -1,3 +1,5 @@
+from math import ceil
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,6 +28,7 @@ from model_diagnostics._utils.test_helper import (
     pd_Series,
 )
 from model_diagnostics.calibration import (
+    add_marginal_subplot,
     plot_bias,
     plot_marginal,
     plot_reliability_diagram,
@@ -683,3 +686,73 @@ def test_plot_marginal_show_lines(show_lines, feature_type, plot_backend):
         for i in range(1, 1 + 3):
             assert isinstance(ax.data[i], Scatter)
             assert ax.data[i].mode == mode
+
+
+def test_add_marginal_subplot_raises():
+    """Test that add_marginal_subplot raises errors."""
+    pytest.importorskip("plotly")
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    n_rows, n_cols = 4, 3
+    fig = make_subplots(
+        rows=n_rows,
+        cols=n_cols,
+    )
+    msg = f"The `fig` only has {n_rows} rows and {n_cols} columns"
+    with pytest.raises(ValueError, match=msg):
+        add_marginal_subplot(go.Figure(), fig, 5, 4)
+
+
+def test_add_marginal_subplot():
+    """Test that add_marginal_subplot works."""
+    pytest.importorskip("plotly")
+    from plotly.subplots import make_subplots
+
+    n_features = 12
+    n_obs = 10
+    y_obs = np.arange(n_obs)
+    X = np.ones((n_obs, n_features))
+    X[:n_obs, 0] = np.sin(np.arange(n_obs))
+    X[:, 1] = y_obs**2
+
+    def model_predict(X):
+        s = 0.5 * n_obs * np.sin(X)
+        return s.sum(axis=1) + np.sqrt(X[:, 1])
+
+    # Now the plotting.
+    feature_list = list(range(n_features))
+    n_cols = 3
+    n_rows = ceil(len(feature_list) / n_cols)
+    fig = make_subplots(
+        rows=n_rows,
+        cols=n_cols,
+        specs=[[{"secondary_y": True}] * n_cols] * n_rows,
+    )
+    for row in range(n_rows):
+        for col in range(n_cols):
+            i = n_cols * row + col
+            with config_context(plot_backend="plotly"):
+                subfig = plot_marginal(
+                    y_obs=y_obs,
+                    y_pred=model_predict(X),
+                    X=X,
+                    feature_name=feature_list[i],
+                    predict_function=model_predict,
+                )
+            add_marginal_subplot(subfig, fig, row, col)
+
+    assert get_xlabel(fig, xaxis=1) == "binned feature 0"
+    assert get_xlabel(fig, xaxis=3) == "binned feature 2"
+    assert get_xlabel(fig, xaxis=4) == "binned feature 3"
+    assert get_ylabel(fig, yaxis=2) == "y"
+    assert get_title(fig) == "Marginal Plot"
+
+    legend_text = get_legend_list(fig)
+    # TODO: It is not 100% clear why legend_text has most often more entries than 3 or
+    # 4. We therefor test >= instead of ==.
+    # It is also unclear why for matplotlib the order varies.
+    assert len(legend_text) >= 3
+    assert legend_text[0] == "mean y_obs"
+    assert legend_text[1] == "mean y_pred"
+    assert legend_text[2] == "partial dependence"

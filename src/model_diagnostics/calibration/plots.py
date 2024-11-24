@@ -771,6 +771,91 @@ def plot_marginal(
         setting the `plot_backend` via
         [`model_diagnostics.set_config`][model_diagnostics.set_config] or
         [`model_diagnostics.config_context`][model_diagnostics.config_context].
+
+    Examples
+    -----
+    If you wish to plot multiple features at once with subfigures, here is how to do it
+    with matplotlib:
+
+    ```py
+    from math import ceil
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from model_diagnostics.calibration import plot_marginal
+
+    # Replace by your own data and model.
+    n_obs = 100
+    y_obs = np.arange(n_obs)
+    X = np.ones((n_obs, 2))
+    X[:, 0] = np.sin(np.arange(n_obs))
+    X[:, 1] = y_obs ** 2
+
+    def model_predict(X):
+        s = 0.5 * n_obs * np.sin(X)
+        return s.sum(axis=1) + np.sqrt(X[:, 1])
+
+    # Now the plotting.
+    feature_list = [0, 1]
+    n_rows, n_cols = ceil(len(feature_list) / 2), 2
+    fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, sharey=True)
+    for i, ax in enumerate(axs):
+        plot_marginal(
+            y_obs=y_obs,
+            y_pred=model_predict(X),
+            X=X,
+            feature_name=feature_list[i],
+            predict_function=model_predict,
+            ax=ax,
+        )
+    fig.tight_layout()
+    ```
+
+    For plotly, use the helper function
+    [`add_marginal_subplot`][model_diagnostics.calibration.plots.add_marginal_subplot]:
+
+    ```py
+    from math import ceil
+    import numpy as np
+    from model_diagnostics import config_context
+    from plotly.subplots import make_subplots
+    from model_diagnostics.calibration import add_marginal_subplot, plot_marginal
+
+    # Replace by your own data and model.
+    n_obs = 100
+    y_obs = np.arange(n_obs)
+    X = np.ones((n_obs, 2))
+    X[:, 0] = np.sin(np.arange(n_obs))
+    X[:, 1] = y_obs ** 2
+
+    def model_predict(X):
+        s = 0.5 * n_obs * np.sin(X)
+        return s.sum(axis=1) + np.sqrt(X[:, 1])
+
+    # Now the plotting.
+    feature_list = [0, 1]
+    n_rows, n_cols = ceil(len(feature_list) / 2), 2
+    fig = make_subplots(
+        rows=n_rows,
+        cols=n_cols,
+        vertical_spacing=0.3 / n_rows,  # equals default
+        # subplot_titles=feature_list,  # maybe
+        specs=[[{"secondary_y": True}] * n_cols] * n_rows,  # This is important!
+    )
+    for row in range(n_rows):
+        for col in range(n_cols):
+            i = n_cols * row + col
+            with config_context(plot_backend="plotly"):
+                subfig = plot_marginal(
+                    y_obs=y_obs,
+                    y_pred=model_predict(X),
+                    X=X,
+                    feature_name=feature_list[i],
+                    predict_function=model_predict,
+                )
+            add_marginal_subplot(subfig, fig, row, col)
+    fig.show()
+    ```
+
     """
     if ax is None:
         plot_backend = get_config()["plot_backend"]
@@ -1130,3 +1215,79 @@ def plot_marginal(
         )
 
     return ax
+
+
+def add_marginal_subplot(subfig, fig, row: int, col: int):
+    """Add a plotly subplot from plot_marginal to a multi-plot figure.
+
+    This is a helper function is accompanying
+    [`plot_marginal`][model_diagnostics.calibration.plot_marginal] in order to ease
+    plotting with subfigures with the plotly backend.
+
+    For it to work, you must call `make_subplots` with the `specs` argument and set
+    the appropriate number of `{"secondary_y": True}` in a list of lists.
+    ```py hl_lines="7"
+    from plotly.subplots import make_subplots
+
+    n_rows, n_cols = ...
+    fig = make_subplots(
+        rows=n_rows,
+        cols=n_cols,
+        specs=[[{"secondary_y": True}] * n_cols] * n_rows,  # This is important!
+    )
+    ```
+    The reason is that `plot_marginal` uses a secondary yaxis (and swapped sides with
+    the primary yaxis).
+
+    Parameters
+    ----------
+    subfig : plotly Figure
+        The subfigure which is added to `fig`.
+    fig : plotly Figure
+        The multi-plot figure to which `subfig` is added at positions `row` and `col`.
+    row : int
+        The (0-based) row index of `fig` at which `subfig` is added.
+    col : int
+        The (0-based) column index of `fig` at which `subfig` is added.
+
+    Returns
+    -------
+    fig
+    """
+    # It returns a tuple of `range`s starting at 1.
+    plotly_rows, plotly_cols = fig._get_subplot_rows_columns()  # noqa: SLF001
+    n_rows = len(plotly_rows)
+    n_cols = len(plotly_cols)
+    if row >= n_rows or col >= n_cols:
+        msg = (
+            f"The `fig` only has {n_rows} rows and {n_cols} columns. You specified "
+            f"(0-based) {row=} and {col=}."
+        )
+        raise ValueError(msg)
+    i = n_cols * row + col
+    # Plotly uses 1-based indices:
+    row += 1
+    col += 1
+    # Transfer the x-axis titles of the subfig to fig.
+    xaxis = "xaxis" if i == 0 else f"xaxis{i + 1}"
+    fig["layout"][xaxis]["title"] = subfig["layout"]["xaxis"]["title"]
+    # Change sides of y-axis.
+    yaxis = "yaxis" if i == 0 else f"yaxis{2 * i + 1}"
+    yaxis2 = f"yaxis{2 * (i + 1)}"
+    fig.update_layout(
+        **{
+            yaxis: {"side": "right", "showgrid": False},
+            yaxis2: {"side": "left", "title": "y"},
+        }
+    )
+    # Only the last added subfig should show the legends, but all the ones before
+    # should not.
+    # So don't show legends for row-1 and col-1.
+    if row > 1:
+        fig.update_traces(patch={"showlegend": False}, row=row - 1, col=col)
+    if col > 1:
+        fig.update_traces(patch={"showlegend": False}, row=row, col=col - 1)
+    for d in subfig.data:
+        fig.add_trace(d, row=row, col=col, secondary_y=d["yaxis"] == "y2")
+
+    fig.update_layout(title=subfig.layout.title.text)

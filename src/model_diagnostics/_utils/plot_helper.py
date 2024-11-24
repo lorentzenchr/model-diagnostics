@@ -13,18 +13,22 @@ def get_plotly_color(i):
     return colors[i % len(colors)]
 
 
-def get_xlabel(ax):
+def get_xlabel(ax, xaxis=1):
     if isinstance(ax, mpl.axes.Axes):
         return ax.get_xlabel()
-    else:
+    elif xaxis == 1:
         # ax = plotly figure
         return ax.layout.xaxis.title.text
+    elif xaxis >= 1:
+        axis = getattr(ax.layout, f"xaxis{xaxis}")
+        return axis.title.text
 
 
 def get_ylabel(ax, yaxis=1):
     if isinstance(ax, mpl.axes.Axes):
         return ax.get_ylabel()
     elif yaxis == 1:
+        # ax = plotly figure
         return ax.layout.yaxis.title.text
     elif yaxis >= 2:
         axis = getattr(ax.layout, f"yaxis{yaxis}")

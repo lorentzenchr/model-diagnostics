@@ -150,12 +150,12 @@ def gpava(
     ----------
     fun : callable
         Function that calculates the functional at interest, e.g.
-        ```
+        ```py
         def median(x, w=None):
             return np.quantile(x, 0.5, method="inverted_cdf")
-        ````
+        ```
         or, to get the upper bound
-        ````
+        ```py
         def median(x, w=None):
             return -np.quantile(-x, 0.5, method="inverted_cdf")
         ```
