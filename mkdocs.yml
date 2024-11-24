@@ -32,6 +32,7 @@ theme:
         name: Switch to system preference
 
   features:
+    - content.code.copy
     - navigation.sections
     - navigation.expand
     - navigation.tabs
@@ -113,6 +114,9 @@ markdown_extensions:
       emoji_index: !!python/name:material.extensions.emoji.twemoji 
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
       use_pygments: true
   - pymdownx.inlinehilite
   - pymdownx.keys
