@@ -752,17 +752,29 @@ def compute_marginal(
                             else [pl.col("bin_edges"), pl.col("__feature_std")]
                         ),
                     )
-                ).collect()
+                )
 
                 if not is_cat_or_string:
                     df = df.with_columns(
-                        pl.col("bin_edges")
-                        .arr.first()
-                        .list.concat(pl.col("__feature_std"))
-                        .list.concat(pl.col("bin_edges").arr.last())
+                        pl.when(pl.col("bin_edges").is_null())
+                        .then(
+                            pl.concat_list(
+                                pl.lit(None),
+                                pl.col("__feature_std"),
+                                pl.lit(None),
+                            )
+                        )
+                        .otherwise(
+                            pl.concat_list(
+                                pl.col("bin_edges").arr.first(),
+                                pl.col("__feature_std"),
+                                pl.col("bin_edges").arr.last(),
+                            )
+                        )
                         .list.to_array(3)
                         .alias("bin_edges")
                     )
+                df = df.collect()
 
             # Add column "model".
             if n_pred > 0:
