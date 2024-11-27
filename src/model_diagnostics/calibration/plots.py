@@ -229,8 +229,11 @@ def plot_reliability_diagram(
 
             # We make the interval conservatively monotone increasing by applying
             # np.maximum.accumulate etc.
-            lower = -np.minimum.accumulate(-boot.confidence_interval.low)
-            upper = np.maximum.accumulate(boot.confidence_interval.high)
+            # Conservative here means smaller intervals such that it is more likely
+            # for the prediction to be out of the intervals leading to the conclusion
+            # of "not auto-calibrated".
+            lower = np.maximum.accumulate(boot.confidence_interval.low)
+            upper = np.minimum.accumulate(boot.confidence_interval.high[::-1])[::-1]
             if diagram_type == "bias":
                 lower = iso.X_thresholds_ - lower
                 upper = iso.X_thresholds_ - upper
