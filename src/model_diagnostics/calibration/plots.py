@@ -1223,12 +1223,12 @@ def plot_marginal(
 def add_marginal_subplot(subfig, fig, row: int, col: int):
     """Add a plotly subplot from plot_marginal to a multi-plot figure.
 
-    This is a helper function is accompanying
+    This auxiliary function is accompanies
     [`plot_marginal`][model_diagnostics.calibration.plot_marginal] in order to ease
     plotting with subfigures with the plotly backend.
 
-    For it to work, you must call `make_subplots` with the `specs` argument and set
-    the appropriate number of `{"secondary_y": True}` in a list of lists.
+    For it to work, you must call plotly's `make_subplots` with the `specs` argument
+    and set the appropriate number of `{"secondary_y": True}` in a list of lists.
     ```py hl_lines="7"
     from plotly.subplots import make_subplots
 
@@ -1256,6 +1256,7 @@ def add_marginal_subplot(subfig, fig, row: int, col: int):
     Returns
     -------
     fig
+        The plotly figure `fig`.
     """
     # It returns a tuple of `range`s starting at 1.
     plotly_rows, plotly_cols = fig._get_subplot_rows_columns()  # noqa: SLF001
