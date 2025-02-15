@@ -45,6 +45,7 @@ def identification_function(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
         It must be `0 < level < 1`.
@@ -129,7 +130,7 @@ def compute_bias(
     functional: str = "mean",
     level: float = 0.5,
     n_bins: int = 10,
-    bin_method: str = "quantile",
+    bin_method: str = "auto",
 ):
     r"""Compute generalised bias conditional on a feature.
 
@@ -164,6 +165,7 @@ def compute_bias(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+
     level : float
         The level of the expectile of quantile. (Often called \(\alpha\).)
         It must be `0 < level < 1`.
@@ -175,10 +177,38 @@ def compute_bias(
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
     bin_method : str
-        The method to use for finding bin edges (boundaries). Options are:
+        The method for finding bin edges (boundaries). Options using `n_bins` are:
 
         - `"quantile"`
         - `"uniform"`
+
+        Options automatically selecting the number of bins for numerical features
+        thereby using uniform bins are same options as
+        [numpy.histogram_bin_edges](https://numpy.org/doc/stable/reference/generated/numpy.histogram_bin_edges.html):
+
+        - `"auto"`
+        Minimum bin width between the `"sturges"` and `"fd"` estimators. Provides good
+        all-around performance.
+        - `"fd"` (Freedman Diaconis Estimator)
+        Robust (resilient to outliers) estimator that takes into account data
+        variability and data size.
+        - `"doane"`
+        An improved version of Sturges' estimator that works better with non-normal
+        datasets.
+        - `"scott"`
+        Less robust estimator that takes into account data variability and data size.
+        - `"stone"`
+        Estimator based on leave-one-out cross-validation estimate of the integrated
+        squared error. Can be regarded as a generalization of Scott's rule.
+        - `"rice"`
+        Estimator does not take variability into account, only data size. Commonly
+        overestimates number of bins required.
+        - `"sturges"`
+        R's default method, only accounts for data size. Only optimal for gaussian data
+        and underestimates number of bins for large non-gaussian datasets.
+        - `"sqrt"`
+        Square root (of data size) estimator, used by Excel and other programs for its
+        speed and simplicity.
 
     Returns
     -------
@@ -342,11 +372,9 @@ def compute_bias(
                     ).alias("variance"),
                 ]
 
-                if is_cat_or_string:
-                    groupby_name = feature_name
-                else:
-                    df = df.hstack([f_binned.get_column("bin")])
-                    groupby_name = "bin"
+                groupby_name = "bin"
+                df = df.hstack([f_binned.get_column("bin")])
+                if not is_cat_or_string:
                     agg_list.append(pl.col(feature_name).mean())
 
                 df = (
@@ -371,6 +399,13 @@ def compute_bias(
                             .alias("bias_stderr"),
                         ]
                     )
+                )
+
+                if is_cat_or_string:
+                    df = df.with_columns(pl.col(groupby_name).alias(feature_name))
+
+                df = (
+                    df
                     # With sort and head alone, we could lose the null value, but we
                     # want to keep it.
                     # .sort("bias_count", descending=True)
@@ -448,7 +483,7 @@ def compute_marginal(
     weights: Optional[npt.ArrayLike] = None,
     *,
     n_bins: int = 10,
-    bin_method: str = "uniform",
+    bin_method: str = "auto",
     n_max: int = 1000,
     rng: Optional[Union[np.random.Generator, int]] = None,
 ):
@@ -482,10 +517,39 @@ def compute_marginal(
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
     bin_method : str
-        The method to use for finding bin edges (boundaries). Options are:
+        The method for finding bin edges (boundaries). Options using `n_bins` are:
 
         - `"quantile"`
         - `"uniform"`
+
+        Options automatically selecting the number of bins for numerical features
+        thereby using uniform bins are same options as
+        [numpy.histogram_bin_edges](https://numpy.org/doc/stable/reference/generated/numpy.histogram_bin_edges.html):
+
+        - `"auto"`
+        Minimum bin width between the `"sturges"` and `"fd"` estimators. Provides good
+        all-around performance.
+        - `"fd"` (Freedman Diaconis Estimator)
+        Robust (resilient to outliers) estimator that takes into account data
+        variability and data size.
+        - `"doane"`
+        An improved version of Sturges' estimator that works better with non-normal
+        datasets.
+        - `"scott"`
+        Less robust estimator that takes into account data variability and data size.
+        - `"stone"`
+        Estimator based on leave-one-out cross-validation estimate of the integrated
+        squared error. Can be regarded as a generalization of Scott's rule.
+        - `"rice"`
+        Estimator does not take variability into account, only data size. Commonly
+        overestimates number of bins required.
+        - `"sturges"`
+        R's default method, only accounts for data size. Only optimal for gaussian data
+        and underestimates number of bins for large non-gaussian datasets.
+        - `"sqrt"`
+        Square root (of data size) estimator, used by Excel and other programs for its
+        speed and simplicity.
+
     n_max : int or None
         Used only for partial dependence computation. The number of rows to subsample
         from X. This speeds up computation, in particular for slow predict functions.
@@ -553,7 +617,7 @@ def compute_marginal(
     >>> from sklearn.linear_model import Ridge
     >>> pl.Config.set_tbl_width_chars(84)  # doctest: +ELLIPSIS
     <class 'polars.config.Config'>
-    >>> y_obs, X =[0, 0, 1, 1], [[0, 1], [1, 1], [1, 2], [2, 2]]
+    >>> y_obs, X =[0, 0, 1, 1], [[0, 1], [1, 1], [2, 2], [3, 2]]
     >>> m = Ridge().fit(X, y_obs)
     >>> compute_marginal(y_obs=y_obs, y_pred=m.predict(X), X=X, feature_name=0,
     ... predict_function=m.predict)
@@ -565,15 +629,15 @@ def compute_marginal(
     │ f64      ┆ f64     ┆ f64     ┆ f64     ┆   ┆       ┆         ┆ array[f ┆ ---     │
     │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 64, 3]  ┆ f64     │
     ╞══════════╪═════════╪═════════╪═════════╪═══╪═══════╪═════════╪═════════╪═════════╡
-    │ 0.0      ┆ 0.0     ┆ 0.1     ┆ 0.0     ┆ … ┆ 1     ┆ 1.0     ┆ [0.0,   ┆ 0.3     │
-    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.0,    ┆         │
-    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.2]    ┆         │
-    │ 1.0      ┆ 0.5     ┆ 0.5     ┆ 0.5     ┆ … ┆ 2     ┆ 2.0     ┆ [0.8,   ┆ 0.5     │
-    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.0,    ┆         │
+    │ 0.5      ┆ 0.0     ┆ 0.125   ┆ 0.0     ┆ … ┆ 2     ┆ 2.0     ┆ [0.0,   ┆ 0.25    │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.5,    ┆         │
     │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 1.0]    ┆         │
-    │ 2.0      ┆ 1.0     ┆ 0.9     ┆ 0.0     ┆ … ┆ 1     ┆ 1.0     ┆ [1.8,   ┆ 0.7     │
+    │ 2.0      ┆ 1.0     ┆ 0.75    ┆ 0.0     ┆ … ┆ 1     ┆ 1.0     ┆ [1.0,   ┆ 0.625   │
     │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.0,    ┆         │
     │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 2.0]    ┆         │
+    │ 3.0      ┆ 1.0     ┆ 1.0     ┆ 0.0     ┆ … ┆ 1     ┆ 1.0     ┆ [2.0,   ┆ 0.875   │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 0.0,    ┆         │
+    │          ┆         ┆         ┆         ┆   ┆       ┆         ┆ 3.0]    ┆         │
     └──────────┴─────────┴─────────┴─────────┴───┴───────┴─────────┴─────────┴─────────┘
     """
     validate_same_first_dimension(y_obs, y_pred)
@@ -682,14 +746,11 @@ def compute_marginal(
                     ),
                 ]
 
-                if is_cat_or_string:
-                    groupby_name = feature_name
-                else:
+                groupby_name = "bin"
+                df = df.hstack([f_binned.get_column("bin")])
+                if not is_cat_or_string:
                     # We also add the bin edges.
-                    df = df.hstack(
-                        [f_binned.get_column("bin"), f_binned.get_column("bin_edges")]
-                    )
-                    groupby_name = "bin"
+                    df = df.hstack([f_binned.get_column("bin_edges")])
                     agg_list += [
                         pl.col(feature_name).mean(),
                         pl.col(feature_name).std(ddof=0).alias("__feature_std"),
@@ -725,11 +786,17 @@ def compute_marginal(
                             for c in ("y_obs", "y_pred")
                         ]
                     )
-                    # With sort and head alone, we could lose the null value, but we
-                    # want to keep it.
-                    # .sort("bias_count", descending=True)
-                    # .head(n_bins)
-                    .with_columns(
+                )
+
+                if is_cat_or_string:
+                    df = df.with_columns(pl.col(groupby_name).alias(feature_name))
+
+                # With sort and head alone, we could lose the null value, but we
+                # want to keep it.
+                # .sort("bias_count", descending=True)
+                # .head(n_bins)
+                df = (
+                    df.with_columns(
                         pl.when(pl.col(feature_name).is_null())
                         .then(pl.max("count") + 1)
                         .otherwise(pl.col("count"))
@@ -786,15 +853,27 @@ def compute_marginal(
             # Add partial dependence.
             with_pd = predict_function is not None and feature_name is not None
             if with_pd:
+                # In case we have "rest-n" string/cat/enum, we must exclude it from pd
+                # because it is an artificual value and not part of the real data.
+                has_rest_n = (
+                    is_cat_or_string and "rest-" in df.get_column(feature_name)[-1]
+                )
+                if has_rest_n:
+                    # Note that null, if present, is the first not the last values.
+                    grid = df.get_column(feature_name)[:-1]
+                else:
+                    grid = df.get_column(feature_name)
                 pd_values = compute_partial_dependence(
                     pred_fun=predict_function,  # type: ignore
                     X=X,  # type: ignore
                     feature_index=feature_index,
-                    grid=df.get_column(feature_name),
+                    grid=grid,
                     weights=weights,
                     n_max=n_max,
                     rng=rng,
                 )
+                if has_rest_n:
+                    pd_values = pl.concat([pl.Series(pd_values), pl.Series([None])])
                 df = df.with_columns(
                     pl.Series(name="partial_dependence", values=pd_values)
                 )
