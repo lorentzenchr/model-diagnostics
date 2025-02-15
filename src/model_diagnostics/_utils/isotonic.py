@@ -383,7 +383,7 @@ def isotonic_regression(
             msg = "Weights w must be strictly positive."
             raise ValueError(msg)
 
-    order = np.s_[:] if increasing else np.s_[::-1]
+    order = np.s_[:] if increasing else np.s_[::-1]  # type: ignore
     x = y[order]
     wx = weights[order]
 

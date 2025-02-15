@@ -196,7 +196,7 @@ lab = "jupyter lab"
 detached = true
 dependencies = [
   "numpy>=1.22",
-  "mypy>=1.4",
+  "mypy>=1.14",
   "ruff==0.4.4",
 ]
 
