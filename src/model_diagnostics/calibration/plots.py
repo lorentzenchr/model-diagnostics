@@ -64,6 +64,7 @@ def plot_reliability_diagram(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+
     level : float
         The level of the expectile or quantile. (Often called \(\alpha\).)
         It must be `0 <= level <= 1`.
@@ -318,7 +319,7 @@ def plot_bias(
     functional: str = "mean",
     level: float = 0.5,
     n_bins: int = 10,
-    bin_method: str = "quantile",
+    bin_method: str = "auto",
     confidence_level: float = 0.9,
     ax: Optional[mpl.axes.Axes] = None,
 ):
@@ -357,6 +358,7 @@ def plot_bias(
         - `"median"`. Argument `level` is neglected.
         - `"expectile"`
         - `"quantile"`
+
     level : float
         The level of the expectile or quantile. (Often called \(\alpha\).)
         It must be `0 <= level <= 1`.
@@ -368,10 +370,39 @@ def plot_bias(
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
     bin_method : str
-        The method to use for finding bin edges (boundaries). Options are:
+        The method for finding bin edges (boundaries). Options using `n_bins` are:
 
-        - "quantile"
-        - "uniform"
+        - `"quantile"`
+        - `"uniform"`
+
+        Options automatically selecting the number of bins for numerical features
+        thereby using uniform bins are same options as
+        [numpy.histogram_bin_edges](https://numpy.org/doc/stable/reference/generated/numpy.histogram_bin_edges.html):
+
+        - `"auto"`
+        Minimum bin width between the `"sturges"` and `"fd"` estimators. Provides good
+        all-around performance.
+        - `"fd"` (Freedman Diaconis Estimator)
+        Robust (resilient to outliers) estimator that takes into account data
+        variability and data size.
+        - `"doane"`
+        An improved version of Sturges' estimator that works better with non-normal
+        datasets.
+        - `"scott"`
+        Less robust estimator that takes into account data variability and data size.
+        - `"stone"`
+        Estimator based on leave-one-out cross-validation estimate of the integrated
+        squared error. Can be regarded as a generalization of Scott's rule.
+        - `"rice"`
+        Estimator does not take variability into account, only data size. Commonly
+        overestimates number of bins required.
+        - `"sturges"`
+        R's default method, only accounts for data size. Only optimal for gaussian data
+        and underestimates number of bins for large non-gaussian datasets.
+        - `"sqrt"`
+        Square root (of data size) estimator, used by Excel and other programs for its
+        speed and simplicity.
+
     confidence_level : float
         Confidence level for error bars. If 0, no error bars are plotted. Value must
         fulfil `0 <= confidence_level < 1`.
@@ -711,7 +742,7 @@ def plot_marginal(
     weights: Optional[npt.ArrayLike] = None,
     *,
     n_bins: int = 10,
-    bin_method: str = "uniform",
+    bin_method: str = "auto",
     n_max: int = 1000,
     rng: Optional[Union[np.random.Generator, int]] = None,
     ax: Optional[mpl.axes.Axes] = None,
@@ -747,10 +778,39 @@ def plot_marginal(
         number of bins might be smaller than `n_bins`. Null values are always included
         in the output, accounting for one bin. NaN values are treated as null values.
     bin_method : str
-        The method to use for finding bin edges (boundaries). Options are:
+        The method for finding bin edges (boundaries). Options using `n_bins` are:
 
-        - "quantile"
-        - "uniform"
+        - `"quantile"`
+        - `"uniform"`
+
+        Options automatically selecting the number of bins for numerical features
+        thereby using uniform bins are same options as
+        [numpy.histogram_bin_edges](https://numpy.org/doc/stable/reference/generated/numpy.histogram_bin_edges.html):
+
+        - `"auto"`
+        Minimum bin width between the `"sturges"` and `"fd"` estimators. Provides good
+        all-around performance.
+        - `"fd"` (Freedman Diaconis Estimator)
+        Robust (resilient to outliers) estimator that takes into account data
+        variability and data size.
+        - `"doane"`
+        An improved version of Sturges' estimator that works better with non-normal
+        datasets.
+        - `"scott"`
+        Less robust estimator that takes into account data variability and data size.
+        - `"stone"`
+        Estimator based on leave-one-out cross-validation estimate of the integrated
+        squared error. Can be regarded as a generalization of Scott's rule.
+        - `"rice"`
+        Estimator does not take variability into account, only data size. Commonly
+        overestimates number of bins required.
+        - `"sturges"`
+        R's default method, only accounts for data size. Only optimal for gaussian data
+        and underestimates number of bins for large non-gaussian datasets.
+        - `"sqrt"`
+        Square root (of data size) estimator, used by Excel and other programs for its
+        speed and simplicity.
+
     n_max : int or None
         Used only for partial dependence computation. The number of rows to subsample
         from X. This speeds up computation, in particular for slow predict functions.
@@ -763,8 +823,8 @@ def plot_marginal(
     show_lines : str
         Option for how to display mean values and partial dependence:
 
-        - "always": Always draw lines.
-        - "numerical": String and categorical features are drawn as points, numerical
+        - `"always"`: Always draw lines.
+        - `"numerical"`: String and categorical features are drawn as points, numerical
           ones as lines.
 
     Returns

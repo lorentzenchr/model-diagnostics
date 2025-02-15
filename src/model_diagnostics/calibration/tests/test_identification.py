@@ -227,6 +227,7 @@ def test_compute_bias_numerical_feature():
         y_pred=df.get_column("y_pred"),
         feature=df.get_column("feature"),
         n_bins=n_bins,
+        bin_method="quantile",
     )
     bias = (df.get_column("y_pred") - df.get_column("y_obs")).to_numpy()
     df_expected = pl.DataFrame(
@@ -248,8 +249,27 @@ def test_compute_bias_numerical_feature():
     assert_frame_equal(df_bias, df_expected, check_exact=False)
 
 
-@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
-@pytest.mark.parametrize("n_bins", [2, 10])
+# Filter warnings for method "stone".
+@pytest.mark.filterwarnings(
+    "ignore:.*The number of bins estimated may be suboptimal.*:RuntimeWarning"
+)
+@pytest.mark.parametrize(
+    ("bin_method", "n_bins"),
+    [
+        ("quantile", 2),
+        ("quantile", 10),
+        ("uniform", 2),
+        ("uniform", 10),
+        ("auto", 10),
+        ("fd", 10),
+        ("doane", 10),
+        ("scott", 10),
+        ("stone", 10),
+        ("rice", 10),
+        ("sturges", 10),
+        ("sqrt", 10),
+    ],
+)
 def test_compute_bias_n_bins_numerical_feature(bin_method, n_bins):
     """Test compute_bias returns right number of bins for a numerical feature."""
     n_obs = 10
@@ -263,7 +283,10 @@ def test_compute_bias_n_bins_numerical_feature(bin_method, n_bins):
         n_bins=n_bins,
         bin_method=bin_method,
     )
-    assert df_bias.shape[0] == np.min([n_bins, 4])
+    if bin_method in ("quantile", "uniform"):
+        assert df_bias.shape[0] == np.min([n_bins, 4])
+    else:
+        assert 2 <= df_bias.shape[0] <= 10
     assert df_bias["bias_count"].sum() == n_obs
 
 
@@ -286,14 +309,18 @@ def test_compute_bias_n_bins_string_like_feature(feature_type):
         y_pred = pl.Series("model", np.arange(n_obs) + 0.5)
         feature = pl.Series("feature", ["a", "a", None, "b", "b", "c"], dtype=dtype)
 
+        if feature_type == "enum":
+            expected_feature = pl.Series(
+                values=[None, "b", "rest-2"], dtype=pl.Enum(["b", "a", "c", "rest-2"])
+            )
+        else:
+            expected_feature = pl.Series(values=[None, "a", "rest-2"], dtype=dtype)
+
         df_expected = pl.DataFrame(
             {
-                "feature": pl.Series(
-                    [None, "b", "a"] if feature_type == "enum" else [None, "a", "b"],
-                    dtype=dtype,
-                ),
+                "feature": expected_feature,
                 "bias_mean": 0.5,
-                "bias_count": pl.Series([1, 2, 2], dtype=pl.UInt32),
+                "bias_count": pl.Series([1, 2, 3], dtype=pl.UInt32),
             }
         )
         for _i in range(10):
@@ -452,21 +479,8 @@ def test_compute_bias_keeps_null_values():
         y_obs=y_obs,
         y_pred=y_pred,
         feature=feature,
-        n_bins=1,
-    )
-    assert_series_equal(
-        df_bias["feature"], pl.Series("feature", [None], dtype=pl.Float64)
-    )
-    assert_series_equal(
-        df_bias["bias_count"], pl.Series("bias_count", [2], dtype=pl.UInt32)
-    )
-    assert df_bias["bias_count"].sum() == 2
-
-    df_bias = compute_bias(
-        y_obs=y_obs,
-        y_pred=y_pred,
-        feature=feature,
         n_bins=2,
+        bin_method="quantile",
     )
     assert_series_equal(df_bias["feature"], pl.Series("feature", [None, 1.625]))
     assert_series_equal(
@@ -479,31 +493,13 @@ def test_compute_bias_keeps_null_values():
         y_pred=y_pred,
         feature=feature,
         n_bins=4,
+        bin_method="quantile",
     )
     assert_series_equal(df_bias["feature"], pl.Series("feature", [None, 1.0, 2.0]))
     assert_series_equal(
         df_bias["bias_count"], pl.Series("bias_count", [2, 3, 5], dtype=pl.UInt32)
     )
     assert df_bias["bias_count"].sum() == n_obs
-
-
-def test_compute_bias_warning_for_n_bins():
-    """Test that compute_bias gives warning for n_bins to small."""
-    y_obs = np.arange(6)
-    y_pred = y_obs + 1
-    feature = ["a", "a", "b", "b", "c", "c"]
-
-    with pytest.warns(
-        UserWarning, match="Due to ties, the effective number of bins is 0"
-    ):
-        df = compute_bias(
-            y_obs=y_obs,
-            y_pred=y_pred,
-            feature=feature,
-            n_bins=2,
-        )
-
-    assert df.shape[0] == 0
 
 
 def test_compute_bias_raises_weights_shape():
@@ -516,7 +512,7 @@ def test_compute_bias_raises_weights_shape():
 
 def test_compute_bias_raises_bin_method():
     y_obs, y_pred, feature = np.arange(5), np.arange(5), np.arange(5)
-    msg = "Parameter bin_method must be either 'quantile' or ''uniform'"
+    msg = "Parameter bin_method must be one of .*quantile"
     with pytest.raises(ValueError, match=msg):
         compute_bias(y_obs, y_pred, feature, n_bins=5, bin_method=None)
 
@@ -533,7 +529,13 @@ def test_compute_bias_1d_array_like(list2array):
     weights = list2array([1, 1, 1, 1])
     if isinstance(y_pred, SkipContainer):
         pytest.skip("Module for data container not imported.")
-    df_bias = compute_bias(y_obs=y_obs, y_pred=y_pred, weights=weights, feature=feature)
+    df_bias = compute_bias(
+        y_obs=y_obs,
+        y_pred=y_pred,
+        weights=weights,
+        feature=feature,
+        bin_method="quantile",
+    )
     df_expected = pl.DataFrame(
         {
             "feature": [0.0, 1.0],
@@ -715,7 +717,25 @@ def test_compute_marginal_feature_none():
     assert_frame_equal(df_marginal, df_expected, check_exact=False)
 
 
-@pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
+# Filter warnings for method "stone".
+@pytest.mark.filterwarnings(
+    "ignore:.*The number of bins estimated may be suboptimal.*:RuntimeWarning"
+)
+@pytest.mark.parametrize(
+    "bin_method",
+    [
+        "quantile",
+        "uniform",
+        "auto",
+        "fd",
+        "doane",
+        "scott",
+        "stone",
+        "rice",
+        "sturges",
+        "sqrt",
+    ],
+)
 def test_compute_marginal_numerical_feature(bin_method):
     """Test compute_marginal for a numerical feature."""
     n_obs = 100
@@ -767,7 +787,15 @@ def test_compute_marginal_numerical_feature(bin_method):
             ),
         }
     )
-    assert_frame_equal(df_marginal, df_expected, check_exact=False)
+
+    if bin_method in ("quantile", "uniform", "rice", "sqrt"):
+        assert_frame_equal(df_marginal, df_expected, check_exact=False)
+    else:
+        # Method "stone" produces only 1 bin.
+        assert 1 <= df_marginal.shape[0] < n_obs
+        assert_series_equal(
+            df_marginal["feature"], df_marginal["y_pred_mean"], check_names=False
+        )
 
 
 @pytest.mark.parametrize("bin_method", ["quantile", "uniform"])
@@ -805,19 +833,25 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
     with pl.StringCache():
         n_bins = 3
         n_obs = 6
-        y_obs = np.array([1, 1, 0, 2, 2, 3])
+        y_obs = np.array([1, 1, 0, 3, 1, 2])
         y_pred = np.zeros(n_obs)
         feature = pl.Series("feature", ["a", "a", None, "b", "b", "c"], dtype=dtype)
 
+        if feature_type == "enum":
+            feature_expected = pl.Series(
+                [None, "b", "rest-2"], dtype=pl.Enum(["b", "a", "c", "rest-2"])
+            )
+            y_obs_mean = [0.0, 2, 4 / 3]
+        else:
+            feature_expected = pl.Series([None, "a", "rest-2"], dtype=dtype)
+            y_obs_mean = [0.0, 1, 2]
+
         df_expected = pl.DataFrame(
             {
-                "feature": pl.Series(
-                    [None, "b", "a"] if feature_type == "enum" else [None, "a", "b"],
-                    dtype=dtype,
-                ),
-                "y_obs_mean": [0.0, 2, 1] if feature_type == "enum" else [0.0, 1, 2],
+                "feature": feature_expected,
+                "y_obs_mean": y_obs_mean,
                 "y_pred_mean": 0.0,
-                "count": pl.Series([1, 2, 2], dtype=pl.UInt32),
+                "count": pl.Series([1, 2, 3], dtype=pl.UInt32),
             }
         )
         for _i in range(10):
@@ -966,6 +1000,7 @@ def test_compute_marginal_with_partial_dependence(weights):
         predict_function=predict,
         weights=weights,
         n_bins=100,
+        bin_method="uniform",
         n_max=n_obs,
         rng=123,
     ).select(["a", "y_obs_mean", "y_pred_mean", "partial_dependence"])
@@ -976,6 +1011,51 @@ def test_compute_marginal_with_partial_dependence(weights):
             "y_obs_mean": 0.0,
             "y_pred_mean": 2.0 * np.arange(n_bins) ** 2,
             "partial_dependence": 5.0 * np.arange(n_bins) - 2,
+        }
+    )
+    assert_frame_equal(df, df_expected)
+
+
+@pytest.mark.parametrize("with_null", [False, True])
+def test_compute_marginal_with_partial_dependence_on_strings(with_null):
+    """Test partial_dependence in compute_marginal with a rest-n value."""
+    n_obs = 20
+    n_bins = 3
+    X = pl.DataFrame(
+        {
+            "a": np.arange(n_obs) % 5,
+            "b": ["a", "b", "c", "d", None if with_null else "e"] * 4,
+        }
+    )
+
+    # The Python function ord throws an error if "rest-3" is passed to it.
+    def predict(X):
+        a = X.get_column("a")
+        b = (
+            X.get_column("b")
+            .map_elements(lambda x: ord(x) - ord("a"), return_dtype=pl.Int32)
+            .fill_null(ord("e") - ord("a"))
+        )
+
+        return a + b - 2 * a * b
+
+    df = compute_marginal(
+        y_obs=np.zeros(n_obs),
+        y_pred=predict(X),
+        X=X,
+        feature_name="b",
+        predict_function=predict,
+        n_bins=n_bins,
+        bin_method="uniform",
+        n_max=n_obs,
+        rng=123,
+    ).select(["b", "y_obs_mean", "partial_dependence"])
+
+    df_expected = pl.DataFrame(
+        {
+            "b": [None, "a", "rest-3"] if with_null else ["a", "b", "rest-3"],
+            "y_obs_mean": 0.0,
+            "partial_dependence": [-10.0, 2, None] if with_null else [2.0, -1, None],
         }
     )
     assert_frame_equal(df, df_expected)

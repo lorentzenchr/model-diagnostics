@@ -247,7 +247,7 @@ def test_plot_reliability_diagram_constant_prediction_transform_output():
         (
             "bin_method",
             "XXX",
-            "Parameter bin_method must be either 'quantile' or ''uniform'",
+            "Parameter bin_method must be one of .*quantile",
         ),
     ],
 )
@@ -462,7 +462,7 @@ def test_plot_bias_multiple_predictions(with_null, feature_type, confidence_leve
         (
             "bin_method",
             "XXX",
-            "Parameter bin_method must be either 'quantile' or ''uniform'",
+            "Parameter bin_method must be one of .*quantile",
         ),
         ("show_lines", 2, "The argument show_lines mut be 'always' or 'numerical'"),
     ],

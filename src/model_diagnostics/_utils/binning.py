@@ -1,5 +1,4 @@
 import sys
-import warnings
 from typing import Optional, Union
 
 import numpy as np
@@ -11,6 +10,19 @@ from model_diagnostics._utils.array import (
     is_pandas_series,
     length_of_first_dimension,
 )
+
+
+def _format_integer(x):
+    """Nicely round and format large integers."""
+    # https://stackoverflow.com/a/45846841
+    x = float(f"{x:.3g}")
+    magnitude = 0
+    while abs(x) >= 1000 and magnitude < 4:
+        magnitude += 1
+        x /= 1000.0
+    return "{}{}".format(
+        f"{x:f}".rstrip("0").rstrip("."), ["", "k", "M", "G", "T"][magnitude]
+    )
 
 
 def bin_feature(
@@ -33,15 +45,24 @@ def bin_feature(
     n_obs : int
         The expected length of the first dimention of feature.
     n_bins : int
-        The number of bins for numerical features and the maximal number of (most
-        frequent) categories shown for categorical features. Due to ties, the effective
-        number of bins might be smaller than `n_bins`. Null values are always included
-        in the output, accounting for one bin. NaN values are treated as null values.
+        The number of bins, at least 2, for numerical features and the maximal number
+        of (most frequent) categories shown for categorical features. Due to ties, the
+        effective number of bins might be smaller than `n_bins`. Null values are always
+        included in the output, accounting for one bin. NaN values are treated as null
+        values.
     bin_method : str
         The method to use for finding bin edges (boundaries). Options are:
 
-        - "quantile"
-        - "uniform"
+        - `"quantile"`
+        - `"uniform"`
+        - `"auto"`
+        - `"fd"`
+        - `"doane"`
+        - `"scott"`
+        - `"stone"`
+        - `"rice"`
+        - `"sturges"`
+        - `"sqrt"`
 
     Returns
     -------
@@ -50,21 +71,43 @@ def bin_feature(
     n_bins : int
         Effective number of bins.
     f_binned : pl.DataFrame or None
-        For a numerical feature the binned/digitized version of it.
-        Columns are:
+        The binned/digitized version of the feature.
+        For numerical features, columns are:
 
         - `bin`: The bin number.
+          Bin `i` is assigned if `bin_edges[i] < feature <= bin_edges[i]`
         - `bin_edges`: edges/thresholds of the bins.
+
+        For other features, columns are:
+
+        - `bin`: The binned version of it, i.e. the many too small values are put
+          together as `"rest-n"` where `n` is the number of unique values it contains.
     """
     is_categorical = False
+    is_enum = False
     is_string = False
     f_binned = None
 
-    if bin_method not in ("quantile", "uniform"):
+    valid_bin_methods = (
+        "quantile",
+        "uniform",
+        "auto",
+        "fd",
+        "doane",
+        "scott",
+        "stone",
+        "rice",
+        "sturges",
+        "sqrt",
+    )
+    if bin_method not in valid_bin_methods:
         msg = (
-            "Parameter bin_method must be either 'quantile' or ''uniform';"
+            f"Parameter bin_method must be one of {valid_bin_methods};"
             f" got {bin_method}."
         )
+        raise ValueError(msg)
+    if n_bins < 2:
+        msg = f"Parameter n_bins must be at least 2, got {n_bins}."
         raise ValueError(msg)
 
     default = f"feature {feature_name}" if isinstance(feature_name, int) else "feature"
@@ -99,8 +142,10 @@ def bin_feature(
             " first dimension."
         )
         raise ValueError(msg)
-    if feature.dtype in [pl.Categorical, pl.Enum]:
+    if feature.dtype == pl.Categorical:
         is_categorical = True
+    elif feature.dtype == pl.Enum:
+        is_enum = True
     elif feature.dtype in [pl.Utf8, pl.Object]:
         # We could convert strings to categoricals.
         is_string = True
@@ -111,52 +156,83 @@ def bin_feature(
         # integers
         pass
 
-    if is_categorical or is_string:
+    # If we have Null values, we should reserve one bin for it and reduce
+    # the effective number of bins by 1.
+    n_bins_ef = max(1, n_bins - feature.has_nulls())
+
+    if is_categorical or is_enum or is_string:
         # For categorical and string features, knowing the frequency table in
         # advance makes life easier in order to make results consistent.
-        # Consider
+        # Consider (no null values)
         #     feature  count
         #         "a"      3
         #         "b"      2
         #         "c"      2
         #         "d"      1
-        # with n_bins = 2. As we want the effective number of bins to be at
-        # most n_bins, we want, in the above case, only "a" in the final
-        # result. Therefore, we need to internally decrease n_bins to 1.
-        if feature.null_count() == 0:
-            value_count = feature.value_counts(sort=True)
-            n_bins_ef = n_bins
-        else:
-            value_count = feature.drop_nulls().value_counts(sort=True)
-            n_bins_ef = n_bins - 1
+        # with n_bins = 3. As we want the effective number of bins to be at most
+        # n_bins, we want, in the above case, only "a" and "b" in the final result. All
+        # the others a put into the second bin and called "rest-2" because it comprises
+        # 2 unique features values (c, d). Ties are dealt with by sorting.
 
-        if n_bins_ef >= value_count.shape[0]:
-            n_bins = value_count.shape[0]
+        # value_counts(sort=True) sorts ties by first occurence, we want
+        # alphanumerical sorting order.
+        value_counts = (
+            feature.drop_nulls()
+            .value_counts()
+            .sort(by=["count", feature_name], descending=[True, False])
+        )
+
+        if n_bins_ef >= value_counts.shape[0]:
+            # This also covers the case of only null values.
+            n_bins_ef = value_counts.shape[0]
+            f_binned = pl.DataFrame({"bin": feature})
         else:
-            count_name = "count"
-            n = value_count[count_name][n_bins_ef]
-            n_bins_tmp = value_count.filter(pl.col(count_name) >= n).shape[0]
-            if n_bins_tmp > n_bins_ef:
-                n_bins = value_count.filter(pl.col(count_name) > n).shape[0]
+            # We keep the n_bins_ef - 1 most frequent values. Ties are resolved by
+            # taking the first one of the sorted values (most often alpha-numerical).
+            if feature.has_nulls():
+                # To ease adding the null value, we take one value more.
+                keep_values = value_counts[feature_name].head(n_bins_ef)
+                if is_categorical:
+                    # FIXME: Workaround for https://github.com/pola-rs/polars/issues/21175
+                    keep_values = keep_values.cast(pl.String)
+                    keep_values[-1] = None
+                    keep_values = keep_values.cast(pl.Categorical)
+                else:
+                    keep_values[-1] = None
             else:
-                n_bins = n_bins_tmp
-
-        if feature.null_count() >= 1:
-            n_bins += 1
-
-        if n_bins == 0:
-            msg = (
-                "Due to ties, the effective number of bins is 0. "
-                f"Consider to increase n_bins>={n_bins_tmp}."
+                keep_values = value_counts[feature_name].head(n_bins_ef - 1)
+            # Number of feature values to put into one bin, called "rest-n",
+            # n = n_remaining.
+            n_remaining = value_counts.shape[0] - (n_bins_ef - 1)
+            remaining_name = "rest-" + _format_integer(n_remaining)
+            while remaining_name in keep_values:
+                remaining_name = "_" + remaining_name
+            return_dtype = feature.dtype
+            if is_enum:
+                return_dtype = pl.Enum(
+                    pl.concat([feature.dtype.categories, pl.Series([remaining_name])])
+                )
+            f_binned = feature.replace_strict(
+                old=keep_values,
+                new=keep_values,
+                default=remaining_name,
+                return_dtype=return_dtype,
             )
-            warnings.warn(msg, UserWarning, stacklevel=2)
+            f_binned = pl.DataFrame({"bin": f_binned})
     else:
-        # Binning
-        # If we have Null values, we should reserve one bin for it and reduce
-        # the effective number of bins by 1.
-        n_bins_ef = max(1, n_bins - (feature.null_count() >= 1))
+        # Binning a numerical feature
         # We will need min and max anyway.
         feature_min, feature_max = feature.min(), feature.max()
+        if feature_min == -np.inf:
+            finite_min = feature.filter(feature > -np.inf).min()
+        else:
+            finite_min = feature_min
+        if feature_max == np.inf:
+            finite_max = feature.filter(feature < np.inf).max()
+        else:
+            finite_max = feature_max
+        f_range = finite_max - finite_min
+
         if bin_method == "quantile":
             # We use method="inverted_cdf" instead of the default "linear" because
             # "linear" produces as many unique values as before.
@@ -168,10 +244,13 @@ def bin_feature(
                 method="inverted_cdf",
             )
             bin_edges = np.unique(q)  # Some quantiles might be the same.
+        elif bin_method == "uniform":
+            bin_edges = finite_min + f_range * np.arange(1, n_bins_ef) / n_bins_ef
         else:
-            # Uniform
-            f_range = feature_max - feature_min
-            bin_edges = feature_min + f_range * np.arange(1, n_bins_ef) / n_bins_ef
+            # numpy histogram bin methods
+            a = feature.filter(feature.is_finite() & feature.is_not_null())
+            bin_edges = np.histogram_bin_edges(a, bins=bin_method)[1:-1]
+            n_bins_ef = bin_edges.shape[0] + 1
         # We want: bins[i-1] < x <= bins[i]
         f_binned = np.digitize(feature, bins=bin_edges, right=True)
         # The full bin edges also include min and max of the feature.
@@ -210,4 +289,4 @@ def bin_feature(
             )
             .collect()
         )
-    return feature, n_bins, f_binned
+    return feature, n_bins_ef + feature.has_nulls(), f_binned

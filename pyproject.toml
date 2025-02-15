@@ -196,7 +196,7 @@ lab = "jupyter lab"
 detached = true
 dependencies = [
   "numpy>=1.22",
-  "mypy>=1.4",
+  "mypy>=1.14",
   "ruff==0.4.4",
 ]
 
@@ -269,8 +269,8 @@ name."py3.11".set-extra-dependencies = [
 ]
 # Latest versions, with plotly
 name."py3.12".set-extra-dependencies = [
-  "numpy>=2.0.0",
-  "polars>=1.4.1",
+  "numpy>=2.2.0",
+  "polars>=1.21.0",
   "scipy",
   "pandas",
   "plotly",
