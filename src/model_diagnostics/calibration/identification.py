@@ -853,10 +853,10 @@ def compute_marginal(
             # Add partial dependence.
             with_pd = predict_function is not None and feature_name is not None
             if with_pd:
-                # In case we have "rest-n" string/cat/enum, we must exclude it from pd
+                # In case we have "other n" string/cat/enum, we must exclude it from pd
                 # because it is an artificual value and not part of the real data.
                 has_rest_n = (
-                    is_cat_or_string and "rest-" in df.get_column(feature_name)[-1]
+                    is_cat_or_string and "other " in df.get_column(feature_name)[-1]
                 )
                 if has_rest_n:
                     # Note that null, if present, is the first not the last values.
