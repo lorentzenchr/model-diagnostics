@@ -311,10 +311,10 @@ def test_compute_bias_n_bins_string_like_feature(feature_type):
 
         if feature_type == "enum":
             expected_feature = pl.Series(
-                values=[None, "b", "rest-2"], dtype=pl.Enum(["b", "a", "c", "rest-2"])
+                values=[None, "b", "other 2"], dtype=pl.Enum(["b", "a", "c", "other 2"])
             )
         else:
-            expected_feature = pl.Series(values=[None, "a", "rest-2"], dtype=dtype)
+            expected_feature = pl.Series(values=[None, "a", "other 2"], dtype=dtype)
 
         df_expected = pl.DataFrame(
             {
@@ -839,11 +839,11 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
 
         if feature_type == "enum":
             feature_expected = pl.Series(
-                [None, "b", "rest-2"], dtype=pl.Enum(["b", "a", "c", "rest-2"])
+                [None, "b", "other 2"], dtype=pl.Enum(["b", "a", "c", "other 2"])
             )
             y_obs_mean = [0.0, 2, 4 / 3]
         else:
-            feature_expected = pl.Series([None, "a", "rest-2"], dtype=dtype)
+            feature_expected = pl.Series([None, "a", "other 2"], dtype=dtype)
             y_obs_mean = [0.0, 1, 2]
 
         df_expected = pl.DataFrame(
@@ -1018,7 +1018,7 @@ def test_compute_marginal_with_partial_dependence(weights):
 
 @pytest.mark.parametrize("with_null", [False, True])
 def test_compute_marginal_with_partial_dependence_on_strings(with_null):
-    """Test partial_dependence in compute_marginal with a rest-n value."""
+    """Test partial_dependence in compute_marginal with a other n value."""
     n_obs = 20
     n_bins = 3
     X = pl.DataFrame(
@@ -1028,7 +1028,7 @@ def test_compute_marginal_with_partial_dependence_on_strings(with_null):
         }
     )
 
-    # The Python function ord throws an error if "rest-3" is passed to it.
+    # The Python function ord throws an error if "other 3" is passed to it.
     def predict(X):
         a = X.get_column("a")
         b = (
@@ -1053,7 +1053,7 @@ def test_compute_marginal_with_partial_dependence_on_strings(with_null):
 
     df_expected = pl.DataFrame(
         {
-            "b": [None, "a", "rest-3"] if with_null else ["a", "b", "rest-3"],
+            "b": [None, "a", "other 3"] if with_null else ["a", "b", "other 3"],
             "y_obs_mean": 0.0,
             "partial_dependence": [-10.0, 2, None] if with_null else [2.0, -1, None],
         }

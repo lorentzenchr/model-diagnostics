@@ -31,15 +31,15 @@ def test_binning_strings_categorical(with_null, feature_type, n_bins):
     if with_null:
         feature[0] = None
         assert feature.has_nulls()
-        rest_name = "rest-3"
+        rest_name = "other 3"
         f_binned_expected = pl.Series(
-            name="bin", values=["rest-3", "b", "rest-3"] * 3 + ["rest-3"]
+            name="bin", values=["other 3", "b", "other 3"] * 3 + ["other 3"]
         )
         f_binned_expected[0] = None
     else:
-        rest_name = "rest-2"
+        rest_name = "other 2"
         f_binned_expected = pl.Series(
-            name="bin", values=["a", "b", "rest-2"] * 3 + ["rest-2"]
+            name="bin", values=["a", "b", "other 2"] * 3 + ["other 2"]
         )
     if feature_type == "cat":
         feature = feature.cast(pl.Categorical)
@@ -166,11 +166,11 @@ def test_binning_auto():
 
 
 def test_binning_strings_with_rest():
-    """Test what happens if 'rest-n' is already taken."""
+    """Test what happens if 'other n' is already taken."""
     n_bins = 3
-    feature = pl.Series(name="my_feature", values=["a", "rest-2"] * 5 + ["c", "d"] * 2)
+    feature = pl.Series(name="my_feature", values=["a", "other 2"] * 5 + ["c", "d"] * 2)
     f_binned_expected = pl.Series(
-        name="bin", values=["a", "rest-2"] * 5 + ["_rest-2"] * 4
+        name="bin", values=["a", "other 2"] * 5 + ["_other 2"] * 4
     )
     n_obs = len(feature)
 

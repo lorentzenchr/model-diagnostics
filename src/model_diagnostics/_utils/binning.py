@@ -81,7 +81,7 @@ def bin_feature(
         For other features, columns are:
 
         - `bin`: The binned version of it, i.e. the many too small values are put
-          together as `"rest-n"` where `n` is the number of unique values it contains.
+          together as `"other n"` where `n` is the number of unique values it contains.
     """
     is_categorical = False
     is_enum = False
@@ -171,7 +171,7 @@ def bin_feature(
         #         "d"      1
         # with n_bins = 3. As we want the effective number of bins to be at most
         # n_bins, we want, in the above case, only "a" and "b" in the final result. All
-        # the others a put into the second bin and called "rest-2" because it comprises
+        # the others a put into the second bin and called "other 2" because it comprises
         # 2 unique features values (c, d). Ties are dealt with by sorting.
 
         # value_counts(sort=True) sorts ties by first occurence, we want
@@ -201,10 +201,10 @@ def bin_feature(
                     keep_values[-1] = None
             else:
                 keep_values = value_counts[feature_name].head(n_bins_ef - 1)
-            # Number of feature values to put into one bin, called "rest-n",
+            # Number of feature values to put into one bin, called "other n",
             # n = n_remaining.
             n_remaining = value_counts.shape[0] - (n_bins_ef - 1)
-            remaining_name = "rest-" + _format_integer(n_remaining)
+            remaining_name = "other " + _format_integer(n_remaining)
             while remaining_name in keep_values:
                 remaining_name = "_" + remaining_name
             return_dtype = feature.dtype
