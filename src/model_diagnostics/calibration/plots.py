@@ -319,7 +319,7 @@ def plot_bias(
     functional: str = "mean",
     level: float = 0.5,
     n_bins: int = 10,
-    bin_method: str = "auto",
+    bin_method: str = "sturges",
     confidence_level: float = 0.9,
     ax: Optional[mpl.axes.Axes] = None,
 ):
@@ -365,10 +365,15 @@ def plot_bias(
         `level=0.5` and `functional="expectile"` gives the mean.
         `level=0.5` and `functional="quantile"` gives the median.
     n_bins : int
-        The number of bins for numerical features and the maximal number of (most
-        frequent) categories shown for categorical features. Due to ties, the effective
-        number of bins might be smaller than `n_bins`. Null values are always included
-        in the output, accounting for one bin. NaN values are treated as null values.
+        The number of bins, at least 2. For numerical features, `n_bins` only applies
+        when `bin_method` is set to `"quantile"` or `"uniform"`.
+        For string-like and categorical features, the most frequent values are taken.
+        Ties are dealt with by taking the first value in natural sorting order.
+        The remaining values are merged into `"other n"` with `n` indicating the unique
+        count.
+
+        I present, null values are always included in the output, accounting for one
+        bin. NaN values are treated as null values.
     bin_method : str
         The method for finding bin edges (boundaries). Options using `n_bins` are:
 
@@ -742,7 +747,7 @@ def plot_marginal(
     weights: Optional[npt.ArrayLike] = None,
     *,
     n_bins: int = 10,
-    bin_method: str = "auto",
+    bin_method: str = "sturges",
     n_max: int = 1000,
     rng: Optional[Union[np.random.Generator, int]] = None,
     ax: Optional[mpl.axes.Axes] = None,
@@ -773,10 +778,15 @@ def plot_marginal(
         Case weights. If given, the bias is calculated as weighted average of the
         identification function with these weights.
     n_bins : int
-        The number of bins for numerical features and the maximal number of (most
-        frequent) categories shown for categorical features. Due to ties, the effective
-        number of bins might be smaller than `n_bins`. Null values are always included
-        in the output, accounting for one bin. NaN values are treated as null values.
+        The number of bins, at least 2. For numerical features, `n_bins` only applies
+        when `bin_method` is set to `"quantile"` or `"uniform"`.
+        For string-like and categorical features, the most frequent values are taken.
+        Ties are dealt with by taking the first value in natural sorting order.
+        The remaining values are merged into `"other n"` with `n` indicating the unique
+        count.
+
+        I present, null values are always included in the output, accounting for one
+        bin. NaN values are treated as null values.
     bin_method : str
         The method for finding bin edges (boundaries). Options using `n_bins` are:
 

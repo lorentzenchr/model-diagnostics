@@ -146,7 +146,7 @@ def test_binning_numerical(bin_method, with_inf, with_null, feature_type):
 
 
 def test_binning_auto():
-    """ "Test auto bin method"""
+    """Test auto bin method"""
     n_bins = 5
     feature = pl.Series(name="my_feature", values=[0, 1, 1, 2])
     n_obs = len(feature)
