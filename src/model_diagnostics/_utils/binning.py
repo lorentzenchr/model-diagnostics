@@ -30,7 +30,7 @@ def bin_feature(
     feature_name: Optional[Union[int, str]],
     n_obs: int,
     n_bins: int = 10,
-    bin_method: str = "quantile",
+    bin_method: str = "sturges",
 ):
     """Helper function to bin features of different dtypes.
 
@@ -45,11 +45,15 @@ def bin_feature(
     n_obs : int
         The expected length of the first dimention of feature.
     n_bins : int
-        The number of bins, at least 2, for numerical features and the maximal number
-        of (most frequent) categories shown for categorical features. Due to ties, the
-        effective number of bins might be smaller than `n_bins`. Null values are always
-        included in the output, accounting for one bin. NaN values are treated as null
-        values.
+        The number of bins, at least 2. For numerical features, `n_bins` only applies
+        when `bin_method` is set to `"quantile"` or `"uniform"`.
+        For string-like and categorical features, the most frequent values are taken.
+        Ties are dealt with by taking the first value in natural sorting order.
+        The remaining values are merged into `"other n"` with `n` indicating the unique
+        count.
+
+        I present, null values are always included in the output, accounting for one
+        bin. NaN values are treated as null values.
     bin_method : str
         The method to use for finding bin edges (boundaries). Options are:
 
