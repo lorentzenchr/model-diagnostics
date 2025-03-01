@@ -930,6 +930,17 @@ def plot_marginal(
     ```
 
     """
+    plot_items = ["y_obs_mean", "y_pred_mean"]
+
+    if y_obs is None:
+        y_obs = np.empty(X.shape[0])
+        y_obs.fill(0)
+        plot_items.remove("y_obs_mean")
+    if y_pred is None:
+        y_pred = np.empty(X.shape[0])
+        y_pred.fill(0)
+        plot_items.remove("y_pred_mean")
+
     if ax is None:
         plot_backend = get_config()["plot_backend"]
         if plot_backend == "matplotlib":
@@ -1149,7 +1160,6 @@ def plot_marginal(
                 showlegend=False,
             )
 
-    plot_items = ["y_obs_mean", "y_pred_mean"]
     if predict_function is not None:
         plot_items.append("partial_dependence")
     label_dict = {
