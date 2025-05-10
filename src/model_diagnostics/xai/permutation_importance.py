@@ -229,6 +229,9 @@ def compute_permutation_importance(
     ...     rng=1,
     ... )
     """
+    if n_repeats is None or n_repeats < 1:
+        n_repeats = 1
+
     # Turn features into form {"x1": ["x1"], "x2": ["x2"], "group": ["x1", "x2"]}
     # While looking verbose, it is the most flexible way to handle all cases
     if features is None:
