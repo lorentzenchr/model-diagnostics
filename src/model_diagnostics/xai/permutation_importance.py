@@ -191,7 +191,7 @@ def compute_permutation_importance(
     >>> y = X["area"] + 20 * X["rooms"] + rng.normal(0, 1, n)
     >>>
     >>> model = LinearRegression()
-    >>> model.fit(X, y)
+    >>> _ = model.fit(X, y)
     >>>
     >>> perm_importance = compute_permutation_importance(
     ...     predict_function=model.predict,
@@ -304,6 +304,7 @@ def compute_permutation_importance(
             "standard_deviation": std,
             "base_score": base_score,
             "n_repeats": n_repeats,
+            #    "scores": scores,
         }
     ).sort("importance", descending=True)
 
