@@ -119,13 +119,16 @@ def compute_permutation_importance(
         will use all features in `X`. Can also be a dictionary with lists of feature
         names/indices as values. The keys of the dictionary are used as feature group
         names. Example: `{"x1": ["x1"], "x2": ["x2"], "size": ["x1", "x2"]}`.
+        Passing a dictionary is also useful if you want to represent feature indices
+        of a numpy array as strings. Example: `{"area": 0, "age": 1}`.
     scoring_function : callable, default=SquaredError()
         A scoring function with signature roughly
         `fun(y_obs, y_pred, weights) -> float`.
     weights : array-like of shape (n_obs) or None, default=None
         Case weights passed to the scoring_function.
-    n_repeats : int, default=5
-        Number of times to repeat the permutation for each feature group.
+    n_repeats : int or None, default=5
+        Number of times to repeat the permutation for each feature group. None means
+        only one repetition.
     n_max : int or None, default=10_000
         Maximum number of observations used. If the number of observations is greater
         than `n_max`, a random subset of size `n_max` will be drawn from `X`, `y`, (and
@@ -255,7 +258,7 @@ def compute_permutation_importance(
         X = safe_copy(X)
 
     # Stack X per repetition
-    if n_repeats > 1:
+    if n_repeats >= 2:
         X = safe_index_rows(X, np.tile(np.arange(n), n_repeats))
         if is_pandas_df(X):
             # duplicated index not working with pandas < 2
@@ -291,7 +294,7 @@ def compute_permutation_importance(
 
     # Aggregate over repetitions
     importance = pl.Series([s.mean() for s in scores])
-    std = pl.Series([s.std() for s in scores]) if n_repeats > 1 else None
+    std = pl.Series([s.std() for s in scores]) if n_repeats >= 2 else None
 
     out = pl.DataFrame(
         {
