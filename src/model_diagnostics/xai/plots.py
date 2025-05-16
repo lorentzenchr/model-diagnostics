@@ -39,12 +39,13 @@ def plot_permutation_importance(
 
     Parameters
     ----------
-    Same as compute_permutation_importance, plus:
-    max_display : int, optional
-        Maximum number of features to display.
-    error_bars : str, optional
+    Same as compute_permutation_importance(), plus:
+    max_display : int or None, optional
+        Maximum number of features to display, by default 15. 
+        If None, all features are displayed.
+    error_bars : str or None, optional
         Error bars to display. Can be "se" (standard error), "std" (standard deviation),
-        "ci" (t confidence interval) or None. Default is "se". Only if `n_repeats > 1`.
+        "ci" (t confidence interval), or None. Default is "se". Only if `n_repeats > 1`.
     confidence_level: Confidence level of the approximate t confidence interval.
         Default is 0.95. Only used if `error_bars="ci"`.
     ax : matplotlib.axes.Axes or plotly Figure, optional
@@ -84,9 +85,10 @@ def plot_permutation_importance(
         method=method,
         smaller_is_better=smaller_is_better,
         rng=rng,
-    )
+    ).reverse()  # because the plot axes are reversed as well
 
-    df = df.head(max_display).reverse()
+    if max_display is not None:
+        df = df.tail(max_display)
 
     feature_groups = df["feature"]
     importances = df["importance"]
