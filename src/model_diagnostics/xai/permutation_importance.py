@@ -100,10 +100,10 @@ def compute_permutation_importance(
     feature groups according to the idea in `[Breiman]` and `[Fisher]`.
 
     For each feature (group), permutation importance measures how much the model
-    performance (score) gets worse when re-calculating the model predictions after
-    permuting the values of that feature (group). The idea is that if a feature
-    is important, then shuffling its rows before calculating predictions will lead
-    to a large drop in model performance.
+    performance worsenes when shuffling the values of that feature (group) before
+    calculating predictions. The idea is that if a feature is important,
+    then shuffling its values will lead to a large drop in model performance.
+    Note that the model is never retrained during this process.
 
     Parameters
     ----------
@@ -295,7 +295,7 @@ def compute_permutation_importance(
 
     # Aggregate over repetitions
     importance = pl.Series([s.mean() for s in scores])
-    std = pl.Series([s.std() for s in scores]) if n_repeats > 1 else 0  # or None?
+    std = pl.Series([s.std() for s in scores]) if n_repeats > 1 else None
 
     out = pl.DataFrame(
         {
