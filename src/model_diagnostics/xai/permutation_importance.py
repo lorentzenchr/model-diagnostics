@@ -201,7 +201,7 @@ def compute_permutation_importance(
     ...     rng=1,
     ... )
     >>> perm_importance
-    shape: (3, 5)
+    shape: (3, 3)
     ┌─────────┬─────────────┬────────────────────┐
     │ feature ┆ importance  ┆ standard_deviation │
     │ ---     ┆ ---         ┆ ---                │
