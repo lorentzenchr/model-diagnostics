@@ -149,8 +149,6 @@ def compute_permutation_importance(
         - `importance`: Sample mean of the importance scores.
         - `standard_deviation`: Sample standard deviation of the importance scores
           (None if `n_repeats = 1`).
-        - `base_score`: Performance score before shuffling.
-        - `n_repeats`: Number of repetitions used to calculate the importance score.
 
         The values are sorted in decreasing order of importance.
 
@@ -201,15 +199,15 @@ def compute_permutation_importance(
     ... )
     >>> perm_importance
     shape: (3, 5)
-    ┌─────────┬─────────────┬────────────────────┬────────────┬───────────┐
-    │ feature ┆ importance  ┆ standard_deviation ┆ base_score ┆ n_repeats │
-    │ ---     ┆ ---         ┆ ---                ┆ ---        ┆ ---       │
-    │ str     ┆ f64         ┆ f64                ┆ f64        ┆ i32       │
-    ╞═════════╪═════════════╪════════════════════╪════════════╪═══════════╡
-    │ area    ┆ 1352.856052 ┆ 36.695011          ┆ 0.99184    ┆ 5         │
-    │ rooms   ┆ 515.038303  ┆ 19.899192          ┆ 0.99184    ┆ 5         │
-    │ age     ┆ 0.001373    ┆ 0.001787           ┆ 0.99184    ┆ 5         │
-    └─────────┴─────────────┴────────────────────┴────────────┴───────────┘
+    ┌─────────┬─────────────┬────────────────────┐
+    │ feature ┆ importance  ┆ standard_deviation │
+    │ ---     ┆ ---         ┆ ---                │
+    │ str     ┆ f64         ┆ f64                │
+    ╞═════════╪═════════════╪════════════════════╡
+    │ area    ┆ 1352.856052 ┆ 36.695011          │
+    │ rooms   ┆ 515.038303  ┆ 19.899192          │
+    │ age     ┆ 0.001373    ┆ 0.001787           │
+    └─────────┴─────────────┴────────────────────┘
     >>>
     >>> # Using feature subsets
     >>> perm_importance = compute_permutation_importance(
@@ -232,6 +230,10 @@ def compute_permutation_importance(
     if n_repeats is None or n_repeats < 1:
         n_repeats = 1
 
+    if method not in ("difference", "ratio", "raw"):
+        msg = f"Unknown normalization method: {method}"
+        raise ValueError(msg)
+
     # Turn features into form {"x1": ["x1"], "x2": ["x2"], "group": ["x1", "x2"]}
     # While looking verbose, it is the most flexible way to handle all cases
     if features is None:
@@ -251,9 +253,6 @@ def compute_permutation_importance(
         n = n_max
     else:
         X = safe_copy(X)
-
-    # Pre-shuffle score
-    base_score = scoring_function(y, predict_function(X), weights=weights)
 
     # Stack X per repetition
     if n_repeats > 1:
@@ -281,17 +280,14 @@ def compute_permutation_importance(
         scores.append(pl.Series(scores_per_repetition))
 
     # Remove base score
-    direction = 1 if smaller_is_better else -1
+    if method in ("difference", "ratio"):
+        base_score = scoring_function(y, predict_function(X), weights=weights)
+        direction = 1 if smaller_is_better else -1
 
-    if method == "difference":
-        scores = [direction * (s - base_score) for s in scores]
-    elif method == "ratio":
-        scores = [(s / base_score) ** direction for s in scores]
-    elif method == "raw":
-        pass
-    else:
-        msg = f"Unknown normalization method: {method}"
-        raise ValueError(msg)
+        if method == "difference":
+            scores = [direction * (s - base_score) for s in scores]
+        elif method == "ratio":
+            scores = [(s / base_score) ** direction for s in scores]
 
     # Aggregate over repetitions
     importance = pl.Series([s.mean() for s in scores])
@@ -302,9 +298,6 @@ def compute_permutation_importance(
             "feature": feature_groups,
             "importance": importance,
             "standard_deviation": std,
-            "base_score": base_score,
-            "n_repeats": n_repeats,
-            #    "scores": scores,
         }
     ).sort("importance", descending=True)
 
