@@ -71,10 +71,10 @@ def plot_permutation_importance(
 
     df = df.head(max_display).reverse()
 
-    features = df["feature"]
+    feature_groups = df["feature"]
     importances = df["importance"]
 
-    if n_repeats > 1 and error_bars is not None:
+    if n_repeats is not None and n_repeats > 1 and error_bars is not None:
         if error_bars not in ("se", "std", "ci"):
             msg = (
                 f"error_bars must be 'se', 'std', 'ci' or None, got {error_bars}."
@@ -116,17 +116,17 @@ def plot_permutation_importance(
     title = "Permutation Feature Importance"
     xlab = "Importance"
     if plot_backend == "matplotlib":
-        y_pos = np.arange(len(features))
+        y_pos = np.arange(len(feature_groups))
         _ = ax.barh(y_pos, importances, xerr=xerr)
-        ax.set_yticks(y_pos, labels=features)
+        ax.set_yticks(y_pos, labels=feature_groups)
         ax.set_xlabel(xlab)
         ax.set_title(title)
     else:
         fig.add_bar(
-            y=features,
+            y=feature_groups,
             x=importances,
             orientation="h",
-            error_x={"array": xerr, "width": 0}
+            error_x={"array": xerr, "width": 0},
         )
         fig.update_layout(
             xaxis_title=xlab,
