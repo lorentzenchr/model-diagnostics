@@ -263,10 +263,8 @@ def compute_permutation_importance(
 
     # Stack X per repetition
     if n_repeats >= 2:
+        # Do we need to worry about pandas 1?
         X = safe_index_rows(X, np.tile(np.arange(n), n_repeats))
-        if is_pandas_df(X):
-            # Duplicated index not working with pandas < 2
-            X = X.reset_index(drop=True)
 
     # Loop over feature groups
     scores = []
