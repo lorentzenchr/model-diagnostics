@@ -257,11 +257,15 @@ def compute_permutation_importance(
     else:
         X = safe_copy(X)
 
+    # Calculate pre-shuffle score before stacking X
+    if method in ("difference", "ratio"):
+        base_score = scoring_function(y, predict_function(X), weights=weights)
+
     # Stack X per repetition
     if n_repeats >= 2:
         X = safe_index_rows(X, np.tile(np.arange(n), n_repeats))
         if is_pandas_df(X):
-            # duplicated index not working with pandas < 2
+            # Duplicated index not working with pandas < 2
             X = X.reset_index(drop=True)
 
     # Loop over feature groups
@@ -284,7 +288,6 @@ def compute_permutation_importance(
 
     # Remove base score
     if method in ("difference", "ratio"):
-        base_score = scoring_function(y, predict_function(X), weights=weights)
         direction = 1 if smaller_is_better else -1
 
         if method == "difference":
