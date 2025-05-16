@@ -4,8 +4,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-import scipy
 
+from scipy import special
 from model_diagnostics import get_config
 from model_diagnostics._utils.plot_helper import is_plotly_figure
 from model_diagnostics.scoring import SquaredError
@@ -55,6 +55,23 @@ def plot_permutation_importance(
     ax :
         Either the matplotlib axes or the plotly figure.
     """
+    if error_bars is not None and n_repeats is not None and n_repeats >= 2:
+        if error_bars not in ("se", "std", "ci"):
+            msg = (
+                f"Argument error_bars must be one of 'se', 'std', 'ci', or None, got "
+                f"{error_bars}."
+            )
+            raise ValueError(msg)
+        if error_bars in ("se", "ci") and not (0 <= confidence_level < 1):
+            msg = (
+                f"Argument confidence_level must fulfil 0 <= level < 1, got "
+                f"{confidence_level}."
+            )
+            raise ValueError(msg)
+        with_error_bars = True
+    else:
+        with_error_bars = False
+
     df = compute_permutation_importance(
         predict_function=predict_function,
         X=X,
@@ -74,22 +91,17 @@ def plot_permutation_importance(
     feature_groups = df["feature"]
     importances = df["importance"]
 
-    if n_repeats is not None and n_repeats > 1 and error_bars is not None:
-        if error_bars not in ("se", "std", "ci"):
-            msg = (
-                f"error_bars must be 'se', 'std', 'ci' or None, got {error_bars}."
-            )
-            raise ValueError(msg)
+    # length of error bars
+    if with_error_bars:
+        xerr = df["standard_deviation"]
         if error_bars in ("se", "ci"):
-            xerr = df["standard_deviation"] / np.sqrt(n_repeats)
+            xerr /= np.sqrt(n_repeats)
             if error_bars == "ci":
-                xerr *= scipy.stats.t.ppf((1 + confidence_level) / 2, n_repeats - 1)
-        if error_bars == "std":
-            xerr = df["standard_deviation"]
+                xerr *= special.stdtrit(n_repeats - 1, (1 + confidence_level) / 2)
     else:
         xerr = None
 
-    # Setup backend
+    # set-up backend
     if ax is None:
         plot_backend = get_config()["plot_backend"]
         if plot_backend == "matplotlib":
@@ -112,7 +124,7 @@ def plot_permutation_importance(
         )
         raise ValueError(msg)
 
-    # Plot
+    # bars
     title = "Permutation Feature Importance"
     xlab = "Importance"
     if plot_backend == "matplotlib":
