@@ -39,7 +39,40 @@ def plot_permutation_importance(
 
     Parameters
     ----------
-    Same as compute_permutation_importance(), plus:
+    predict_function : callable
+        A callable to get predictions, i.e. `predict_function(X)`.
+    X : array-like of shape (n_obs, n_features)
+        The dataframe or array of features to be passed to the model predict function.
+    y : npt.ArrayLike
+        1D array of shape (n_observations,) containing the target values.
+    features: list, tuple, dict, default=None
+        Iterable of feature names/indices of features in `X`. The default None
+        will use all features in `X`. Can also be a dictionary with lists of feature
+        names/indices as values. The keys of the dictionary are used as feature group
+        names. Example: `{"x1": ["x1"], "x2": ["x2"], "size": ["x1", "x2"]}`.
+        Passing a dictionary is also useful if you want to represent feature indices
+        of a numpy array as strings. Example: `{"area": 0, "age": 1}`.
+    scoring_function : callable, default=SquaredError()
+        A scoring function with signature roughly
+        `fun(y_obs, y_pred, weights) -> float`.
+    weights : array-like of shape (n_obs) or None, default=None
+        Case weights passed to the scoring_function.
+    n_repeats : int, default=5
+        Number of times to repeat the permutation for each feature group.
+    n_max : int or None, default=10_000
+        Maximum number of observations used. If the number of observations is greater
+        than `n_max`, a random subset of size `n_max` will be drawn from `X`, `y`, (and
+        `weights`). Pass None for no subsampling.
+    method : str, default="difference"
+        Normalization method for the importance scores. The options are: "difference",
+        "ratio", and "raw" (no normalization).
+    scoring_direction : str, default="smaller"
+        Direction of scoring function. Use "smaller" if smaller values are better
+        (e.g., average losses), or "greater" if greater values are better
+        (e.g., R-squared).
+    rng : np.random.Generator, int or None, default=None
+        The random number generator used for shuffling values and for subsampling
+        `n_max` rows. The input is internally wrapped by `np.random.default_rng(rng)`.
     max_display : int or None, optional
         Maximum number of features to display, by default 15.
         If None, all features are displayed.
