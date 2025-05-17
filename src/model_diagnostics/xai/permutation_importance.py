@@ -137,7 +137,7 @@ def compute_permutation_importance(
         "ratio", and "raw" (no normalization).
     scoring_direction : str, default="smaller"
         Direction of scoring function. Use "smaller" if smaller values are better
-        (e.g., average losses), or "greater" if greater values are better 
+        (e.g., average losses), or "greater" if greater values are better
         (e.g., R-squared).
     rng : np.random.Generator, int or None, default=None
         The random number generator used for shuffling values and for subsampling
