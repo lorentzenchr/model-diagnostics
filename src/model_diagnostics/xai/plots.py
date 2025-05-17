@@ -22,7 +22,7 @@ def plot_permutation_importance(
     n_repeats: int = 5,
     n_max: Optional[int] = 10_000,
     method: str = "difference",
-    smaller_is_better: bool = True,
+    scoring_direction: str = "smaller",
     rng: Optional[Union[np.random.Generator, int]] = None,
     max_display: Optional[int] = 15,
     error_bars: Optional[str] = "se",
@@ -70,7 +70,7 @@ def plot_permutation_importance(
             raise ValueError(msg)
         if error_bars in ("se", "ci") and not (0 < confidence_level < 1):
             msg = (
-                f"Argument confidence_level must fulfil 0 < level < 1, got "
+                f"Argument confidence_level must fulfil 0 < confidence_level < 1, got "
                 f"{confidence_level}."
             )
             raise ValueError(msg)
@@ -88,7 +88,7 @@ def plot_permutation_importance(
         n_repeats=n_repeats,
         n_max=n_max,
         method=method,
-        smaller_is_better=smaller_is_better,
+        scoring_direction=scoring_direction,
         rng=rng,
     ).reverse()  # because the plot axes are reversed as well
 

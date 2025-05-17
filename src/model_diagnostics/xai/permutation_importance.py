@@ -91,7 +91,7 @@ def compute_permutation_importance(
     n_repeats: int = 5,
     n_max: Optional[int] = 10_000,
     method: str = "difference",
-    smaller_is_better: bool = True,
+    scoring_direction: str = "smaller",
     rng: Optional[Union[np.random.Generator, int]] = None,
 ):
     """Compute permutation feature importance.
@@ -135,9 +135,10 @@ def compute_permutation_importance(
     method : str, default="difference"
         Normalization method for the importance scores. The options are: "difference",
         "ratio", and "raw" (no normalization).
-    smaller_is_better : bool, default=True
-        If True, smaller values of the scoring_function are better.
-        If False, the role of shuffled scores and base_score is reversed.
+    scoring_direction : str, default="smaller"
+        Direction of scoring function. Use "smaller" if smaller values are better
+        (e.g., average losses), or "greater" if greater values are better 
+        (e.g., R-squared).
     rng : np.random.Generator, int or None, default=None
         The random number generator used for shuffling values and for subsampling
         `n_max` rows. The input is internally wrapped by `np.random.default_rng(rng)`.
@@ -237,6 +238,13 @@ def compute_permutation_importance(
         msg = f"Unknown normalization method: {method}"
         raise ValueError(msg)
 
+    if scoring_direction not in ("smaller", "greater"):
+        msg = (
+            f"Argument scoring_direction must be 'smaller' or 'greater', got "
+            f"{scoring_direction}."
+        )
+        raise ValueError(msg)
+
     # Turn features into form {"x1": ["x1"], "x2": ["x2"], "group": ["x1", "x2"]}
     # While looking verbose, it is the most flexible way to handle all cases
     if features is None:
@@ -286,7 +294,7 @@ def compute_permutation_importance(
 
     # Remove base score
     if method in ("difference", "ratio"):
-        direction = 1 if smaller_is_better else -1
+        direction = 1 if scoring_direction == "smaller" else -1
 
         if method == "difference":
             scores = [direction * (s - base_score) for s in scores]
