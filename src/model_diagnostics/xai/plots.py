@@ -4,8 +4,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-
 from scipy import special
+
 from model_diagnostics import get_config
 from model_diagnostics._utils.plot_helper import is_plotly_figure
 from model_diagnostics.scoring import SquaredError
@@ -19,14 +19,14 @@ def plot_permutation_importance(
     features: Optional[Union[list, tuple, set, dict]] = None,
     scoring_function: Callable = SquaredError(),
     weights: Optional[npt.ArrayLike] = None,
-    n_repeats: Optional[int] = 5,
+    n_repeats: int = 5,
     n_max: Optional[int] = 10_000,
-    method: Optional[str] = "difference",
-    smaller_is_better: Optional[bool] = True,
+    method: str = "difference",
+    smaller_is_better: bool = True,
     rng: Optional[Union[np.random.Generator, int]] = None,
     max_display: Optional[int] = 15,
     error_bars: Optional[str] = "se",
-    confidence_level: Optional[float] = 0.95,
+    confidence_level: float = 0.95,
     ax: Optional[mpl.axes.Axes] = None,
 ):
     """
@@ -41,12 +41,12 @@ def plot_permutation_importance(
     ----------
     Same as compute_permutation_importance(), plus:
     max_display : int or None, optional
-        Maximum number of features to display, by default 15. 
+        Maximum number of features to display, by default 15.
         If None, all features are displayed.
     error_bars : str or None, optional
         Error bars to display. Can be "se" (standard error), "std" (standard deviation),
         "ci" (t confidence interval), or None. Default is "se". Only if `n_repeats > 1`.
-    confidence_level: float, optional
+    confidence_level: float
         Confidence level of the approximate t confidence interval.
         Default is 0.95. Only used if `error_bars="ci"`.
     ax : matplotlib.axes.Axes or plotly Figure, optional
@@ -60,17 +60,17 @@ def plot_permutation_importance(
     if max_display is not None and max_display < 1:
         msg = f"Argument max_display must be None or >=1, got {max_display}."
         raise ValueError(msg)
-    
-    if error_bars is not None and n_repeats is not None and n_repeats >= 2:
+
+    if error_bars is not None and n_repeats >= 2:
         if error_bars not in ("se", "std", "ci"):
             msg = (
                 f"Argument error_bars must be one of 'se', 'std', 'ci', or None, got "
                 f"{error_bars}."
             )
             raise ValueError(msg)
-        if error_bars in ("se", "ci") and not (0 <= confidence_level < 1):
+        if error_bars in ("se", "ci") and not (0 < confidence_level < 1):
             msg = (
-                f"Argument confidence_level must fulfil 0 <= level < 1, got "
+                f"Argument confidence_level must fulfil 0 < level < 1, got "
                 f"{confidence_level}."
             )
             raise ValueError(msg)
@@ -148,10 +148,7 @@ def plot_permutation_importance(
             error_x={"array": xerr, "width": 0},
         )
         fig.update_layout(
-            xaxis_title=xlab,
-            yaxis_title=None,
-            title=title,
-            yaxis_type="category"
+            xaxis_title=xlab, yaxis_title=None, title=title, yaxis_type="category"
         )
 
     return ax

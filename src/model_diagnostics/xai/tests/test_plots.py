@@ -1,6 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
-import polars as pl
 import pytest
 from sklearn.datasets import make_regression
 from sklearn.linear_model import LinearRegression
@@ -13,11 +11,11 @@ from model_diagnostics.xai import plot_permutation_importance
 @pytest.mark.parametrize(
     ("param", "value", "msg"),
     [
-        ("max_display", -1, "Argument max_display must be None or >=1, got -1."),
+        ("max_display", 0, "Argument max_display must be None or >=1, got 0."),
         (
-            "confidence_level", 
-            2,
-            "Argument confidence_level must fulfil 0 <= level < 1, got 2."
+            "confidence_level",
+            1,
+            "Argument confidence_level must fulfil 0 < confidence_level < 1, got 1.",
         ),
         (
             "error_bars",

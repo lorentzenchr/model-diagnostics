@@ -88,10 +88,10 @@ def compute_permutation_importance(
     features: Optional[Union[list, tuple, set, dict]] = None,
     scoring_function: Callable = SquaredError(),
     weights: Optional[npt.ArrayLike] = None,
-    n_repeats: Optional[int] = 5,
+    n_repeats: int = 5,
     n_max: Optional[int] = 10_000,
-    method: Optional[str] = "difference",
-    smaller_is_better: Optional[bool] = True,
+    method: str = "difference",
+    smaller_is_better: bool = True,
     rng: Optional[Union[np.random.Generator, int]] = None,
 ):
     """Compute permutation feature importance.
@@ -126,9 +126,8 @@ def compute_permutation_importance(
         `fun(y_obs, y_pred, weights) -> float`.
     weights : array-like of shape (n_obs) or None, default=None
         Case weights passed to the scoring_function.
-    n_repeats : int or None, default=5
-        Number of times to repeat the permutation for each feature group. None means
-        only one repetition.
+    n_repeats : int, default=5
+        Number of times to repeat the permutation for each feature group.
     n_max : int or None, default=10_000
         Maximum number of observations used. If the number of observations is greater
         than `n_max`, a random subset of size `n_max` will be drawn from `X`, `y`, (and
@@ -230,8 +229,9 @@ def compute_permutation_importance(
     ...     rng=1,
     ... )
     """
-    if n_repeats is None or n_repeats < 1:
-        n_repeats = 1
+    if n_repeats < 1:
+        msg = f"Argument n_repeats must be >= 1, got {n_repeats}."
+        raise ValueError(msg)
 
     if method not in ("difference", "ratio", "raw"):
         msg = f"Unknown normalization method: {method}"
