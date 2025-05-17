@@ -46,7 +46,8 @@ def plot_permutation_importance(
     error_bars : str or None, optional
         Error bars to display. Can be "se" (standard error), "std" (standard deviation),
         "ci" (t confidence interval), or None. Default is "se". Only if `n_repeats > 1`.
-    confidence_level: Confidence level of the approximate t confidence interval.
+    confidence_level: float, optional
+        Confidence level of the approximate t confidence interval.
         Default is 0.95. Only used if `error_bars="ci"`.
     ax : matplotlib.axes.Axes or plotly Figure, optional
         Axes object to draw the plot onto, otherwise uses the current Axes.
@@ -56,6 +57,10 @@ def plot_permutation_importance(
     ax :
         Either the matplotlib axes or the plotly figure.
     """
+    if max_display is not None and max_display < 1:
+        msg = f"Argument max_display must be None or >=1, got {max_display}."
+        raise ValueError(msg)
+    
     if error_bars is not None and n_repeats is not None and n_repeats >= 2:
         if error_bars not in ("se", "std", "ci"):
             msg = (
