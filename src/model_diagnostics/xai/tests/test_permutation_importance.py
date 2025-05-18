@@ -53,4 +53,3 @@ def test_permutation_importance_consistent_across_types(X, n_repeats, weights):
     )
 
     assert_frame_equal(result, reference)
-
