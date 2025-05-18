@@ -6,10 +6,10 @@ import numpy.typing as npt
 import polars as pl
 
 from model_diagnostics._utils.array import (
+    get_second_dimension,
     is_pandas_df,
     is_pyarrow_table,
     length_of_first_dimension,
-    get_second_dimension,
     safe_assign_column,
     safe_index_rows,
 )
