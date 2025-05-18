@@ -10,6 +10,7 @@ from model_diagnostics._utils.array import (
     is_pandas_series,
     is_pyarrow_table,
     length_of_first_dimension,
+    get_second_dimension,
     safe_assign_column,
     safe_index_rows,
 )
@@ -49,18 +50,6 @@ def safe_index_rows_1d(x, row_indices):
     return safe_index_rows(x, row_indices)
 
 
-def safe_select_column(X, index):
-    if hasattr(X, "iloc"):
-        out = X.iloc[:, index]
-    elif is_pyarrow_table(X):
-        out = X.column(index)
-    else:
-        # numpy, polars
-        out = X[:, index]
-
-    return out
-
-
 def safe_shuffle_cols(X, columns, row_indices):
     X = safe_copy(X)  # Important
     if isinstance(columns, (str, int)):
@@ -69,7 +58,7 @@ def safe_shuffle_cols(X, columns, row_indices):
 
     for v in columns:
         column_index = all_columns.index(v) if isinstance(v, str) else v
-        x = safe_select_column(X, column_index)
+        x = get_second_dimension(X, column_index)
         x_shuffled = safe_index_rows_1d(x, row_indices)
         X = safe_assign_column(X, values=x_shuffled, column_index=column_index)
 
