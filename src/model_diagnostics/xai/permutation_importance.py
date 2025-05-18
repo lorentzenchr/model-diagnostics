@@ -51,16 +51,11 @@ def safe_index_rows_1d(x, row_indices):
 
 def safe_select_column(X, index):
     if hasattr(X, "iloc"):
-        # pandas
         out = X.iloc[:, index]
     elif is_pyarrow_table(X):
         out = X.column(index)
-    elif hasattr(X, "select"):
-        # polars
-        all_columns = safe_column_names(X)
-        out = X.select(all_columns[index])
     else:
-        # numpy
+        # numpy, polars
         out = X[:, index]
 
     return out
