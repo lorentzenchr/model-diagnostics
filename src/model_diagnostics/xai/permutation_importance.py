@@ -260,7 +260,7 @@ def compute_permutation_importance(
         )
         X_shuffled = safe_shuffle_cols(X, features[feature_group], shuffle_indices)
 
-        # Note: np.split() also works on Series and DataFrames
+        # np.split() ok on numpy array, pl/pd Series/DataFrame, but not on pa.tables
         predictions = predict_function(X_shuffled)
         scores_per_repetition = [
             scoring_function(y, pred, weights=weights)
