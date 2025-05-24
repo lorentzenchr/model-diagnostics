@@ -12,6 +12,8 @@ from model_diagnostics._utils.array import (
     is_pyarrow_table,
     length_of_first_dimension,
     length_of_second_dimension,
+    safe_assign_column,
+    safe_copy,
     safe_index_rows,
     validate_2_arrays,
     validate_same_first_dimension,
@@ -356,7 +358,7 @@ def test_safe_index_rows(a):
 @pytest.mark.parametrize(
     ("a", "result"),
     [
-        ([[1, 2], [3, 4]], [0, 1]),
+        (np.array([[1, 2], [3, 4]]), [0, 1]),
         (pa_table({"b": [0, 1], "a": ["A", "B"]}), ["b", "a"]),
         (pd_DataFrame({"b": [0, 1], "a": 0.5}), ["b", "a"]),
         (pl.DataFrame({"b": [0, 1], "a": 0.5}), ["b", "a"]),
@@ -367,3 +369,25 @@ def test_get_column_names(a, result):
     if isinstance(a, SkipContainer):
         pytest.skip("Module for data container not imported.")
     assert get_column_names(a) == result
+
+
+@pytest.mark.parametrize(
+    ("a", "result"),
+    [
+        (np.array([[1, 2], [3, 4]]), np.array([[1, 2], [3, 4]])),
+        (
+            pa_table({"a": [0, 1], "b": ["A", "B"]}),
+            pa_table({"a": [0, 1], "b": ["A", "B"]}),
+        ),
+        (pd_DataFrame({"a": [0, 1], "b": 0.5}), pd_DataFrame({"a": [0, 1], "b": 0.5})),
+        (pl.DataFrame({"a": [0, 1], "b": 0.5}), pl.DataFrame({"a": [0, 1], "b": 0.5})),
+    ],
+)
+def test_safe_copy(a, result):
+    """Test that get_second_dimension works correctly."""
+    if isinstance(a, SkipContainer):
+        pytest.skip("Module for data container not imported.")
+
+    b = safe_copy(a)
+    safe_assign_column(b, values=[0, 0], column_index=1)  # has side-effects
+    assert_array_equal(a, result)
