@@ -1,4 +1,3 @@
-import copy
 from typing import Callable, Optional, Union
 
 import numpy as np
@@ -6,47 +5,43 @@ import numpy.typing as npt
 import polars as pl
 
 from model_diagnostics._utils.array import (
+    get_column_names,
     get_second_dimension,
-    is_pandas_df,
-    is_pyarrow_table,
     length_of_first_dimension,
     safe_assign_column,
+    safe_copy,
     safe_index_rows,
 )
 from model_diagnostics.scoring import SquaredError
 
 
-def safe_copy(X):
-    if hasattr(X, "copy"):
-        # pandas
-        X = X.copy()
-    elif is_pyarrow_table(X) or isinstance(X, pl.DataFrame):
-        # Copy on Write
-        pass
-    else:
-        X = copy.deepcopy(X)
-    return X
+def rearrange_rows_of_some_columns(X, columns, row_indices):
+    """Rearrange values in specific columns according to provided indices.
 
+    This function creates a copy of the input data and rearranges the values
+    in the specified columns according to the provided row indices. It supports
+    various data container formats (numpy arrays, pandas DataFrames, polars
+    DataFrames, PyArrow Tables).
 
-def safe_column_names(X):
-    """If we have column names, return them. Otherwise, return indices."""
-    if is_pyarrow_table(X):
-        return X.column_names
-    elif is_pandas_df(X):
-        return X.columns.to_list()
-    elif hasattr(X, "columns"):
-        # polars
-        return X.columns
-    else:
-        # numpy
-        return list(range(X.shape[1]))
+    Parameters
+    ----------
+    X : array-like
+        The input data which can be a numpy array, pandas DataFrame,
+        polars DataFrame, PyArrow Table, or other similar data container.
+    columns : str, int, or list of str or int
+        Column name(s) or index/indices of the column(s) to be rearranged.
+    row_indices : array-like
+        Indices specifying the new order of rows for the specified column(s).
 
-
-def safe_shuffle_cols(X, columns, row_indices):
+    Returns
+    -------
+    array-like
+        A copy of X with values in the specified columns rearranged.
+    """
     X = safe_copy(X)  # Important
     if isinstance(columns, (str, int)):
         columns = [columns]
-    all_columns = safe_column_names(X)
+    all_columns = get_column_names(X)
 
     for v in columns:
         column_index = all_columns.index(v) if isinstance(v, str) else v
@@ -224,7 +219,7 @@ def compute_permutation_importance(
     # Turn features into form {"x1": ["x1"], "x2": ["x2"], "group": ["x1", "x2"]}
     # While looking verbose, it is the most flexible way to handle all cases
     if features is None:
-        features = safe_column_names(X)
+        features = get_column_names(X)
     if not isinstance(features, dict):
         features = {v: [v] for v in features}
 
@@ -258,7 +253,9 @@ def compute_permutation_importance(
         shuffle_indices = np.concatenate(
             [rng_.permutation(n) for _ in range(n_repeats)]
         )
-        X_shuffled = safe_shuffle_cols(X, features[feature_group], shuffle_indices)
+        X_shuffled = rearrange_rows_of_some_columns(
+            X, features[feature_group], shuffle_indices
+        )
 
         # np.split() ok on numpy array, pl/pd Series/DataFrame, but not on pa.tables
         predictions = predict_function(X_shuffled)

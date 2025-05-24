@@ -352,3 +352,59 @@ def safe_index_rows(x, indices):
     else:
         # numpy, polars
         return x[indices]
+
+
+def safe_copy(X: npt.ArrayLike) -> npt.ArrayLike:
+    """Create a safe copy of input data in various formats.
+
+    Parameters
+    ----------
+    X : array-like
+        The input data to be copied, which can be numpy array, pandas DataFrame,
+        polars DataFrame, PyArrow Table, or other object types.
+
+    Returns
+    -------
+    copied_X : array-like
+        A copy of the input data in the same format.
+    """
+    if hasattr(X, "copy"):
+        # pandas
+        X = X.copy()
+    elif is_pyarrow_table(X) or isinstance(X, pl.DataFrame):
+        # Copy on Write
+        pass
+    else:
+        X = copy.deepcopy(X)
+    return X
+
+
+def get_column_names(X: npt.ArrayLike) -> list:
+    """Extract column names from different data containers.
+
+    This function handles different data container formats and returns
+    their column names or indices if names are not available.
+
+    Parameters
+    ----------
+    X : array-like
+        The input data which can be a numpy array, pandas DataFrame,
+        polars DataFrame, PyArrow Table, or other similar data container.
+
+    Returns
+    -------
+    list
+        A list of column names if available, or column indices (integers)
+        for array-like objects without named columns.
+    """
+    if is_pyarrow_table(X):
+        colnames = X.column_names
+    elif is_pandas_df(X):
+        colnames = X.columns.to_list()
+    elif hasattr(X, "columns"):
+        # polars
+        colnames = X.columns
+    else:
+        # numpy
+        colnames = list(range(X.shape[1]))
+    return colnames
