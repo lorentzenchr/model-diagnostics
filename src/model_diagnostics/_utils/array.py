@@ -354,7 +354,7 @@ def safe_index_rows(x, indices):
         return x[indices]
 
 
-def safe_copy(x: npt.ArrayLike) -> npt.ArrayLike:
+def safe_copy(x) -> npt.ArrayLike:
     """Create a safe copy of input data in various formats.
 
     Parameters
@@ -379,7 +379,7 @@ def safe_copy(x: npt.ArrayLike) -> npt.ArrayLike:
     return x
 
 
-def get_column_names(x: npt.ArrayLike) -> list:
+def get_column_names(x) -> list:
     """Extract column names from different data containers.
 
     This function handles different data container formats and returns
