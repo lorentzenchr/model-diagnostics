@@ -384,7 +384,10 @@ def test_get_column_names(a, result):
     ],
 )
 def test_safe_copy(a, result):
-    """Test that get_second_dimension works correctly."""
+    """Test that get_second_dimension works correctly.
+
+    For simplicity, we only consider numerical values.
+    """
     if isinstance(a, SkipContainer):
         pytest.skip("Module for data container not imported.")
 
