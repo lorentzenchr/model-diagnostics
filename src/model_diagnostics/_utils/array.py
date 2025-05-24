@@ -354,32 +354,32 @@ def safe_index_rows(x, indices):
         return x[indices]
 
 
-def safe_copy(X: npt.ArrayLike) -> npt.ArrayLike:
+def safe_copy(x: npt.ArrayLike) -> npt.ArrayLike:
     """Create a safe copy of input data in various formats.
 
     Parameters
     ----------
-    X : array-like
+    x : array-like
         The input data to be copied, which can be numpy array, pandas DataFrame,
         polars DataFrame, PyArrow Table, or other object types.
 
     Returns
     -------
-    copied_X : array-like
+    copied_x : array-like
         A copy of the input data in the same format.
     """
-    if hasattr(X, "copy"):
+    if hasattr(x, "copy"):
         # pandas
-        X = X.copy()
-    elif is_pyarrow_table(X) or isinstance(X, pl.DataFrame):
+        x = x.copy()
+    elif is_pyarrow_table(x) or isinstance(x, pl.DataFrame):
         # Copy on Write
         pass
     else:
-        X = copy.deepcopy(X)
-    return X
+        x = copy.deepcopy(x)
+    return x
 
 
-def get_column_names(X: npt.ArrayLike) -> list:
+def get_column_names(x: npt.ArrayLike) -> list:
     """Extract column names from different data containers.
 
     This function handles different data container formats and returns
@@ -387,7 +387,7 @@ def get_column_names(X: npt.ArrayLike) -> list:
 
     Parameters
     ----------
-    X : array-like
+    x : array-like
         The input data which can be a numpy array, pandas DataFrame,
         polars DataFrame, PyArrow Table, or other similar data container.
 
@@ -397,14 +397,14 @@ def get_column_names(X: npt.ArrayLike) -> list:
         A list of column names if available, or column indices (integers)
         for array-like objects without named columns.
     """
-    if is_pyarrow_table(X):
-        colnames = X.column_names
-    elif is_pandas_df(X):
-        colnames = X.columns.to_list()
-    elif hasattr(X, "columns"):
+    if is_pyarrow_table(x):
+        colnames = x.column_names
+    elif is_pandas_df(x):
+        colnames = x.columns.to_list()
+    elif hasattr(x, "columns"):
         # polars
-        colnames = X.columns
+        colnames = x.columns
     else:
         # numpy
-        colnames = list(range(X.shape[1]))
+        colnames = list(range(x.shape[1]))
     return colnames
