@@ -14,6 +14,7 @@ from model_diagnostics._utils.test_helper import (
     pa_table,
     pd_DataFrame,
 )
+from model_diagnostics.scoring import LogLoss, PoissonDeviance, SquaredError
 from model_diagnostics.xai import compute_permutation_importance
 
 
@@ -103,3 +104,38 @@ def test_no_side_effects(a, original, n_max, n_repeat):
         rng=0,
     )
     assert_array_equal(a, original)
+
+
+@pytest.mark.parametrize(
+    "scorer",
+    [LogLoss(), PoissonDeviance(), SquaredError()],
+)
+@pytest.mark.parametrize("n_repeats", [1, 2])
+@pytest.mark.parametrize("n_max", [None, 8])
+def test_permutation_importance_finds_important_feature(scorer, n_repeats, n_max):
+    X = pl.DataFrame(
+        {
+            "a": np.array([0, 1] * 5),
+            "b": np.linspace(0.1, 0.9, num=10),  # important feature
+            "c": np.zeros(10),
+        }
+    )
+
+    y = pl.Series(np.arange(10))
+
+    def predict(x):
+        return x["b"]
+
+    result = compute_permutation_importance(
+        predict,
+        X=X,
+        y=y,
+        scoring_function=scorer,
+        n_repeats=n_repeats,
+        n_max=n_max,
+        rng=0,
+    )
+
+    assert result["feature"][0] == "b"
+    assert result["importance"][0] > 0.0
+    assert result["importance"][1] == 0.0
