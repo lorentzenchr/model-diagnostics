@@ -251,7 +251,7 @@ name."py3.9".set-extra-dependencies = [
   "polars==1.0.0",
   "scipy==1.10",
   "pandas==1.5.*",
-  "pyarrow==11.0.*"
+  "pyarrow==13.0.*"
 ]
 # Minimal versions without pandas and pyarrow 
 name."py3.10".set-extra-dependencies = [
