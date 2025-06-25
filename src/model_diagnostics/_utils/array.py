@@ -295,9 +295,9 @@ def safe_assign_column(x, values, column_index):
                         # Pandas might error with:
                         #   cannot reindex on an axis with duplicate labels
                         # Try reindexing ourselves.
-                        x = x.reset_index()
+                        x = x.reset_index(drop=True)
                     if not pd_values.index.is_unique:
-                        pd_values = pd_values.reset_index()
+                        pd_values = pd_values.reset_index(drop=True)
                     x.iloc[:, column_index] = pd_values
             else:
                 x.iloc[:, column_index] = pd_values
