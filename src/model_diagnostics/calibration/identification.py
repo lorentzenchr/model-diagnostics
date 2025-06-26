@@ -311,20 +311,21 @@ def compute_bias(
     with pl.StringCache():
         feature_name = None
         if feature is not None:
-            feature, n_bins, f_binned = bin_feature(
+            feature_series, n_bins, f_binned = bin_feature(
                 feature=feature,
                 feature_name=None,
                 n_obs=n_obs,
                 n_bins=n_bins,
                 bin_method=bin_method,
             )
-            feature_name = feature.name
-            is_cat_or_string = feature.dtype in [
+            feature_name = feature_series.name
+            is_cat_or_string = feature_series.dtype in [
                 pl.Categorical,
                 pl.Enum,
                 pl.Utf8,
                 pl.Object,
             ]
+            feature = feature_series
 
         for i in range(len(pred_names)):
             # Loop over columns of y_pred.

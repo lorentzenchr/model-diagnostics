@@ -305,7 +305,7 @@ def test_plot_bias(
         random_state=42,
     )
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
-    clf = LogisticRegression(solver="lbfgs")
+    clf = LogisticRegression(solver="newton-cg")
     clf.fit(X_train, y_train)
     feature = X_test[:, 0]
     if feature_type != "num":
@@ -576,7 +576,7 @@ def test_plot_marginal(with_null_values, feature_type, bin_method, ax, plot_back
 
     clf = make_pipeline(
         ColumnTransformer([("ohe", safe_ohe, [0])], remainder="passthrough"),
-        LogisticRegression(solver="lbfgs"),
+        LogisticRegression(solver="newton-cg"),
     )
     clf.fit(X, y)
 

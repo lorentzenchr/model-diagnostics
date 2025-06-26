@@ -97,6 +97,10 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
     else:
         X_skl = X.to_pandas()
 
+    if feature_type == "numeric" and pandas is not None:
+        # scikit-learn does not like integers in partial dependence
+        X_skl["a"] = 1.0 * X_skl["a"]
+
     grid = X.get_column("a").unique().sort()
     # Make sure grid is the same data container as X.
     if data_container == "list":
