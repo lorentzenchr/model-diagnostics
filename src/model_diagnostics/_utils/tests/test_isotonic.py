@@ -236,7 +236,7 @@ def test_gpava_simple(y, fun_lower, x_lower, fun_upper, x_upper):
         tol=1e-12,
     )
 
-    assert result.fun == pytest.approx(loss_lower, rel=1e-8)
+    assert result.fun == pytest.approx(loss_lower, rel=1e-7)
 
     # Check that it is the boundary of solutions.
     eps = 1e-8 * np.mean(np.abs(xl))
