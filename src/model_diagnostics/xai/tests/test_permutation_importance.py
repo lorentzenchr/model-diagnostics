@@ -14,7 +14,7 @@ from model_diagnostics._utils.test_helper import (
     pa_table,
     pd_DataFrame,
 )
-from model_diagnostics.scoring import LogLoss, PoissonDeviance, SquaredError
+from model_diagnostics.scoring import PoissonDeviance, SquaredError
 from model_diagnostics.xai import compute_permutation_importance
 
 
@@ -143,7 +143,6 @@ def test_permutation_importance_finds_important_feature(
         method=method,
         rng=0,
     )
-    print(result)
     assert result["feature"][0] == "b"
     assert result["importance"][0] > 0.0 + (method == "ratio")
     assert result["importance"][1] == pytest.approx(0.0 + (method == "ratio"))
