@@ -65,8 +65,8 @@ def test_permutation_importance_consistent_across_types(X, n_repeats, weights):
     ("a", "original"),
     [
         (
-            np.array([[1, 2, 3, 4], [1, 2, 3, 4]]),
-            np.array([[1, 2, 3, 4], [1, 2, 3, 4]]),
+            np.array([[1, 2, 3, 4], [1, 2, 3, 4]]).T,
+            np.array([[1, 2, 3, 4], [1, 2, 3, 4]]).T,
         ),
         (
             pa_table({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
@@ -84,7 +84,8 @@ def test_permutation_importance_consistent_across_types(X, n_repeats, weights):
 )
 @pytest.mark.parametrize("n_max", [3, None])
 @pytest.mark.parametrize("n_repeat", [1, 2])
-def test_no_side_effects(a, original, n_max, n_repeat):
+@pytest.mark.parametrize("weights", [None, [1.0, 1.0, 2.0, 2.0]])
+def test_no_side_effects(a, original, n_max, n_repeat, weights):
     """Test that calculate_permutation_importance() does not modify input.
 
     For simplicity, we only use numerical data.
@@ -99,6 +100,7 @@ def test_no_side_effects(a, original, n_max, n_repeat):
         rf.predict,
         X=a,
         y=y,
+        weights=weights,
         n_repeats=n_repeat,
         n_max=n_max,
         rng=0,
@@ -108,11 +110,15 @@ def test_no_side_effects(a, original, n_max, n_repeat):
 
 @pytest.mark.parametrize(
     "scorer",
-    [LogLoss(), PoissonDeviance(), SquaredError()],
+    [PoissonDeviance(), SquaredError()],
 )
 @pytest.mark.parametrize("n_repeats", [1, 2])
 @pytest.mark.parametrize("n_max", [None, 8])
-def test_permutation_importance_finds_important_feature(scorer, n_repeats, n_max):
+@pytest.mark.parametrize("weights", [None, [1.0] * 10])
+@pytest.mark.parametrize("method", ["difference", "ratio"])
+def test_permutation_importance_finds_important_feature(
+    scorer, n_repeats, n_max, weights, method
+):
     X = pl.DataFrame(
         {
             "a": np.array([0, 1] * 5),
@@ -121,7 +127,7 @@ def test_permutation_importance_finds_important_feature(scorer, n_repeats, n_max
         }
     )
 
-    y = pl.Series(np.arange(10))
+    y = X["a"] + X["b"] + X["c"]
 
     def predict(x):
         return x["b"]
@@ -130,15 +136,17 @@ def test_permutation_importance_finds_important_feature(scorer, n_repeats, n_max
         predict,
         X=X,
         y=y,
+        weights=weights,
         scoring_function=scorer,
         n_repeats=n_repeats,
         n_max=n_max,
+        method=method,
         rng=0,
     )
-
+    print(result)
     assert result["feature"][0] == "b"
-    assert result["importance"][0] > 0.0
-    assert result["importance"][1] == 0.0
+    assert result["importance"][0] > 0.0 + (method == "ratio")
+    assert result["importance"][1] == pytest.approx(0.0 + (method == "ratio"))
 
 
 def test_compute_permutation_importance_raises_errors():
@@ -150,7 +158,7 @@ def test_compute_permutation_importance_raises_errors():
         }
     )
 
-    y = pl.Series(np.arange(10))
+    y = X["a"] + X["b"] + X["c"]
 
     def predict(x):
         return x["b"]
