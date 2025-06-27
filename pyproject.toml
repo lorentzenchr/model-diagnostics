@@ -122,7 +122,6 @@ lint.isort.known-first-party = ["model_diagnostics"]
 # disallow_untyped_defs = false
 # follow_imports = "normal"
 ignore_missing_imports = true
-plugins = "numpy.typing.mypy_plugin"
 pretty = true
 # show_column_numbers = true
 # warn_no_return = false
@@ -195,7 +194,7 @@ lab = "jupyter lab"
 [tool.hatch.envs.format]
 detached = true
 dependencies = [
-  "numpy>=1.22",
+  "numpy>=2.3",
   "mypy>=1.14",
   "ruff==0.4.4",
 ]
