@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import numpy as np
+import polars as pl
 import pytest
 from sklearn.datasets import make_regression
 from sklearn.linear_model import LinearRegression
@@ -77,3 +79,33 @@ def test_plot_permutation_importance(
 
     assert get_xlabel(plt_ax) == "Importance"
     assert get_title(plt_ax) == "Permutation Feature Importance"
+
+
+def test_plot_permutation_importance_raises_errors():
+    X = pl.DataFrame(
+        {
+            "a": np.array([0, 1] * 5),
+            "b": np.linspace(0.1, 0.9, num=10),  # important feature
+            "c": np.zeros(10),
+        }
+    )
+
+    y = pl.Series(np.arange(10))
+
+    def predict(x):
+        return x["b"]
+
+    # max_display
+    msg = "Argument max_display must be None or >=1, got 0"
+    with pytest.raises(ValueError, match=msg):
+        plot_permutation_importance(predict, X=X, y=y, max_display=0)
+
+    # error_bars
+    msg = "Argument error_bars must be one of 'se', 'std', 'ci', or None, got .*"
+    with pytest.raises(ValueError, match=msg):
+        plot_permutation_importance(predict, X=X, y=y, error_bars="sd")
+
+    # confidence_level
+    msg = "Argument confidence_level must fulfil 0 < confidence_level < 1, got .*"
+    with pytest.raises(ValueError, match=msg):
+        plot_permutation_importance(predict, X=X, y=y, confidence_level=1)

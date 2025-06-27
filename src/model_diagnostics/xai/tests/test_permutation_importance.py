@@ -139,3 +139,33 @@ def test_permutation_importance_finds_important_feature(scorer, n_repeats, n_max
     assert result["feature"][0] == "b"
     assert result["importance"][0] > 0.0
     assert result["importance"][1] == 0.0
+
+
+def test_compute_permutation_importance_raises_errors():
+    X = pl.DataFrame(
+        {
+            "a": np.array([0, 1] * 5),
+            "b": np.linspace(0.1, 0.9, num=10),  # important feature
+            "c": np.zeros(10),
+        }
+    )
+
+    y = pl.Series(np.arange(10))
+
+    def predict(x):
+        return x["b"]
+
+    # n_repeats
+    msg = "Argument n_repeats must be >= 1, got 0"
+    with pytest.raises(ValueError, match=msg):
+        compute_permutation_importance(predict, X=X, y=y, n_repeats=0)
+
+    # method
+    msg = "Unknown normalization method: invalid_method"
+    with pytest.raises(ValueError, match=msg):
+        compute_permutation_importance(predict, X=X, y=y, method="invalid_method")
+
+    # scoring_direction
+    msg = "Argument scoring_direction must be 'smaller' or 'greater', got .*"
+    with pytest.raises(ValueError, match=msg):
+        compute_permutation_importance(predict, X=X, y=y, scoring_direction="larger")
