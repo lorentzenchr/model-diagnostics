@@ -48,8 +48,7 @@ jobs:
       name: Build docs
       run: hatch run docs:build
 
-    - if: matrix.python-version == '3.11' && runner.os == 'Linux'
-      name: Run test matrix
+    - name: Run test matrix
       run: |
         hatch -e test run versions
         hatch -e test run pytest
