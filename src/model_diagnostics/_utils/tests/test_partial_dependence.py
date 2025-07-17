@@ -82,16 +82,6 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
                     "b": X["b"].to_numpy(),
                 }
             )
-        elif feature_type == "string":
-            # TODO: With pandas 2.0.3, this does not work for strings. Get
-            # AssertionError from polars in string_column_to_ndarray.
-            # X_skl = pandas.api.interchange.from_dataframe(X). So we do it manually.
-            X_skl = pandas.DataFrame(
-                {
-                    "a": X["a"].to_numpy(),
-                    "b": X["b"].to_numpy(),
-                }
-            )
         else:
             X_skl = pandas.api.interchange.from_dataframe(X)
     else:
