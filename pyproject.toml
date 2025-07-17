@@ -149,6 +149,7 @@ exclude = [
 ]
 
 [tool.hatch.envs.default]
+installer = "uv"
 dependencies = [
   "pandas>=1.5",
   "pyarrow>=11.0.0",
