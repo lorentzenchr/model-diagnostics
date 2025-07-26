@@ -60,8 +60,7 @@ def compute_permutation_importance(
     scoring_function: Callable = SquaredError(),
     weights: Optional[npt.ArrayLike] = None,
     n_repeats: int = 5,
-    n_max: Optional[int] = 10_000,
-    method: str = "difference",
+    n_max: int = 10_000,
     scoring_direction: str = "smaller",
     rng: Optional[Union[np.random.Generator, int]] = None,
 ):
@@ -74,6 +73,9 @@ def compute_permutation_importance(
     performance worsenes when shuffling the values of that feature (group) before
     calculating predictions. The idea is that if a feature is important,
     then shuffling its values will lead to a large drop in model performance.
+    Shuffling is done `n_repeats` times, and mean differences and mean ratios are
+    returned along with their standard errors.
+
     Note that the model is never retrained during this process.
 
     Parameters
@@ -103,9 +105,6 @@ def compute_permutation_importance(
         Maximum number of observations used. If the number of observations is greater
         than `n_max`, a random subset of size `n_max` will be drawn from `X`, `y`, (and
         `weights`). Pass None for no subsampling.
-    method : str, default="difference"
-        Normalization method for the importance scores. The options are: "difference",
-        "ratio", and "raw" (no normalization).
     scoring_direction : str, default="smaller"
         Direction of scoring function. Use "smaller" if smaller values are better
         (e.g., average losses), or "greater" if greater values are better
@@ -117,14 +116,15 @@ def compute_permutation_importance(
     Returns
     -------
     df : polars.DataFrame
-        A DataFrame with the following columns:
+        A DataFrame with one row per feature (group) and the following columns:
 
         - `feature`: Feature name or feature group name.
-        - `importance`: Sample mean of the importance scores.
-        - `standard_deviation`: Sample standard deviation of the importance scores
-          (None if `n_repeats = 1`).
-
-        The values are sorted in decreasing order of importance.
+        - `difference_mean`: Mean of the score differences.
+        - `difference_stderr`: Standard error, i.e. standard deviation of
+          `difference_mean`. (None if `n_repeats = 1`.)
+        - `ratio_mean`: Mean of the score ratios.
+        - `ratio_stderr`: Standard error, i.e. standard deviation of `ratio_mean`.
+          (None if `n_repeats = 1`.)
 
     References
     ----------
@@ -154,13 +154,13 @@ def compute_permutation_importance(
     >>>
     >>> X = pl.DataFrame(
     ...     {
-    ...         "area": rng.uniform(30, 120, n),
     ...         "rooms": rng.choice([2.5, 3.5, 4.5], n),
+    ...         "area": rng.uniform(30, 120, n),
     ...         "age": rng.uniform(0, 100, n),
     ...     }
     ... )
     >>>
-    >>> y = X["area"] + 20 * X["rooms"] + rng.normal(0, 1, n)
+    >>> y = X["area"] + 20 * X["rooms"] + rng.normal(0, 10, n)
     >>>
     >>> model = LinearRegression()
     >>> _ = model.fit(X, y)
@@ -172,16 +172,16 @@ def compute_permutation_importance(
     ...     rng=1,
     ... )
     >>> perm_importance
-    shape: (3, 3)
-    ┌─────────┬─────────────┬────────────────────┐
-    │ feature ┆ importance  ┆ standard_deviation │
-    │ ---     ┆ ---         ┆ ---                │
-    │ str     ┆ f64         ┆ f64                │
-    ╞═════════╪═════════════╪════════════════════╡
-    │ area    ┆ 1352.856052 ┆ 36.695011          │
-    │ rooms   ┆ 515.038303  ┆ 19.899192          │
-    │ age     ┆ 0.001373    ┆ 0.001787           │
-    └─────────┴─────────────┴────────────────────┘
+    shape: (3, 5)
+    ┌─────────┬─────────────────┬───────────────────┬─────────────┬───────────────┐
+    │ feature │ difference_mean │ difference_stderr │ ratio_mean  │ ratio_stderr  │
+    │ ---     │ ---             │ ---               │ ---         │ ---           │
+    │ str     │ f64             │ f64               │ f64         │ f64           │
+    ╞═════════╪═════════════════╪═══════════════════╪═════════════╪═══════════════╡
+    │ rooms   │ 530.616671      │ 2.13286           │ 6.241891    │ 0.02107       │
+    │ area    │ 1361.262988     │ 3.559097          │ 14.447736   │ 0.03516       │
+    │ age     │ 0.008699        │ 0.002088          │ 1.000086    │ 0.000021      │
+    └─────────┴─────────────────┴───────────────────┴─────────────┴───────────────┘
     >>>
     >>> # Using feature subsets
     >>> perm_importance = compute_permutation_importance(
@@ -205,10 +205,6 @@ def compute_permutation_importance(
         msg = f"Argument n_repeats must be >= 1, got {n_repeats}."
         raise ValueError(msg)
 
-    if method not in ("difference", "ratio", "raw"):
-        msg = f"Unknown normalization method: {method}"
-        raise ValueError(msg)
-
     if scoring_direction not in ("smaller", "greater"):
         msg = (
             f"Argument scoring_direction must be 'smaller' or 'greater', got "
@@ -223,7 +219,7 @@ def compute_permutation_importance(
     if not isinstance(features, dict):
         features = {v: [v] for v in features}
 
-    # Usually, the data is too large and we need subsampling
+    # Sometimes, the data is too large and we need subsampling
     n = length_of_first_dimension(X)
     rng_ = np.random.default_rng(rng)  # we need it later for shuffling
     if n_max is not None and n > n_max:
@@ -237,16 +233,14 @@ def compute_permutation_importance(
         X = safe_copy(X)
 
     # Calculate pre-shuffle score before stacking X
-    if method in ("difference", "ratio"):
-        base_score = scoring_function(y, predict_function(X), weights=weights)
+    base_score = scoring_function(y, predict_function(X), weights=weights)
 
     # Stack X per repetition
     if n_repeats >= 2:
-        # Do we need to worry about pandas 1?
         X = safe_index_rows(X, np.tile(np.arange(n), n_repeats))
 
     # Loop over feature groups
-    scores = []
+    feature_scores = []
     feature_groups = features.keys()
 
     for feature_group in feature_groups:
@@ -263,27 +257,30 @@ def compute_permutation_importance(
             scoring_function(y, pred, weights=weights)
             for pred in np.split(predictions, n_repeats, axis=0)
         ]
-        scores.append(pl.Series(scores_per_repetition))
+        feature_scores.append(pl.Series(scores_per_repetition))
 
-    # Remove base score
-    if method in ("difference", "ratio"):
-        direction = 1 if scoring_direction == "smaller" else -1
-
-        if method == "difference":
-            scores = [direction * (s - base_score) for s in scores]
-        elif method == "ratio":
-            scores = [(s / base_score) ** direction for s in scores]
+    # Differences and ratios wrt base score
+    direction = 1 if scoring_direction == "smaller" else -1
+    difference_scores = [direction * (s - base_score) for s in feature_scores]
+    ratio_scores = [(s / base_score) ** direction for s in feature_scores]
 
     # Aggregate over repetitions
-    importance = pl.Series([s.mean() for s in scores])
-    std = pl.Series([s.std() for s in scores]) if n_repeats >= 2 else None
+    difference_mean = [s.mean() for s in difference_scores]
+    ratio_mean = [s.mean() for s in ratio_scores]
+    if n_repeats >= 2:
+        difference_stderr = [s.std() for s in difference_scores] / np.sqrt(n_repeats)
+        ratio_stderr = [s.std() for s in ratio_scores] / np.sqrt(n_repeats)
+    else:
+        difference_stderr, ratio_stderr = None, None
 
     out = pl.DataFrame(
         {
             "feature": feature_groups,
-            "importance": importance,
-            "standard_deviation": std,
+            "difference_mean": difference_mean,
+            "difference_stderr": difference_stderr,
+            "ratio_mean": ratio_mean,
+            "ratio_stderr": ratio_stderr,
         }
-    ).sort("importance", descending=True)
+    )
 
     return out

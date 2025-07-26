@@ -20,22 +20,16 @@ def plot_permutation_importance(
     scoring_function: Callable = SquaredError(),
     weights: Optional[npt.ArrayLike] = None,
     n_repeats: int = 5,
-    n_max: Optional[int] = 10_000,
-    method: str = "difference",
+    n_max: int = 10_000,
     scoring_direction: str = "smaller",
     rng: Optional[Union[np.random.Generator, int]] = None,
-    max_display: Optional[int] = 15,
-    error_bars: Optional[str] = "se",
+    max_display: int = 15,
+    which: str = "difference",
     confidence_level: float = 0.95,
     ax: Optional[mpl.axes.Axes] = None,
 ):
     """
-    Plot permutation feature importance as a horizontal barplot with error bars.
-
-    Note that error bars are representing standard errors of the mean importance
-    (over the n_repeats). To get standard deviations, use `error_bars="std"`.
-    For Student confidence intervals, use `error_bars="ci"` along with the argument
-    `confidence_level=0.95`.
+    Plot permutation importance as barplot with confidence intervals.
 
     Parameters
     ----------
@@ -63,9 +57,6 @@ def plot_permutation_importance(
         Maximum number of observations used. If the number of observations is greater
         than `n_max`, a random subset of size `n_max` will be drawn from `X`, `y`, (and
         `weights`). Pass None for no subsampling.
-    method : str, default="difference"
-        Normalization method for the importance scores. The options are: "difference",
-        "ratio", and "raw" (no normalization).
     scoring_direction : str, default="smaller"
         Direction of scoring function. Use "smaller" if smaller values are better
         (e.g., average losses), or "greater" if greater values are better
@@ -76,12 +67,11 @@ def plot_permutation_importance(
     max_display : int or None, optional
         Maximum number of features to display, by default 15.
         If None, all features are displayed.
-    error_bars : str or None, optional
-        Error bars to display. Can be "se" (standard error), "std" (standard deviation),
-        "ci" (t confidence interval), or None. Default is "se". Only if `n_repeats > 1`.
-    confidence_level: float
-        Confidence level of the approximate t confidence interval.
-        Default is 0.95. Only used if `error_bars="ci"`.
+    which : str, default="difference"
+        Should difference or ratio scores be shown? Either "difference" or "ratio".
+    confidence_level : float, default=0.95
+        Confidence level for error bars. If 0, no error bars are plotted. Value must
+        fulfil `0 <= confidence_level < 1`. Set to 0.683 to show standard errors.
     ax : matplotlib.axes.Axes or plotly Figure, optional
         Axes object to draw the plot onto, otherwise uses the current Axes.
 
@@ -94,22 +84,16 @@ def plot_permutation_importance(
         msg = f"Argument max_display must be None or >=1, got {max_display}."
         raise ValueError(msg)
 
-    if error_bars is not None and n_repeats >= 2:
-        if error_bars not in ("se", "std", "ci"):
-            msg = (
-                f"Argument error_bars must be one of 'se', 'std', 'ci', or None, got "
-                f"{error_bars}."
-            )
-            raise ValueError(msg)
-        if error_bars in ("se", "ci") and not (0 < confidence_level < 1):
-            msg = (
-                f"Argument confidence_level must fulfil 0 < confidence_level < 1, got "
-                f"{confidence_level}."
-            )
-            raise ValueError(msg)
-        with_error_bars = True
-    else:
-        with_error_bars = False
+    if which not in ("difference", "ratio"):
+        msg = f"Unknown normalization method: {which}"
+        raise ValueError(msg)
+
+    if not (0 <= confidence_level < 1):
+        msg = (
+            f"Argument confidence_level must fulfil 0 <= level < 1, got "
+            f"{confidence_level}."
+        )
+        raise ValueError(msg)
 
     df = compute_permutation_importance(
         predict_function=predict_function,
@@ -120,24 +104,21 @@ def plot_permutation_importance(
         weights=weights,
         n_repeats=n_repeats,
         n_max=n_max,
-        method=method,
         scoring_direction=scoring_direction,
         rng=rng,
-    ).reverse()  # because the plot axes are reversed as well
+    )
+    # Plot axes are reversed
+    df = df.sort(which + "_mean", descending=False)
 
     if max_display is not None:
         df = df.tail(max_display)
 
     feature_groups = df["feature"]
-    importances = df["importance"]
-
-    # length of error bars
-    if with_error_bars:
-        xerr = df["standard_deviation"]
-        if error_bars in ("se", "ci"):
-            xerr /= np.sqrt(n_repeats)
-            if error_bars == "ci":
-                xerr *= special.stdtrit(n_repeats - 1, (1 + confidence_level) / 2)
+    importances = df[which + "_mean"]
+    if confidence_level > 0 and n_repeats >= 2:
+        xerr = df[which + "_stderr"] * special.stdtrit(
+            n_repeats - 1, (1 + confidence_level) / 2
+        )
     else:
         xerr = None
 
@@ -147,13 +128,13 @@ def plot_permutation_importance(
         if plot_backend == "matplotlib":
             ax = plt.gca()
         else:
-            import plotly.graph_objects as go
+            import plotly.graph_objects as go  # noqa: PLC0415
 
             fig = ax = go.Figure()
     elif isinstance(ax, mpl.axes.Axes):
         plot_backend = "matplotlib"
     elif is_plotly_figure(ax):
-        import plotly.graph_objects as go
+        import plotly.graph_objects as go  # noqa: PLC0415
 
         plot_backend = "plotly"
         fig = ax

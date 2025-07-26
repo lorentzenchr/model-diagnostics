@@ -115,9 +115,8 @@ def test_no_side_effects(a, original, n_max, n_repeat, weights):
 @pytest.mark.parametrize("n_repeats", [1, 2])
 @pytest.mark.parametrize("n_max", [None, 8])
 @pytest.mark.parametrize("weights", [None, [1.0] * 10])
-@pytest.mark.parametrize("method", ["difference", "ratio"])
 def test_permutation_importance_finds_important_feature(
-    scorer, n_repeats, n_max, weights, method
+    scorer, n_repeats, n_max, weights
 ):
     X = pl.DataFrame(
         {
@@ -140,12 +139,12 @@ def test_permutation_importance_finds_important_feature(
         scoring_function=scorer,
         n_repeats=n_repeats,
         n_max=n_max,
-        method=method,
         rng=0,
     )
-    assert result["feature"][0] == "b"
-    assert result["importance"][0] > 0.0 + (method == "ratio")
-    assert result["importance"][1] == pytest.approx(0.0 + (method == "ratio"))
+    assert all(result["difference_mean"][0:2] > 0.0)
+    assert all(result["ratio_mean"][0:2] > 1.0)
+    assert result["difference_mean"][2] == 0.0
+    assert result["ratio_mean"][2] == 1.0
 
 
 def test_compute_permutation_importance_raises_errors():
@@ -166,11 +165,6 @@ def test_compute_permutation_importance_raises_errors():
     msg = "Argument n_repeats must be >= 1, got 0"
     with pytest.raises(ValueError, match=msg):
         compute_permutation_importance(predict, X=X, y=y, n_repeats=0)
-
-    # method
-    msg = "Unknown normalization method: invalid_method"
-    with pytest.raises(ValueError, match=msg):
-        compute_permutation_importance(predict, X=X, y=y, method="invalid_method")
 
     # scoring_direction
     msg = "Argument scoring_direction must be 'smaller' or 'greater', got .*"
