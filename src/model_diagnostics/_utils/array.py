@@ -291,13 +291,13 @@ def safe_assign_column(x, values, column_index):
                     warnings.filterwarnings(
                         "ignore", category=DeprecationWarning, message=msg
                     )
-                    if not x.index.is_unique:
-                        # Pandas might error with:
-                        #   cannot reindex on an axis with duplicate labels
-                        # Try reindexing ourselves.
-                        x = x.reset_index()
-                    if not pd_values.index.is_unique:
-                        pd_values = pd_values.reset_index()
+                    # if not x.index.is_unique:
+                    # Pandas might error with:
+                    #   cannot reindex on an axis with duplicate labels
+                    # Try reindexing ourselves.
+                    x = x.reset_index(drop=True)
+                    # if not pd_values.index.is_unique:
+                    pd_values = pd_values.reset_index(drop=True)
                     x.iloc[:, column_index] = pd_values
             else:
                 x.iloc[:, column_index] = pd_values
@@ -352,3 +352,62 @@ def safe_index_rows(x, indices):
     else:
         # numpy, polars
         return x[indices]
+
+
+def safe_copy(x) -> npt.ArrayLike:
+    """Create a safe copy of input data in various formats.
+
+    'Safe' means that it is guaranteed that the original data will not be modified
+    by modifications of the 'safe' copy. But only copy if really required.
+
+    Parameters
+    ----------
+    x : array-like
+        The input data to be copied, which can be numpy array, pandas DataFrame,
+        polars DataFrame, PyArrow Table, or other object types.
+
+    Returns
+    -------
+    copied_x : array-like
+        A copy of the input data in the same format.
+    """
+    if hasattr(x, "copy"):
+        # list, numpy, pandas, scipy sparse, ...
+        x = x.copy()
+    elif is_pyarrow_table(x) or isinstance(x, pl.DataFrame):
+        # Copy on Write
+        pass
+    else:
+        x = copy.deepcopy(x)
+    return x
+
+
+def get_column_names(x) -> list:
+    """Extract column names from different data containers.
+
+    This function handles different data container formats and returns
+    their column names or indices if names are not available.
+
+    Parameters
+    ----------
+    x : array-like
+        The input data which can be a numpy array, pandas DataFrame,
+        polars DataFrame, PyArrow Table, or other similar data container.
+
+    Returns
+    -------
+    list
+        A list of column names if available, or column indices (integers)
+        for array-like objects without named columns.
+    """
+    if is_pyarrow_table(x):
+        colnames = x.column_names
+    elif is_pandas_df(x):
+        colnames = x.columns.to_list()
+    elif hasattr(x, "columns") and isinstance(x.columns, list):
+        # polars
+        colnames = x.columns
+    else:
+        # e.g. numpy
+        colnames = list(range(x.shape[1]))
+    return colnames
