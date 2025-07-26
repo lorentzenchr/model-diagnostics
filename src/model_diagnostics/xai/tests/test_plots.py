@@ -1,6 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
-import polars as pl
 import pytest
 from sklearn.datasets import make_regression
 from sklearn.linear_model import LinearRegression

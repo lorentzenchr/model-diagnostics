@@ -141,10 +141,10 @@ def test_permutation_importance_finds_important_feature(
         n_max=n_max,
         rng=0,
     )
-    assert all(result["difference_mean"][0:2] > 0.0)
-    assert all(result["ratio_mean"][0:2] > 1.0)
-    assert result["difference_mean"][2] == 0.0
-    assert result["ratio_mean"][2] == 1.0
+    assert result["difference_mean"][1] > 0.0
+    assert result["ratio_mean"][1] > 1.0
+    assert all(result["difference_mean"][[0, 2]] == 0.0)
+    assert all(result["ratio_mean"][[0, 2]] == 1.0)
 
 
 def test_compute_permutation_importance_raises_errors():

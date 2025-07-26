@@ -90,7 +90,7 @@ def plot_permutation_importance(
 
     if not (0 <= confidence_level < 1):
         msg = (
-            f"Argument confidence_level must fulfil 0 <= level < 1, got "
+            f"Argument confidence_level must fulfil 0 <= confidence_level < 1, got "
             f"{confidence_level}."
         )
         raise ValueError(msg)
@@ -128,13 +128,13 @@ def plot_permutation_importance(
         if plot_backend == "matplotlib":
             ax = plt.gca()
         else:
-            import plotly.graph_objects as go  # noqa: PLC0415
+            import plotly.graph_objects as go
 
             fig = ax = go.Figure()
     elif isinstance(ax, mpl.axes.Axes):
         plot_backend = "matplotlib"
     elif is_plotly_figure(ax):
-        import plotly.graph_objects as go  # noqa: PLC0415
+        import plotly.graph_objects as go
 
         plot_backend = "plotly"
         fig = ax
