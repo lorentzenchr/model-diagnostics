@@ -384,7 +384,7 @@ def test_get_column_names(a, result):
     ],
 )
 def test_safe_copy(a, result):
-    """Test that get_second_dimension works correctly.
+    """Test that safe_copy() works correctly.
 
     For simplicity, we only consider numerical values.
     """
@@ -392,5 +392,6 @@ def test_safe_copy(a, result):
         pytest.skip("Module for data container not imported.")
 
     b = safe_copy(a)
-    safe_assign_column(b, values=[0, 0], column_index=1)  # has side-effects
+    b = safe_assign_column(b, values=[0, 0], column_index=1)  # has side-effects
     assert_array_equal(a, result)
+    assert not np.array_equal(b, a)

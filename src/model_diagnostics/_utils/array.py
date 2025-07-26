@@ -357,6 +357,9 @@ def safe_index_rows(x, indices):
 def safe_copy(x) -> npt.ArrayLike:
     """Create a safe copy of input data in various formats.
 
+    'Safe' means that it is guaranteed that the original data will not be modified
+    by modifications of the 'safe' copy. But only copy if really required.
+
     Parameters
     ----------
     x : array-like
@@ -369,7 +372,7 @@ def safe_copy(x) -> npt.ArrayLike:
         A copy of the input data in the same format.
     """
     if hasattr(x, "copy"):
-        # pandas
+        # list, numpy, pandas, scipy sparse, ...
         x = x.copy()
     elif is_pyarrow_table(x) or isinstance(x, pl.DataFrame):
         # Copy on Write
@@ -401,10 +404,10 @@ def get_column_names(x) -> list:
         colnames = x.column_names
     elif is_pandas_df(x):
         colnames = x.columns.to_list()
-    elif hasattr(x, "columns"):
+    elif hasattr(x, "columns") and isinstance(x.columns, list):
         # polars
         colnames = x.columns
     else:
-        # numpy
+        # e.g. numpy
         colnames = list(range(x.shape[1]))
     return colnames
