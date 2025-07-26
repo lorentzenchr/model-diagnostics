@@ -395,3 +395,9 @@ def test_safe_copy(a, result):
     b = safe_assign_column(b, values=[0, 0], column_index=1)  # has side-effects
     assert_array_equal(a, result)
     assert not np.array_equal(b, a)
+
+
+def test_that_else_condition_in_safe_copy_works():
+    """Test that the else condition in safe_copy() works."""
+    a = (0, 1, 2, 3)
+    assert safe_copy(a) == a
