@@ -21,7 +21,7 @@ classifiers = [
 ]
 keywords = ["machine learning", "model diagnostics", "calibration"]
 dependencies = [
-  "matplotlib>=3.6.1",
+  "matplotlib>=3.8.4",  # numpy 2 support
   "numpy>=2.0.0",
   "packaging>=23.1",
   "polars>=1.1.0",  # numpy 2 support
