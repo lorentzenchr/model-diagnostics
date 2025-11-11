@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import pytest
+from packaging.version import Version
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.datasets import make_classification
@@ -319,7 +320,10 @@ def test_plot_bias(
         elif feature_type == "cat":
             dtype = pl.Categorical
         elif feature_type == "cat_physical":
-            dtype = pl.Categorical(ordering="physical")
+            if Version(pl.__version__) < Version("1.32.0"):
+                dtype = pl.Categorical(ordering="lexical")
+            else:
+                dtype = pl.Categorical()
         elif feature_type == "enum":
             dtype = pl.Enum(categories=np.unique(feature))
         else:
@@ -527,7 +531,10 @@ def test_plot_marginal(with_null_values, feature_type, bin_method, ax, plot_back
         elif feature_type == "cat":
             dtype = pl.Categorical
         elif feature_type == "cat_physical":
-            dtype = pl.Categorical(ordering="physical")
+            if Version(pl.__version__) < Version("1.32.0"):
+                dtype = pl.Categorical(ordering="lexical")
+            else:
+                dtype = pl.Categorical()
         elif feature_type == "enum":
             dtype = pl.Enum(categories=np.unique(feature))
         else:
