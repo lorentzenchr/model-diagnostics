@@ -296,7 +296,10 @@ def test_compute_bias_n_bins_string_like_feature(feature_type):
     if feature_type == "cat":
         dtype = pl.Categorical
     elif feature_type == "cat_physical":
-        dtype = pl.Categorical(ordering="physical")
+        if Version(pl.__version__) < Version("1.32.0"):
+            dtype = pl.Categorical(ordering="lexical")
+        else:
+            dtype = pl.Categorical()
     elif feature_type == "enum":
         dtype = pl.Enum(categories=["b", "a", "c"])
     else:
@@ -824,7 +827,10 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
     if feature_type == "cat":
         dtype = pl.Categorical
     elif feature_type == "cat_physical":
-        dtype = pl.Categorical(ordering="physical")
+        if Version(pl.__version__) < Version("1.32.0"):
+            dtype = pl.Categorical(ordering="lexical")
+        else:
+            dtype = pl.Categorical()
     elif feature_type == "enum":
         dtype = pl.Enum(categories=["b", "a", "c"])
     else:
