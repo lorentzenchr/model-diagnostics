@@ -172,6 +172,7 @@ dependencies = [
   "mkdocs-literate-nav>=0.6.1",
   "mkdocs-section-index>=0.3.9",
   "mkdocs-jupyter==0.24.7",  # https://github.com/danielfrg/mkdocs-jupyter/issues/212
+  "click<=8.2.1",  # https://github.com/mkdocs/mkdocs/issues/4032
 ]
 
 [tool.hatch.envs.docs.scripts]

@@ -93,6 +93,7 @@ def plot_reliability_diagram(
     Notes
     -----
     [](){#notes}
+
     The expectation conditional on the predictions is \(E(Y|y_{pred})\). This object is
     estimated by the pool-adjacent violator (PAV) algorithm, which has very desirable
     properties:
@@ -425,6 +426,7 @@ def plot_bias(
     Notes
     -----
     [](){#notes}
+
     A model \(m(X)\) is conditionally calibrated iff \(E(V(m(X), Y))=0\) a.s. The
     empirical version, given some data, reads \(\frac{1}{n}\sum_i V(m(x_i), y_i)\).
     See `[FLM2022]`.
