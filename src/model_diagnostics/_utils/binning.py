@@ -196,11 +196,14 @@ def bin_feature(
             if feature_out.has_nulls():
                 # To ease adding the null value, we take one value more.
                 keep_values = value_counts[feature_name].head(n_bins_ef)
-                if is_categorical:
-                    # FIXME: Workaround for https://github.com/pola-rs/polars/issues/21175
+                if is_categorical or is_enum:
+                    # FIXME: categorical: Workaround for https://github.com/pola-rs/polars/issues/21175
+                    # FIXME: enum: Workaround for https://github.com/pola-rs/polars/pull/25245
+                    # to be released in polars 1.35.3 or 1.36.
+                    dtype = keep_values.dtype
                     keep_values = keep_values.cast(pl.String)
                     keep_values[-1] = None
-                    keep_values = keep_values.cast(pl.Categorical)
+                    keep_values = keep_values.cast(dtype)
                 else:
                     keep_values[-1] = None
             else:
