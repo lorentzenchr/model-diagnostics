@@ -9,6 +9,7 @@ from .scoring import (
     PoissonDeviance,
     SquaredError,
     decompose,
+    compute_score
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "PoissonDeviance",
     "SquaredError",
     "decompose",
+    "compute_score"
 ]

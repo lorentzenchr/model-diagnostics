@@ -11,7 +11,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 from scipy import special
-from scipy.stats import expectile
+from scipy.stats import expectile, t
 from sklearn.isotonic import IsotonicRegression as IsotonicRegression_skl
 
 from model_diagnostics._utils.array import (
@@ -61,6 +61,21 @@ class _BaseScoringFunction(ABC):
             The average score.
         """
         return np.average(self.score_per_obs(y_obs, y_pred), weights=weights)
+    
+    def confidence_interval(
+        self,
+        y_obs: npt.ArrayLike,
+        y_pred: npt.ArrayLike,
+        confidence_level: Optional[float] = None,
+        weights: Optional[npt.ArrayLike] = None,
+    ) -> np.ndarray:
+        score_per_obs = self.score_per_obs(y_obs, y_pred)
+        avg_score = np.average(score_per_obs, weights=weights)
+        df = len(score_per_obs) - 1
+        score_stddev = np.average((score_per_obs - avg_score) ** 2, weights=weights) / np.amax(
+            [1, df]
+        )
+        return avg_score + t.interval(confidence_level, df=df, scale=np.sqrt(score_stddev))
 
     @abstractmethod
     def score_per_obs(
@@ -928,6 +943,260 @@ def decompose(
                 "score": score,
             }
         )
+        df_list.append(df)
+
+    df = pl.concat(df_list)
+
+    # Remove column "model" for a single model.
+    if n_pred <= 1:
+        df = df.drop("model")
+
+    return df
+
+
+def compute_score(
+    y_obs: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    weights: Optional[npt.ArrayLike] = None,
+    confidence_level: Optional[float] = None,
+    *,
+    scoring_function: Callable[..., Any],  # TODO: make type hint stricter
+    functional: Optional[str] = None,
+    level: Optional[float] = None,
+) -> pl.DataFrame:
+    r"""Additive decomposition of scores.
+
+    The score is decomposed as
+    `score = miscalibration - discrimination + uncertainty`.
+
+    Parameters
+    ----------
+    y_obs : array-like of shape (n_obs)
+        Observed values of the response variable.
+    y_pred : array-like of shape (n_obs) or (n_obs, n_models)
+        Predicted values of the `functional` of interest, e.g. the conditional
+        expectation of the response, `E(Y|X)`.
+    weights : array-like of shape (n_obs) or None
+        Case weights.
+    scoring_function : callable
+        A scoring function with signature roughly
+        `fun(y_obs, y_pred, weights) -> float`.
+    functional : str or None
+        The target functional which `y_pred` aims to predict.
+        If `None`, then it will be inferred from `scoring_function.functional`.
+        Options are:
+
+        - `"mean"`. Argument `level` is neglected.
+        - `"median"`. Argument `level` is neglected.
+        - `"expectile"`
+        - `"quantile"`
+    level : float or None
+        Functionals like expectiles and quantiles have a level (often called alpha).
+        If `None`, then it will be inferred from `scoring_function.level`.
+
+    Returns
+    -------
+    decomposition : polars.DataFrame
+        The resulting score decomposition as a dataframe with columns:
+
+        - `miscalibration`
+        - `discrimination`
+        - `uncertainty`
+        - `score`: the average score
+
+    If `y_pred` contains several predictions, i.e. it is 2-dimension with shape
+    `(n_obs, n_pred)` and `n_pred >1`, then there is the additional column:
+
+        - `model`
+
+    Notes
+    -----
+    To be precise, this function returns the decomposition of the score in terms of
+    auto-miscalibration, auto-discrimination (or resolution) and uncertainy (or
+    entropy), see `[FLM2022]` and references therein.
+    The key element is to estimate the recalibrated predictions, i.e. \(T(Y|m(X))\) for
+    the target functional \(T\) and model predictions \(m(X)\).
+    This is accomplished by isotonic regression, `[Dimitriadis2021]` and
+    `[Gneiting2021]`.
+
+    References
+    ----------
+    `[FLM2022]`
+
+    :   T. Fissler, C. Lorentzen, and M. Mayer.
+        "Model Comparison and Calibration Assessment". (2022)
+        [arxiv:2202.12780](https://arxiv.org/abs/2202.12780).
+
+    `[Dimitriadis2021]`
+
+    :   T. Dimitriadis, T. Gneiting, and A. I. Jordan.
+        "Stable reliability diagrams for probabilistic classifiers". (2021)
+        [doi:10.1073/pnas.2016191118](https://doi.org/10.1073/pnas.2016191118)
+
+    `[Gneiting2021]`
+
+    :   T. Gneiting and J. Resin.
+        "Regression Diagnostics meets Forecast Evaluation: Conditional Calibration,
+        Reliability Diagrams, and Coefficient of Determination". (2021).
+        [arXiv:2108.03210](https://arxiv.org/abs/2108.03210).
+
+    Examples
+    --------
+    >>> decompose(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1, 2],
+    ... scoring_function=SquaredError())
+    shape: (1, 4)
+    ┌────────────────┬────────────────┬─────────────┬───────┐
+    │ miscalibration ┆ discrimination ┆ uncertainty ┆ score │
+    │ ---            ┆ ---            ┆ ---         ┆ ---   │
+    │ f64            ┆ f64            ┆ f64         ┆ f64   │
+    ╞════════════════╪════════════════╪═════════════╪═══════╡
+    │ 0.625          ┆ 0.125          ┆ 0.25        ┆ 0.75  │
+    └────────────────┴────────────────┴─────────────┴───────┘
+    """
+    if functional is None:
+        if hasattr(scoring_function, "functional"):
+            functional = scoring_function.functional
+        else:
+            msg = (
+                "You set functional=None, but scoring_function has no attribute "
+                "functional."
+            )
+            raise ValueError(msg)
+    if level is None:
+        level = 0.5
+        if functional in ("expectile", "quantile"):
+            if hasattr(scoring_function, "level"):
+                level = float(scoring_function.level)
+            else:
+                msg = (
+                    "You set level=None, but scoring_function has no attribute "
+                    "level."
+                )
+                raise ValueError(msg)
+
+    allowed_functionals = ("mean", "median", "expectile", "quantile")
+    if functional not in allowed_functionals:
+        msg = (
+            f"The functional must be one of {allowed_functionals}, got "
+            f"{functional}."
+        )
+        raise ValueError(msg)
+    if functional in ("expectile", "quantile") and (level <= 0 or level >= 1):
+        msg = f"The level must fulfil 0 < level < 1, got {level}."
+        raise ValueError(msg)
+    if confidence_level is not None and functional != "mean":
+        msg = ("Confidence intervals for the score are currently implemented "
+                "only for the mean functional.")
+        raise ValueError
+
+    validate_same_first_dimension(y_obs, y_pred)
+    n_pred = length_of_second_dimension(y_pred)
+    pred_names, _ = get_sorted_array_names(y_pred)
+    y_o = np.asarray(y_obs)
+
+    if weights is None:
+        w = None
+    else:
+        validate_same_first_dimension(weights, y_o)
+        w = np.asarray(weights)  # needed to satisfy mypy
+        if w.ndim > 1:
+            msg = f"The array weights must be 1-dimensional, got weights.ndim={w.ndim}."
+            raise ValueError(msg)
+
+    if functional == "mean":
+        iso = IsotonicRegression_skl(y_min=None, y_max=None)
+        marginal = np.average(y_o, weights=w)
+    else:
+        iso = IsotonicRegression(functional=functional, level=level)
+        if functional == "expectile":
+            marginal = expectile(y_o, alpha=level, weights=w)
+        elif functional == "quantile":
+            marginal = 0.5 * (
+                quantile_lower(y_o, level=level) + quantile_upper(y_o, level=level)
+            )
+
+    if y_o[0] == marginal == y_o[-1]:
+        # y_o is constant. We need to check if y_o is allowed as argument to y_pred.
+        # For instance for the poisson deviance, y_o = 0 is allowed. But 0 is forbidden
+        # as a prediction.
+        try:
+            scoring_function(y_o[0], marginal)
+        except ValueError as exc:
+            msg = (
+                "Your y_obs is constant and lies outside the allowed range of y_pred "
+                "of your scoring function. Therefore, the score decomposition cannot "
+                "be applied."
+            )
+            raise ValueError(msg) from exc
+
+    # The recalibrated versions, further down, could contain min(y_obs) and that could
+    # be outside of the valid domain, e.g. y_pred = 0 for the Poisson deviance where
+    # y_obs=0 is allowed. We detect that here:
+    y_min = np.amin(y_o)
+    y_min_allowed = True
+    try:
+        scoring_function(y_o[:1], np.array([y_min]), None if w is None else w[:1])
+    except ValueError:
+        y_min_allowed = False
+
+    marginal = np.full_like(y_o, fill_value=marginal, dtype=float)
+    score_marginal = scoring_function(y_o, marginal, w)
+
+    df_list = []
+    for i in range(len(pred_names)):
+        # Loop over columns of y_pred.
+        x = y_pred if n_pred == 0 else get_second_dimension(y_pred, i)
+        iso.fit(x, y_o, sample_weight=w)
+        recalibrated = np.squeeze(iso.predict(x))
+        if not y_min_allowed and recalibrated[0] <= y_min:
+            # Oh dear, this needs quite some extra work:
+            # First index of value greater than y_min
+            idx1 = np.argmax(recalibrated > y_min)
+            val1 = recalibrated[idx1]
+            # First index of value greater than the value at idx1.
+            idx2 = np.argmax(recalibrated > val1)
+            # Note that val1 may already be the largest value of the array => idx2 = 0.
+            if idx2 == 0:
+                idx2 = recalibrated.shape[0]
+            # We merge the first 2 blocks of the isotonic regression as it violates
+            # our domain requirements.
+            re2 = recalibrated[:idx2]
+            w2 = None if w is None else w[:idx2]
+            if functional == "mean":
+                recalibrated[:idx2] = np.average(re2, weights=w2)
+            elif functional == "expectile":
+                recalibrated[:idx2] = expectile(re2, alpha=level, weights=w2)
+            elif functional == "quantile":
+                # Note, no scoring function known that could end up here.
+                lower = quantile_lower(re2, level=level)
+                upper = quantile_upper(re2, level=level)
+                recalibrated[:idx2] = 0.5 * (lower + upper)
+
+        score = scoring_function(y_o, x, w)
+        interval = scoring_function.confidence_interval(y_o, x, confidence_level, w,)
+        try:
+            score_recalibrated = scoring_function(y_o, recalibrated, w)
+        except ValueError as exc:
+            msg = (
+                "The recalibrated predictions obtained from isotonic regression are "
+                "very likely outside the allowed range of y_pred of your scoring "
+                "function. Therefore, the score decomposition cannot be applied."
+            )
+            raise ValueError(msg) from exc
+
+        df = pl.DataFrame(
+            {
+                "model": pred_names[i],
+                "miscalibration": score - score_recalibrated,
+                "discrimination": score_marginal - score_recalibrated,
+                "uncertainty": score_marginal,
+                "score": score,
+            }
+        )
+        if confidence_level is not None:
+            df = df.with_columns(
+                pl.lit([interval]).alias("score_interval")
+            )
         df_list.append(df)
 
     df = pl.concat(df_list)
