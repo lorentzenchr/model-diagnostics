@@ -60,7 +60,10 @@ class _BaseScoringFunction(ABC):
         score : float
             The average score.
         """
-        return np.average(self.score_per_obs(y_obs, y_pred), weights=weights)
+        return np.average(
+            self.score_per_obs(y_obs, y_pred),
+            weights=weights,  # type: ignore
+        )
 
     @abstractmethod
     def score_per_obs(
