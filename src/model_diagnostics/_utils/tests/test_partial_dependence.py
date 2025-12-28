@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 from numpy.testing import assert_allclose, assert_equal
 from polars.testing import assert_frame_equal
-from sklearn.base import RegressorMixin
+from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.inspection import partial_dependence
 
 from model_diagnostics._utils.array import (
@@ -137,7 +137,7 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
         rng=rng,
     )
 
-    class ModelWrapPredict(RegressorMixin):
+    class ModelWrapPredict(RegressorMixin, BaseEstimator):
         def fit(self, X):
             self.is_fitted_ = True
             return self
