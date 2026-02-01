@@ -207,8 +207,8 @@ def compute_permutation_importance(
 
     if scoring_orientation not in ("smaller_is_better", "greater_is_better"):
         msg = (
-            f"Argument scoring_orientation must be 'smaller' or 'greater', got "
-            f"{scoring_orientation}."
+            f"Argument scoring_orientation must be 'smaller_is_better' or "
+            f"'greater_is_better', got {scoring_orientation}."
         )
         raise ValueError(msg)
 
