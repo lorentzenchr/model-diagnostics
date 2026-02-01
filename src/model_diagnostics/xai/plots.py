@@ -21,7 +21,7 @@ def plot_permutation_importance(
     weights: Optional[npt.ArrayLike] = None,
     n_repeats: int = 5,
     n_max: int = 10_000,
-    scoring_direction: str = "smaller",
+    scoring_orientation: str = "smaller",
     rng: Optional[Union[np.random.Generator, int]] = None,
     max_display: int = 15,
     which: str = "difference",
@@ -57,7 +57,7 @@ def plot_permutation_importance(
         Maximum number of observations used. If the number of observations is greater
         than `n_max`, a random subset of size `n_max` will be drawn from `X`, `y`, (and
         `weights`). Pass None for no subsampling.
-    scoring_direction : str, default="smaller"
+    scoring_orientation : str, default="smaller"
         Direction of scoring function. Use "smaller" if smaller values are better
         (e.g., average losses), or "greater" if greater values are better
         (e.g., R-squared).
@@ -104,7 +104,7 @@ def plot_permutation_importance(
         weights=weights,
         n_repeats=n_repeats,
         n_max=n_max,
-        scoring_direction=scoring_direction,
+        scoring_orientation=scoring_orientation,
         rng=rng,
     )
     # Plot axes are reversed

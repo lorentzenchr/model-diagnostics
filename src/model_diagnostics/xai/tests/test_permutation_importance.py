@@ -166,7 +166,7 @@ def test_compute_permutation_importance_raises_errors():
     with pytest.raises(ValueError, match=msg):
         compute_permutation_importance(predict, X=X, y=y, n_repeats=0)
 
-    # scoring_direction
-    msg = "Argument scoring_direction must be 'smaller' or 'greater', got .*"
+    # scoring_orientation
+    msg = "Argument scoring_orientation must be 'smaller' or 'greater', got .*"
     with pytest.raises(ValueError, match=msg):
-        compute_permutation_importance(predict, X=X, y=y, scoring_direction="larger")
+        compute_permutation_importance(predict, X=X, y=y, scoring_orientation="larger")

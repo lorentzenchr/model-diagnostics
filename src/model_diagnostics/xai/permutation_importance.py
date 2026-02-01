@@ -61,7 +61,7 @@ def compute_permutation_importance(
     weights: Optional[npt.ArrayLike] = None,
     n_repeats: int = 5,
     n_max: int = 10_000,
-    scoring_direction: str = "smaller",
+    scoring_orientation: str = "smaller",
     rng: Optional[Union[np.random.Generator, int]] = None,
 ):
     """Compute permutation feature importance.
@@ -105,7 +105,7 @@ def compute_permutation_importance(
         Maximum number of observations used. If the number of observations is greater
         than `n_max`, a random subset of size `n_max` will be drawn from `X`, `y`, (and
         `weights`). Pass None for no subsampling.
-    scoring_direction : str, default="smaller"
+    scoring_orientation : str, default="smaller"
         Direction of scoring function. Use "smaller" if smaller values are better
         (e.g., average losses), or "greater" if greater values are better
         (e.g., R-squared).
@@ -205,10 +205,10 @@ def compute_permutation_importance(
         msg = f"Argument n_repeats must be >= 1, got {n_repeats}."
         raise ValueError(msg)
 
-    if scoring_direction not in ("smaller", "greater"):
+    if scoring_orientation not in ("smaller", "greater"):
         msg = (
-            f"Argument scoring_direction must be 'smaller' or 'greater', got "
-            f"{scoring_direction}."
+            f"Argument scoring_orientation must be 'smaller' or 'greater', got "
+            f"{scoring_orientation}."
         )
         raise ValueError(msg)
 
@@ -260,7 +260,7 @@ def compute_permutation_importance(
         feature_scores.append(pl.Series(scores_per_repetition))
 
     # Differences and ratios wrt base score
-    direction = 1 if scoring_direction == "smaller" else -1
+    direction = 1 if scoring_orientation == "smaller" else -1
     difference_scores = [direction * (s - base_score) for s in feature_scores]
     ratio_scores = [(s / base_score) ** direction for s in feature_scores]
 
