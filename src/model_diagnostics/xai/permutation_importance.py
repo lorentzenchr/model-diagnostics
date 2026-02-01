@@ -36,7 +36,7 @@ def rearrange_rows_of_some_columns(X, columns, row_indices):
     Returns
     -------
     array-like
-        A copy of X with values in the specified columns rearranged.
+        A copy of X with rearranged values in the specified columns.
     """
     X = safe_copy(X)  # Important
     if isinstance(columns, (str, int)):
@@ -147,11 +147,11 @@ def compute_permutation_importance(
     >>> import numpy as np
     >>> import polars as pl
     >>> from sklearn.linear_model import LinearRegression
-    >>>
+
     >>> # Create a synthetic dataset
     >>> rng = np.random.default_rng(1)
     >>> n = 1000
-    >>>
+
     >>> X = pl.DataFrame(
     ...     {
     ...         "rooms": rng.choice([2.5, 3.5, 4.5], n),
@@ -159,12 +159,12 @@ def compute_permutation_importance(
     ...         "age": rng.uniform(0, 100, n),
     ...     }
     ... )
-    >>>
+
     >>> y = X["area"] + 20 * X["rooms"] + rng.normal(0, 10, n)
-    >>>
+
     >>> model = LinearRegression()
     >>> _ = model.fit(X, y)
-    >>>
+
     >>> perm_importance = compute_permutation_importance(
     ...     pred_fun=model.predict,
     ...     X=X,
@@ -182,7 +182,7 @@ def compute_permutation_importance(
     │ area    ┆ 1328.885114     ┆ 15.924463         ┆ 14.343058  ┆ 0.159894     │
     │ age     ┆ 0.174047        ┆ 0.090023          ┆ 1.001748   ┆ 0.000904     │
     └─────────┴─────────────────┴───────────────────┴────────────┴──────────────┘
-    >>>
+
     >>> # Using feature subsets
     >>> perm_importance = compute_permutation_importance(
     ...     pred_fun=model.predict,
@@ -191,7 +191,7 @@ def compute_permutation_importance(
     ...     features=["area", "age"],
     ...     rng=1,
     ... )
-    >>>
+
     >>> # Using feature groups
     >>> perm_importance = compute_permutation_importance(
     ...     pred_fun=model.predict,
@@ -212,16 +212,16 @@ def compute_permutation_importance(
         )
         raise ValueError(msg)
 
-    # Turn features into form {"x1": ["x1"], "x2": ["x2"], "group": ["x1", "x2"]}
-    # While looking verbose, it is the most flexible way to handle all cases
+    # Turn features into form {"x1": ["x1"], "x2": ["x2"], "group": ["x1", "x2"]}.
+    # While looking verbose, it is the most flexible way to handle all cases.
     if features is None:
         features = get_column_names(X)
     if not isinstance(features, dict):
         features = {v: [v] for v in features}
 
-    # Sometimes, the data is too large and we need subsampling
+    # Sometimes, the data is too large and we need subsampling.
     n = length_of_first_dimension(X)
-    rng_ = np.random.default_rng(rng)  # we need it later for shuffling
+    rng_ = np.random.default_rng(rng)
     if n_max is not None and n > n_max:
         row_indices = rng_.choice(n, size=n_max, replace=False)
         X = safe_index_rows(X, row_indices)
