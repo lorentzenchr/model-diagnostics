@@ -53,6 +53,8 @@ nav:
 
 watch:
   - src/model_diagnostics/
+  - docs/development.md
+  - docs/index.md
 
 plugins:
   # Built-in

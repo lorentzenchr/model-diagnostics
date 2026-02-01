@@ -60,7 +60,10 @@ class _BaseScoringFunction(ABC):
         score : float
             The average score.
         """
-        return np.average(self.score_per_obs(y_obs, y_pred), weights=weights)
+        return np.average(
+            self.score_per_obs(y_obs, y_pred),
+            weights=weights,  # type: ignore
+        )
 
     @abstractmethod
     def score_per_obs(
@@ -142,9 +145,9 @@ class HomogeneousExpectileScore(_BaseScoringFunction):
     Examples
     --------
     >>> hes = HomogeneousExpectileScore(degree=2, level=0.1)
-    >>> hes(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])  # doctest: +SKIP
-    0.95
-    """  # FIXME: numpy 2.0.0, doctest skip should not be necessary.
+    >>> hes(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    np.float64(0.95)
+    """
 
     def __init__(self, degree: float = 2, level: float = 0.5) -> None:
         self.degree = degree
@@ -268,9 +271,9 @@ class SquaredError(HomogeneousExpectileScore):
     Examples
     --------
     >>> se = SquaredError()
-    >>> se(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])  # doctest: +SKIP
-    0.75
-    """  # FIXME: numpy 2.0.0, doctest skip should not be necessary.
+    >>> se(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    np.float64(0.75)
+    """
 
     def __init__(self) -> None:
         super().__init__(degree=2, level=0.5)
@@ -296,9 +299,9 @@ class PoissonDeviance(HomogeneousExpectileScore):
     Examples
     --------
     >>> pd = PoissonDeviance()
-    >>> pd(y_obs=[0, 0, 1, 1], y_pred=[2, 1, 1 , 2])  # doctest: +SKIP
-    1.6534264097200273
-    """  # FIXME: numpy 2.0.0, doctest skip should not be necessary.
+    >>> pd(y_obs=[0, 0, 1, 1], y_pred=[2, 1, 1 , 2])
+    np.float64(1.6534264097200273)
+    """
 
     def __init__(self) -> None:
         super().__init__(degree=1, level=0.5)
@@ -325,9 +328,9 @@ class GammaDeviance(HomogeneousExpectileScore):
     Examples
     --------
     >>> gd = GammaDeviance()
-    >>> gd(y_obs=[3, 2, 1, 1], y_pred=[2, 1, 1 , 2])  # doctest: +SKIP
-    0.2972674459459178
-    """  # FIXME: numpy 2.0.0, doctest skip should not be necessary.
+    >>> gd(y_obs=[3, 2, 1, 1], y_pred=[2, 1, 1 , 2])
+    np.float64(0.2972674459459178)
+    """
 
     def __init__(self) -> None:
         super().__init__(degree=0, level=0.5)
@@ -366,11 +369,9 @@ class LogLoss(_BaseScoringFunction):
     Examples
     --------
     >>> ll = LogLoss()
-    >>> ll(y_obs=[0, 0.5, 1, 1], y_pred=[0.1, 0.2, 0.8 , 0.9], weights=[1, 2, 1, 1])  # doctest: +SKIP
-    0.17603033705165635
-    """  # noqa: E501
-
-    # FIXME: numpy 2.0.0, doctest skip should not be necessary.
+    >>> ll(y_obs=[0, 0.5, 1, 1], y_pred=[0.1, 0.2, 0.8 , 0.9], weights=[1, 2, 1, 1])
+    np.float64(0.17603033705165635)
+    """
 
     @property
     def functional(self):
@@ -466,9 +467,9 @@ class HomogeneousQuantileScore(_BaseScoringFunction):
     Examples
     --------
     >>> hqs = HomogeneousQuantileScore(degree=3, level=0.1)
-    >>> hqs(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])  # doctest: +SKIP
-    0.6083333333333334
-    """  # FIXME: numpy 2.0.0, doctest skip should not be necessary.
+    >>> hqs(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    np.float64(0.6083333333333334)
+    """
 
     def __init__(self, degree: float = 2, level: float = 0.5) -> None:
         self.degree = degree
@@ -569,9 +570,9 @@ class PinballLoss(HomogeneousQuantileScore):
     Examples
     --------
     >>> pl = PinballLoss(level=0.9)
-    >>> pl(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])  # doctest: +SKIP
-    0.275
-    """  # FIXME: numpy 2.0.0, doctest skip should not be necessary.
+    >>> pl(y_obs=[0, 0, 1, 1], y_pred=[-1, 1, 1 , 2])
+    np.float64(0.275)
+    """
 
     def __init__(self, level: float = 0.5) -> None:
         super().__init__(degree=1, level=level)
@@ -606,6 +607,7 @@ class ElementaryScore(_BaseScoringFunction):
     Notes
     -----
     [](){#notes}
+
     The elementary scoring or loss function is given by
 
     \[
@@ -644,9 +646,9 @@ class ElementaryScore(_BaseScoringFunction):
     Examples
     --------
     >>> el_score = ElementaryScore(eta=2, functional="mean")
-    >>> el_score(y_obs=[1, 2, 2, 1], y_pred=[4, 1, 2, 3])  # doctest: +SKIP
-    0.5
-    """  # FIXME: numpy 2.0.0, doctest skip should not be necessary.
+    >>> el_score(y_obs=[1, 2, 2, 1], y_pred=[4, 1, 2, 3])
+    np.float64(0.5)
+    """
 
     def __init__(
         self, eta: float, functional: str = "mean", level: float = 0.5

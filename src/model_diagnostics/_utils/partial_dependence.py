@@ -93,7 +93,7 @@ def compute_partial_dependence(
     pd_values = np.average(
         y_pred.reshape(n_grid, y_pred.shape[0] // n_grid),
         axis=1,
-        weights=weights,
+        weights=weights,  # type: ignore
     )
 
     return pd_values
