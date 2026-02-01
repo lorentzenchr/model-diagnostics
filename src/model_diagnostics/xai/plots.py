@@ -13,7 +13,7 @@ from model_diagnostics.xai import compute_permutation_importance
 
 
 def plot_permutation_importance(
-    predict_function: Callable,
+    pred_fun: Callable,
     X: npt.ArrayLike,
     y: npt.ArrayLike,
     features: Optional[Union[list, tuple, set, dict]] = None,
@@ -33,8 +33,8 @@ def plot_permutation_importance(
 
     Parameters
     ----------
-    predict_function : callable
-        A callable to get predictions, i.e. `predict_function(X)`.
+    pred_fun : callable
+        A callable to get predictions, i.e. `pred_fun(X)`.
     X : array-like of shape (n_obs, n_features)
         The dataframe or array of features to be passed to the model predict function.
     y : npt.ArrayLike
@@ -96,7 +96,7 @@ def plot_permutation_importance(
         raise ValueError(msg)
 
     df = compute_permutation_importance(
-        predict_function=predict_function,
+        pred_fun=pred_fun,
         X=X,
         y=y,
         features=features,

@@ -53,7 +53,7 @@ def rearrange_rows_of_some_columns(X, columns, row_indices):
 
 
 def compute_permutation_importance(
-    predict_function: Callable,
+    pred_fun: Callable,
     X: npt.ArrayLike,
     y: npt.ArrayLike,
     features: Optional[Union[list, tuple, set, dict]] = None,
@@ -81,8 +81,8 @@ def compute_permutation_importance(
     Parameters
     ----------
 
-    predict_function : callable
-        A callable to get predictions, i.e. `predict_function(X)`.
+    pred_fun : callable
+        A callable to get predictions, i.e. `pred_fun(X)`.
     X : array-like of shape (n_obs, n_features)
         The dataframe or array of features to be passed to the model predict function.
     y : npt.ArrayLike
@@ -166,7 +166,7 @@ def compute_permutation_importance(
     >>> _ = model.fit(X, y)
     >>>
     >>> perm_importance = compute_permutation_importance(
-    ...     predict_function=model.predict,
+    ...     pred_fun=model.predict,
     ...     X=X,
     ...     y=y,
     ...     rng=1,
@@ -185,7 +185,7 @@ def compute_permutation_importance(
     >>>
     >>> # Using feature subsets
     >>> perm_importance = compute_permutation_importance(
-    ...     predict_function=model.predict,
+    ...     pred_fun=model.predict,
     ...     X=X,
     ...     y=y,
     ...     features=["area", "age"],
@@ -194,7 +194,7 @@ def compute_permutation_importance(
     >>>
     >>> # Using feature groups
     >>> perm_importance = compute_permutation_importance(
-    ...     predict_function=model.predict,
+    ...     pred_fun=model.predict,
     ...     X=X,
     ...     y=y,
     ...     features={"size": ["area", "rooms"], "age": "age"},
@@ -233,7 +233,7 @@ def compute_permutation_importance(
         X = safe_copy(X)
 
     # Calculate pre-shuffle score before stacking X
-    base_score = scoring_function(y, predict_function(X), weights=weights)
+    base_score = scoring_function(y, pred_fun(X), weights=weights)
 
     # Stack X per repetition
     if n_repeats >= 2:
@@ -252,7 +252,7 @@ def compute_permutation_importance(
         )
 
         # np.split() ok on numpy array, pl/pd Series/DataFrame, but not on pa.tables
-        predictions = predict_function(X_shuffled)
+        predictions = pred_fun(X_shuffled)
         scores_per_repetition = [
             scoring_function(y, pred, weights=weights)
             for pred in np.split(predictions, n_repeats, axis=0)

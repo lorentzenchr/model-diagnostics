@@ -56,7 +56,7 @@ def test_plot_permutation_importance(max_display, confidence_level, ax, plot_bac
 
     with config_context(plot_backend=plot_backend):
         plt_ax = plot_permutation_importance(
-            predict_function=lr.predict,
+            pred_fun=lr.predict,
             X=X,
             y=y,
             max_display=max_display,
