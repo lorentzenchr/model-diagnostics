@@ -147,7 +147,6 @@ def compute_permutation_importance(
     >>> import numpy as np
     >>> import polars as pl
     >>> from sklearn.linear_model import LinearRegression
-
     >>> # Create a synthetic dataset
     >>> rng = np.random.default_rng(1)
     >>> n = 1000
