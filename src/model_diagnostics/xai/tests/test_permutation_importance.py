@@ -45,7 +45,7 @@ def test_permutation_importance_consistent_across_types(X, n_repeats, weights):
         predict,
         X=X_numpy,
         y=y,
-        features={"a": 0, "b": 1},  # specify feature names
+        features={"a": "0", "b": "1"},  # specify feature names
         n_repeats=n_repeats,
         weights=weights,
         rng=0,
@@ -75,7 +75,7 @@ def test_permutation_importance_consistent_across_types(X, n_repeats, weights):
 @pytest.mark.parametrize("n_max", [3, None])
 @pytest.mark.parametrize("n_repeat", [1, 2])
 @pytest.mark.parametrize("weights", [None, [1.0, 1.0, 2.0, 2.0]])
-def test_no_side_effects(a, original, n_max, n_repeat, weights):
+def test_no_side_effects(a, n_max, n_repeat, weights):
     """Test that calculate_permutation_importance() does not modify input.
 
     For simplicity, we only use numerical data.
