@@ -1,13 +1,10 @@
 import copy
 import sys
-import warnings
-from importlib.metadata import version
 from typing import Optional, Union
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-from packaging.version import Version, parse
 
 AL_or_polars = Union[npt.ArrayLike, pl.Series]
 
