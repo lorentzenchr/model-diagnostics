@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import polars as pl
 import pytest
@@ -62,24 +64,12 @@ def test_permutation_importance_consistent_across_types(X, n_repeats, weights):
 
 
 @pytest.mark.parametrize(
-    ("a", "original"),
+    "a",
     [
-        (
-            np.array([[1, 2, 3, 4], [1, 2, 3, 4]]).T,
-            np.array([[1, 2, 3, 4], [1, 2, 3, 4]]).T,
-        ),
-        (
-            pa_table({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
-            pa_table({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
-        ),
-        (
-            pd_DataFrame({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
-            pd_DataFrame({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
-        ),
-        (
-            pl.DataFrame({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
-            pl.DataFrame({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
-        ),
+        np.array([[1, 2, 3, 4], [1, 2, 3, 4]]).T,
+        pa_table({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
+        pd_DataFrame({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
+        pl.DataFrame({"a": [0, 1, 2, 3], "b": [1, 1, 2, 2]}),
     ],
 )
 @pytest.mark.parametrize("n_max", [3, None])
@@ -93,6 +83,7 @@ def test_no_side_effects(a, original, n_max, n_repeat, weights):
     if isinstance(a, SkipContainer):
         pytest.skip("Module for data container not imported.")
 
+    original = copy.deepcopy(a)
     y = np.arange(length_of_first_dimension(a))
     rf = RandomForestRegressor(n_estimators=10, random_state=0)
     rf.fit(a, y)
