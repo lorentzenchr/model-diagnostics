@@ -278,29 +278,7 @@ def safe_assign_column(x, values, column_index):
                     else values,
                     dtype=dtype,
                 )
-            if parse(version("pandas")) < Version("2.0.0"):
-                # FIXME: pandas >= 2.0 (<2.0 means 1.5.*)
-                with warnings.catch_warnings():
-                    msg = (
-                        r"In a future version, `df.iloc\[:, i\] = newvals` will "
-                        r"attempt to set the values inplace instead of always "
-                        r"setting a new array. To retain the old behavior, use either "
-                        r"`df\[df.columns\[i\]\] = newvals` or, if columns are "
-                        r"non-unique, `df.isetitem\(i, newvals\)`"
-                    )
-                    warnings.filterwarnings(
-                        "ignore", category=DeprecationWarning, message=msg
-                    )
-                    # if not x.index.is_unique:
-                    # Pandas might error with:
-                    #   cannot reindex on an axis with duplicate labels
-                    # Try reindexing ourselves.
-                    x = x.reset_index(drop=True)
-                    # if not pd_values.index.is_unique:
-                    pd_values = pd_values.reset_index(drop=True)
-                    x.iloc[:, column_index] = pd_values
-            else:
-                x.iloc[:, column_index] = pd_values
+            x.iloc[:, column_index] = pd_values
         except Exception as e:
             # FIXME: pyarrow version XXX
             # Older pyarrow versions of AttributeError do not have a 'add_note' method.
