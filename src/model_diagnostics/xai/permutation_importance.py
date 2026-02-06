@@ -150,7 +150,6 @@ def compute_permutation_importance(
     >>> # Create a synthetic dataset
     >>> rng = np.random.default_rng(1)
     >>> n = 1000
-
     >>> X = pl.DataFrame(
     ...     {
     ...         "rooms": rng.choice([2.5, 3.5, 4.5], n),
@@ -158,12 +157,9 @@ def compute_permutation_importance(
     ...         "age": rng.uniform(0, 100, n),
     ...     }
     ... )
-
     >>> y = X["area"] + 20 * X["rooms"] + rng.normal(0, 10, n)
-
     >>> model = LinearRegression()
     >>> _ = model.fit(X, y)
-
     >>> perm_importance = compute_permutation_importance(
     ...     pred_fun=model.predict,
     ...     X=X,
@@ -182,7 +178,7 @@ def compute_permutation_importance(
     │ age     ┆ 0.174047        ┆ 0.090023          ┆ 1.001748   ┆ 0.000904     │
     └─────────┴─────────────────┴───────────────────┴────────────┴──────────────┘
 
-    >>> # Using feature subsets
+    Using feature subsets
     >>> perm_importance = compute_permutation_importance(
     ...     pred_fun=model.predict,
     ...     X=X,
@@ -191,7 +187,7 @@ def compute_permutation_importance(
     ...     rng=1,
     ... )
 
-    >>> # Using feature groups
+    Using feature groups
     >>> perm_importance = compute_permutation_importance(
     ...     pred_fun=model.predict,
     ...     X=X,
