@@ -355,7 +355,7 @@ def safe_copy(x) -> npt.ArrayLike:
     elif is_pyarrow_table(x) or isinstance(x, pl.DataFrame):
         # Copy on Write
         pass
-    else:
+    elif not isinstance(x, tuple):
         x = copy.deepcopy(x)
     return x
 
@@ -387,5 +387,5 @@ def get_column_names(x) -> list:
         colnames = x.columns
     else:
         # e.g. numpy
-        colnames = list(str(i) for i in range(x.shape[1]))
+        colnames = [str(i) for i in range(x.shape[1])]
     return colnames
