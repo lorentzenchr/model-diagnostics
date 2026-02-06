@@ -409,5 +409,5 @@ def get_column_names(x) -> list:
         colnames = x.columns
     else:
         # e.g. numpy
-        colnames = list(range(x.shape[1]))
+        colnames = list(str(i) for i in range(x.shape[1]))
     return colnames
