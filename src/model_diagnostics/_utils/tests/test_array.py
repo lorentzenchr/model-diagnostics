@@ -358,7 +358,7 @@ def test_safe_index_rows(a):
 @pytest.mark.parametrize(
     ("a", "result"),
     [
-        (np.array([[1, 2], [3, 4]]), [0, 1]),
+        (np.array([[1, 2], [3, 4]]), ["0", "1"]),
         (pa_table({"b": [0, 1], "a": ["A", "B"]}), ["b", "a"]),
         (pd_DataFrame({"b": [0, 1], "a": 0.5}), ["b", "a"]),
         (pl.DataFrame({"b": [0, 1], "a": 0.5}), ["b", "a"]),
