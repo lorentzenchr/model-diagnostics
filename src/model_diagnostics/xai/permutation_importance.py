@@ -15,7 +15,7 @@ from model_diagnostics._utils.array import (
 from model_diagnostics.scoring import SquaredError
 
 
-def rearrange_rows_of_some_columns(X, columns, row_indices):
+def _rearrange_rows_of_some_columns(X, columns, row_indices):
     """Rearrange values in specific columns according to provided indices.
 
     This function creates a copy of the input data and rearranges the values
@@ -247,7 +247,7 @@ def compute_permutation_importance(
         shuffle_indices = np.concatenate(
             [rng_.permutation(n) for _ in range(n_repeats)]
         )
-        X_shuffled = rearrange_rows_of_some_columns(
+        X_shuffled = _rearrange_rows_of_some_columns(
             X, features[feature_group], shuffle_indices
         )
 
