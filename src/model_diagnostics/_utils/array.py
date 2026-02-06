@@ -346,12 +346,12 @@ def safe_copy(x) -> npt.ArrayLike:
     copied_x : array-like
         A copy of the input data in the same format.
     """
-    if hasattr(x, "copy"):
-        # list, numpy, pandas, scipy sparse, ...
-        x = x.copy()
-    elif is_pyarrow_table(x) or isinstance(x, pl.DataFrame):
+    if is_pyarrow_table(x) or isinstance(x, pl.DataFrame):
         # Copy on Write
         pass
+    elif hasattr(x, "copy"):
+        # list, numpy, pandas, scipy sparse, ...
+        x = x.copy()
     elif not isinstance(x, tuple):
         x = copy.deepcopy(x)
     return x
