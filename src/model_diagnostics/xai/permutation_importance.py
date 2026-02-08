@@ -7,6 +7,7 @@ import polars as pl
 from model_diagnostics._utils.array import (
     get_column_names,
     get_second_dimension,
+    is_pyarrow_array,
     length_of_first_dimension,
     safe_assign_column,
     safe_copy,
@@ -246,8 +247,10 @@ def compute_permutation_importance(
             X, features[feature_group], shuffle_indices
         )
 
-        # np.split() ok on numpy array, pl/pd Series/DataFrame, but not on pa.tables
         predictions = pred_fun(X_shuffled)
+
+        if is_pyarrow_array(predictions):  # np.split() does not work on pyarrow arrays
+            predictions = predictions.to_numpy()
         scores_per_repetition = [
             scoring_function(y, pred, weights=weights)
             for pred in np.split(predictions, n_repeats, axis=0)

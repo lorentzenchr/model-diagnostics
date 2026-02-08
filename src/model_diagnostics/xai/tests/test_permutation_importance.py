@@ -13,8 +13,10 @@ from model_diagnostics._utils.array import (
 )
 from model_diagnostics._utils.test_helper import (
     SkipContainer,
+    pa_array,
     pa_table,
     pd_DataFrame,
+    pd_Series,
 )
 from model_diagnostics.scoring import PoissonDeviance, SquaredError
 from model_diagnostics.xai import compute_permutation_importance
@@ -164,3 +166,49 @@ def test_compute_permutation_importance_raises_errors():
     )
     with pytest.raises(ValueError, match=msg):
         compute_permutation_importance(predict, X=X, y=y, scoring_orientation="larger")
+
+
+@pytest.mark.parametrize(
+    "predict_return_type",
+    ["numpy", "pandas", "polars", "pyarrow"],
+)
+def test_prediction_function_return_types(predict_return_type):
+    """Test that prediction function can return different types of structures."""
+    X = pl.DataFrame(
+        {
+            "a": [0, 1, 2, 3, 4],
+            "b": [5, 6, 7, 8, 9],
+        }
+    )
+    y = np.array([0, 1, 2, 3, 4])
+
+    if predict_return_type == "numpy":
+
+        def predict(X):
+            return X["a"]
+    elif predict_return_type == "pandas":
+        if isinstance(pd_Series, SkipContainer):
+            pytest.skip("pandas not available")
+
+        def predict(X):
+            return pd_Series(X["a"])
+    elif predict_return_type == "polars":
+
+        def predict(X):
+            return pl.Series(X["a"])
+    elif predict_return_type == "pyarrow":
+        if isinstance(pa_array, SkipContainer):
+            pytest.skip("pyarrow not available")
+
+        def predict(X):
+            return pa_array(X["a"])
+
+    result = compute_permutation_importance(
+        predict,
+        X=X,
+        y=y,
+        n_repeats=2,
+        rng=0,
+    )
+
+    assert isinstance(result, pl.DataFrame)
