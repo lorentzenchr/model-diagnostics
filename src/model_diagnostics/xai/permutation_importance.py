@@ -7,6 +7,8 @@ import polars as pl
 from model_diagnostics._utils.array import (
     get_column_names,
     get_second_dimension,
+    is_pandas_df,
+    is_pandas_series,
     is_pyarrow_array,
     length_of_first_dimension,
     safe_assign_column,
@@ -249,7 +251,12 @@ def compute_permutation_importance(
 
         predictions = pred_fun(X_shuffled)
 
-        if is_pyarrow_array(predictions):  # np.split() does not work on pyarrow arrays
+        # np.split() does not work on pyarrow arrays and should not be used on Pandas
+        if (
+            is_pyarrow_array(predictions)
+            or is_pandas_df(predictions)
+            or is_pandas_series(predictions)
+        ):
             predictions = predictions.to_numpy()
         scores_per_repetition = [
             scoring_function(y, pred, weights=weights)
