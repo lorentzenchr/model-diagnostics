@@ -7,6 +7,9 @@ on:
     # 5 pm every 15th day of a month
     - cron: '0 5 15 * *'
 
+permissions:
+  contents: read
+
 env:
   PYTHONUNBUFFERED: "1"
   FORCE_COLOR: "1"
