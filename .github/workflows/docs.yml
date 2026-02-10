@@ -13,6 +13,9 @@ on:
   # To enable to manually trigger this action.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   FORCE_COLOR: "1"
 
