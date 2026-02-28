@@ -6,11 +6,14 @@ from numpy.testing import assert_array_equal
 from model_diagnostics._utils.array import (
     array_name,
     get_array_min_max,
+    get_column_names,
     get_second_dimension,
     get_sorted_array_names,
     is_pyarrow_table,
     length_of_first_dimension,
     length_of_second_dimension,
+    safe_assign_column,
+    safe_copy,
     safe_index_rows,
     validate_2_arrays,
     validate_same_first_dimension,
@@ -350,3 +353,51 @@ def test_safe_index_rows(a):
         assert_array_equal(a_sub, np.array([[-99, 0], [22, 2]]))
     else:
         assert_array_equal(a_sub, np.array([-99, 22]))
+
+
+@pytest.mark.parametrize(
+    ("a", "result"),
+    [
+        (np.array([[1, 2], [3, 4]]), ["0", "1"]),
+        (pa_table({"b": [0, 1], "a": ["A", "B"]}), ["b", "a"]),
+        (pd_DataFrame({"b": [0, 1], "a": 0.5}), ["b", "a"]),
+        (pl.DataFrame({"b": [0, 1], "a": 0.5}), ["b", "a"]),
+    ],
+)
+def test_get_column_names(a, result):
+    """Test that get_column_names() works correctly."""
+    if isinstance(a, SkipContainer):
+        pytest.skip("Module for data container not imported.")
+    assert get_column_names(a) == result
+
+
+@pytest.mark.parametrize(
+    ("a", "result"),
+    [
+        (np.array([[1, 2], [3, 4]]), np.array([[1, 2], [3, 4]])),
+        (
+            pa_table({"a": [0, 1], "b": ["A", "B"]}),
+            pa_table({"a": [0, 1], "b": ["A", "B"]}),
+        ),
+        (pd_DataFrame({"a": [0, 1], "b": 0.5}), pd_DataFrame({"a": [0, 1], "b": 0.5})),
+        (pl.DataFrame({"a": [0, 1], "b": 0.5}), pl.DataFrame({"a": [0, 1], "b": 0.5})),
+    ],
+)
+def test_safe_copy(a, result):
+    """Test that safe_copy() works correctly.
+
+    For simplicity, we only consider numerical values.
+    """
+    if isinstance(a, SkipContainer):
+        pytest.skip("Module for data container not imported.")
+
+    b = safe_copy(a)
+    b = safe_assign_column(b, values=[0, 0], column_index=1)  # has side-effects
+    assert_array_equal(a, result)
+    assert not np.array_equal(b, a)
+
+
+def test_that_else_condition_in_safe_copy_works():
+    """Test that the else condition in safe_copy() works."""
+    a = (0, 1, 2, 3)
+    assert safe_copy(a) == a

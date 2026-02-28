@@ -1,13 +1,10 @@
 import copy
 import sys
-import warnings
-from importlib.metadata import version
 from typing import Optional, Union
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-from packaging.version import Version, parse
 
 AL_or_polars = Union[npt.ArrayLike, pl.Series]
 
@@ -278,29 +275,7 @@ def safe_assign_column(x, values, column_index):
                     else values,
                     dtype=dtype,
                 )
-            if parse(version("pandas")) < Version("2.0.0"):
-                # FIXME: pandas >= 2.0 (<2.0 means 1.5.*)
-                with warnings.catch_warnings():
-                    msg = (
-                        r"In a future version, `df.iloc\[:, i\] = newvals` will "
-                        r"attempt to set the values inplace instead of always "
-                        r"setting a new array. To retain the old behavior, use either "
-                        r"`df\[df.columns\[i\]\] = newvals` or, if columns are "
-                        r"non-unique, `df.isetitem\(i, newvals\)`"
-                    )
-                    warnings.filterwarnings(
-                        "ignore", category=DeprecationWarning, message=msg
-                    )
-                    if not x.index.is_unique:
-                        # Pandas might error with:
-                        #   cannot reindex on an axis with duplicate labels
-                        # Try reindexing ourselves.
-                        x = x.reset_index()
-                    if not pd_values.index.is_unique:
-                        pd_values = pd_values.reset_index()
-                    x.iloc[:, column_index] = pd_values
-            else:
-                x.iloc[:, column_index] = pd_values
+            x.iloc[:, column_index] = pd_values
         except Exception as e:
             # FIXME: pyarrow version XXX
             # Older pyarrow versions of AttributeError do not have a 'add_note' method.
@@ -352,3 +327,62 @@ def safe_index_rows(x, indices):
     else:
         # numpy, polars
         return x[indices]
+
+
+def safe_copy(x) -> npt.ArrayLike:
+    """Create a safe copy of input data in various formats.
+
+    'Safe' means that it is guaranteed that the original data will not be modified
+    by modifications of the 'safe' copy. But only copy if really required.
+
+    Parameters
+    ----------
+    x : array-like
+        The input data to be copied, which can be numpy array, pandas DataFrame,
+        polars DataFrame, PyArrow Table, or other object types.
+
+    Returns
+    -------
+    copied_x : array-like
+        A copy of the input data in the same format.
+    """
+    if is_pyarrow_table(x) or isinstance(x, pl.DataFrame):
+        # Copy on Write
+        pass
+    elif hasattr(x, "copy"):
+        # list, numpy, pandas, scipy sparse, ...
+        x = x.copy()
+    elif not isinstance(x, tuple):
+        x = copy.deepcopy(x)
+    return x
+
+
+def get_column_names(x) -> list:
+    """Extract column names from different data containers.
+
+    This function handles different data container formats and returns
+    their column names or indices if names are not available.
+
+    Parameters
+    ----------
+    x : array-like
+        The input data which can be a numpy array, pandas DataFrame,
+        polars DataFrame, PyArrow Table, or other similar data container.
+
+    Returns
+    -------
+    list
+        A list of column names if available, or column indices (integers)
+        for array-like objects without named columns.
+    """
+    if is_pyarrow_table(x):
+        colnames = x.column_names
+    elif is_pandas_df(x):
+        colnames = x.columns.to_list()
+    elif hasattr(x, "columns") and isinstance(x.columns, list):
+        # polars
+        colnames = x.columns
+    else:
+        # e.g. numpy
+        colnames = [str(i) for i in range(x.shape[1])]
+    return colnames
