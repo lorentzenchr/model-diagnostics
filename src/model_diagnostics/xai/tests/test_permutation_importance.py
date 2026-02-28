@@ -14,7 +14,9 @@ from model_diagnostics._utils.array import (
 from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
+    pa_available,
     pa_table,
+    pd_available,
     pd_DataFrame,
     pd_Series,
 )
@@ -185,9 +187,9 @@ def test_prediction_function_return_types(predict_return_type):
     if predict_return_type == "numpy":
 
         def predict(X):
-            return X["a"]
+            return X["a"].to_numpy()
     elif predict_return_type == "pandas":
-        if isinstance(pd_Series, SkipContainer):
+        if not pd_available:
             pytest.skip("pandas not available")
 
         def predict(X):
@@ -197,7 +199,7 @@ def test_prediction_function_return_types(predict_return_type):
         def predict(X):
             return pl.Series(X["a"])
     elif predict_return_type == "pyarrow":
-        if isinstance(pa_array, SkipContainer):
+        if not pa_available:
             pytest.skip("pyarrow not available")
 
         def predict(X):
