@@ -886,7 +886,7 @@ def plot_marginal(
     ```
 
     For plotly, use the helper function
-    [`add_marginal_subplot`][model_diagnostics.calibration.plots.add_marginal_subplot]:
+    [`add_marginal_subplot`][model_diagnostics.calibration.add_marginal_subplot]:
 
     ```py
     from math import ceil
