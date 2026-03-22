@@ -1,5 +1,6 @@
-from .identification import compute_bias, compute_marginal, identification_function
-from .plots import (
+from ._compute import compute_bias, compute_marginal
+from ._identification import identification_function
+from ._plots import (
     add_marginal_subplot,
     plot_bias,
     plot_marginal,

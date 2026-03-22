@@ -1,5 +1,5 @@
-from .plots import plot_murphy_diagram
-from .scoring import (
+from ._plots import plot_murphy_diagram
+from ._scoring import (
     ElementaryScore,
     GammaDeviance,
     HomogeneousExpectileScore,

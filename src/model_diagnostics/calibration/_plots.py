@@ -23,7 +23,7 @@ from model_diagnostics._utils.array import (
 from model_diagnostics._utils.isotonic import IsotonicRegression
 from model_diagnostics._utils.plot_helper import get_plotly_color, is_plotly_figure
 
-from .identification import compute_bias, compute_marginal
+from ._compute import compute_bias, compute_marginal
 
 
 def plot_reliability_diagram(
@@ -886,7 +886,7 @@ def plot_marginal(
     ```
 
     For plotly, use the helper function
-    [`add_marginal_subplot`][model_diagnostics.calibration.plots.add_marginal_subplot]:
+    [`add_marginal_subplot`][model_diagnostics.calibration.add_marginal_subplot]:
 
     ```py
     from math import ceil

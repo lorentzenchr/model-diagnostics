@@ -12,14 +12,14 @@
 Highlights:
 
 - All common point predictions covered: mean, median, quantiles, expectiles.
-- Assess model calibration with [identification functions](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/identification/#model_diagnostics.calibration.identification.identification_function) (generalized residuals), [compute_bias](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/identification/#model_diagnostics.calibration.identification.compute_bias) and [compute_marginal](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/identification/#model_diagnostics.calibration.identification.compute_marginal).
+- Assess model calibration with [identification functions](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/#model_diagnostics.calibration.identification_function) (generalized residuals), [compute_bias](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/#model_diagnostics.calibration.compute_bias) and [compute_marginal](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/#model_diagnostics.calibration.compute_marginal).
 - Assess calibration and bias graphically
-    - [reliability diagrams](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/plots/#model_diagnostics.calibration.plots.plot_reliability_diagram) for auto-calibration
-    - [bias plots](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/plots/#model_diagnostics.calibration.plots.plot_bias) for conditional calibration
-    - [marginal plots](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/plots/#model_diagnostics.calibration.plots.plot_marginal) for average `y_obs`, `y_pred` and partial dependence for one feature
+    - [reliability diagrams](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/#model_diagnostics.calibration.plot_reliability_diagram) for auto-calibration
+    - [bias plots](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/#model_diagnostics.calibration.plot_bias) for conditional calibration
+    - [marginal plots](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/calibration/#model_diagnostics.calibration.plot_marginal) for average `y_obs`, `y_pred` and partial dependence for one feature
 - Assess the predictive performance of models
-    - strictly consistent, homogeneous [scoring functions](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/scoring/scoring/)
-    - [score decomposition](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/scoring/scoring/#model_diagnostics.scoring.scoring.decompose) into miscalibration, discrimination and uncertainty
+    - strictly consistent, homogeneous [scoring functions](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/scoring/)
+    - [score decomposition](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/scoring/#model_diagnostics.scoring.decompose) into miscalibration, discrimination and uncertainty
 - Choose your plot backend, either [matplotlib](https://matplotlib.org) or [plotly](https://plotly.com/python/), e.g., via [set_config](https://lorentzenchr.github.io/model-diagnostics/reference/model_diagnostics/#model_diagnostics.set_config).
 
 :rocket: To our knowledge, this is the first python package to offer reliability diagrams for quantiles and expectiles and a score decomposition, both made available by an internal implementation of isotonic quantile/expectile regression. :rocket:

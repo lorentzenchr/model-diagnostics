@@ -26,7 +26,7 @@ from model_diagnostics._utils.isotonic import (
     quantile_lower,
     quantile_upper,
 )
-from model_diagnostics.calibration import identification_function
+from model_diagnostics.calibration._identification import identification_function
 
 
 class _BaseScoringFunction(ABC):

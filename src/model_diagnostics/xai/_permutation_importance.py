@@ -15,7 +15,7 @@ from model_diagnostics._utils.array import (
     safe_copy,
     safe_index_rows,
 )
-from model_diagnostics.scoring import SquaredError
+from model_diagnostics.scoring._scoring import SquaredError
 
 
 def _rearrange_rows_of_some_columns(X, columns, row_indices):
