@@ -15,7 +15,7 @@ from model_diagnostics._utils.array import (
 )
 from model_diagnostics._utils.plot_helper import get_plotly_color, is_plotly_figure
 
-from .scoring import ElementaryScore
+from ._scoring import ElementaryScore
 
 
 def plot_murphy_diagram(

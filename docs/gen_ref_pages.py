@@ -17,7 +17,7 @@ log_msg = ["\n\tAPI tReference:"]
 for path in sorted(
     set(src.rglob("*.py"))
     - set(src.rglob("*tests/*.py"))
-    # - set(src.rglob("*/_[!_]*.py"))  # No single underscore file
+    - set(src.rglob("*/_[!_]*.py"))  # No single underscore file
     - set(src.rglob("*/_[!_]*/*.py"))  # No single underscore module
     - set(src.rglob("__about__.py"))
 ):
