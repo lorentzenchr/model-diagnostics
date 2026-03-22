@@ -120,7 +120,7 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
+# properdocs documentation
 /site
 
 # mypy
