@@ -21,12 +21,12 @@ from model_diagnostics._utils.array import (
     validate_2_arrays,
     validate_same_first_dimension,
 )
+from model_diagnostics._utils.identification import identification_function
 from model_diagnostics._utils.isotonic import (
     IsotonicRegression,
     quantile_lower,
     quantile_upper,
 )
-from model_diagnostics.calibration._identification import identification_function
 
 
 class _BaseScoringFunction(ABC):

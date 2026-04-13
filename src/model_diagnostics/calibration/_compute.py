@@ -14,9 +14,8 @@ from model_diagnostics._utils.array import (
     validate_same_first_dimension,
 )
 from model_diagnostics._utils.binning import bin_feature
-from model_diagnostics._utils.partial_dependence import compute_partial_dependence
-
-from ._identification import identification_function
+from model_diagnostics._utils.identification import identification_function
+from model_diagnostics.xai._partial_dependence import compute_partial_dependence
 
 
 def compute_bias(
@@ -776,7 +775,7 @@ def compute_marginal(
                 pd_values = compute_partial_dependence(
                     pred_fun=predict_function,  # type: ignore
                     X=X,  # type: ignore
-                    feature_index=feature_index,
+                    features=feature_index,
                     grid=grid,
                     weights=weights,
                     n_max=n_max,

@@ -1,5 +1,5 @@
 import copy
-from typing import Callable, Optional, Union
+from typing import Callable
 
 import numpy as np
 import numpy.typing as npt
@@ -17,11 +17,11 @@ from model_diagnostics._utils.array import (
 def compute_partial_dependence(
     pred_fun: Callable,
     X: npt.ArrayLike,
-    feature_index: int,
+    features: int | str,
     grid: npt.ArrayLike,
-    weights: Optional[npt.ArrayLike] = None,
+    weights: npt.ArrayLike | None = None,
     n_max: int = 1000,
-    rng: Optional[Union[np.random.Generator, int]] = None,
+    rng: np.random.Generator | int | None = None,
 ):
     """Compute partial dependence.
 
@@ -32,12 +32,12 @@ def compute_partial_dependence(
     ----------
     pred_fun : callable
         Prediction function, such that `pred_fun(X)` gives predicted values.
-     X : array-like of shape (n_obs, n_features)
+    X : array-like of shape (n_obs, n_features)
         The dataframe or array of features to be passed to the model predict function.
-    feature_index : int
-        Index / Position of the feature in `X`.
+    features : int or str
+        Column index or column name of the feature in `X`.
     grid : pl.Series
-        Values of the feature, specified by feature_index, for wich to compute partial
+        Values of the feature specified by `features`, for wich to compute partial
         dependence.
     weights : array-like of shape (n_obs) or None
         Case weights. If given, the bias is calculated as weighted average of the
@@ -81,7 +81,7 @@ def compute_partial_dependence(
         # pandas<2 does not allow "values" to have repeated indices
         X_stacked = X_stacked.reset_index(drop=True)
     X_stacked = safe_assign_column(
-        X_stacked, values=grid_stacked, column_index=feature_index
+        X_stacked, values=grid_stacked, column_index=features
     )
 
     y_pred = pred_fun(X_stacked)

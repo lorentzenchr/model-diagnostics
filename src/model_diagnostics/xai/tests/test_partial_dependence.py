@@ -15,7 +15,7 @@ from model_diagnostics._utils.array import (
     is_pyarrow_table,
     safe_index_rows,
 )
-from model_diagnostics._utils.partial_dependence import compute_partial_dependence
+from model_diagnostics.xai import compute_partial_dependence
 
 
 @pytest.mark.parametrize("n_max", [None, 50])
@@ -130,7 +130,7 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
     pd_values = compute_partial_dependence(
         pred_fun=predict,
         X=X,
-        feature_index=0,
+        features=0,
         grid=grid,
         weights=weights,
         n_max=n_max,
