@@ -2,7 +2,7 @@ import numpy as np
 import polars as pl
 import pytest
 from numpy.testing import assert_array_equal
-from polars.testing import assert_frame_equal
+from polars.testing import assert_frame_equal, assert_series_equal
 
 from model_diagnostics._utils.array import (
     array_name,
@@ -17,6 +17,7 @@ from model_diagnostics._utils.array import (
     safe_assign_column,
     safe_copy,
     safe_index_rows,
+    to_pl_series,
     validate_2_arrays,
     validate_same_first_dimension,
 )
@@ -330,7 +331,6 @@ def test_get_sorted_array_names():
             pl.DataFrame({"a": [1, 2, 3], "b": [0, 0, 0]}),
         ),
         (
-    
             pl.DataFrame({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]}),
             [0.1, 0.2, 0.3],
             1,
@@ -359,7 +359,6 @@ def test_get_sorted_array_names():
             pd_DataFrame({"a": [1, 2, 3], "b": [0, 0, 0]}),
         ),
         (
-    
             pd_DataFrame({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]}),
             [0.1, 0.2, 0.3],
             1,
@@ -388,7 +387,6 @@ def test_get_sorted_array_names():
             pa_table({"a": [1, 2, 3], "b": [0, 0, 0]}),
         ),
         (
-    
             pa_table({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]}),
             [0.1, 0.2, 0.3],
             1,
@@ -517,3 +515,32 @@ def test_that_else_condition_in_safe_copy_works():
     """Test that the else condition in safe_copy() works."""
     a = (0, 1, 2, 3)
     assert safe_copy(a) == a
+
+
+@pytest.mark.parametrize(
+    ("a", "result"),
+    [
+        (list(range(5)), pl.Series(range(5))),
+        (np.arange(5), pl.Series(range(5))),
+        (pl.Series(values=range(5), name="z"), pl.Series(values=range(5), name="z")),
+        (pa_array(range(5)), pl.Series(range(5))),
+        (pa_array(range(5), type="float32"), pl.Series(range(5), dtype=pl.Float32)),
+        (pa_array(["a", "b"]), pl.Series(["a", "b"])),
+        (pd_Series(range(5)), pl.Series(range(5))),
+        (pd_Series(range(5), dtype="float32"), pl.Series(range(5), dtype=pl.Float32)),
+        (pd_Series(["a", "b"]), pl.Series(["a", "b"])),
+        (
+            pd_Series(["a", "b"], dtype="category"),
+            pl.Series(["a", "b"], dtype=pl.Categorical),
+        ),
+    ],
+)
+def test_to_pl_series(a, result):
+    """Test that to_pl_series works as expected."""
+    if isinstance(a, SkipContainer):
+        pytest.skip("Module for data container not imported.")
+    x = to_pl_series(a, name=None)
+    assert_series_equal(x, result)
+
+    x = to_pl_series(x, name="a_nice_name")
+    assert x.name == "a_nice_name"

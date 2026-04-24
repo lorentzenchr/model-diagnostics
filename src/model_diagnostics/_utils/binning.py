@@ -9,6 +9,7 @@ from model_diagnostics._utils.array import (
     array_name,
     is_pandas_series,
     length_of_first_dimension,
+    to_pl_series,
 )
 
 
@@ -118,34 +119,15 @@ def bin_feature(
     feature_name = array_name(feature, default=default)
     # The following statement, i.e. possibly the creation of a pl.Categorical,
     # MUST be under the StringCache context manager!
-    try:
-        feature_out = pl.Series(name=feature_name, values=feature)
-    except ImportError:
-        # FIXME: pyarrow not installed
-        # For non numpy-backed columns, pyarrow is needed. Here we handle the case
-        # where pyarrow is not installed and such a pandas extention array is
-        # passed, e.g. with CategoricalDtype.
-        if is_pandas_series(feature):
-            pandas = sys.modules["pandas"]
-            is_pandas_categorical = isinstance(
-                feature.dtype,  # type: ignore
-                pandas.CategoricalDtype,
-            )
-            feature_out = pl.from_dataframe(
-                feature.to_frame(name=feature_name)  # type: ignore
-            )[:, 0]
-            if is_pandas_categorical and isinstance(feature_out.dtype, pl.Enum):
-                # Pandas categoricals usually get mapped to polars categoricals.
-                # But this code path gives pl.Enum.
-                feature_out = feature_out.cast(pl.Categorical)
-        else:
-            raise  # re-raises the ImportError
+    feature_out = to_pl_series(feature, name=feature_name)
+
     if length_of_first_dimension(feature_out) != n_obs:
         msg = (
             f"The feature array {feature_name} does not have length {n_obs} of its"
             " first dimension."
         )
         raise ValueError(msg)
+
     if feature_out.dtype == pl.Categorical:
         is_categorical = True
     elif feature_out.dtype == pl.Enum:
