@@ -2,6 +2,7 @@ import numpy as np
 import polars as pl
 import pytest
 from numpy.testing import assert_array_equal
+from polars.testing import assert_frame_equal
 
 from model_diagnostics._utils.array import (
     array_name,
@@ -9,6 +10,7 @@ from model_diagnostics._utils.array import (
     get_column_names,
     get_second_dimension,
     get_sorted_array_names,
+    is_pandas_df,
     is_pyarrow_table,
     length_of_first_dimension,
     length_of_second_dimension,
@@ -111,7 +113,7 @@ def test_get_second_dimension(a, i, result):
     """Test that get_second_dimension works correctly."""
     if isinstance(a, SkipContainer):
         pytest.skip("Module for data container not imported.")
-    np.testing.assert_array_equal(get_second_dimension(a, i), result)
+    assert_array_equal(get_second_dimension(a, i), result)
 
 
 @pytest.mark.parametrize(
@@ -309,6 +311,120 @@ def test_get_sorted_array_names():
     names, indices = get_sorted_array_names(y_pred)
     assert names == ["model_2", "model_3", "model_1", "3"]
     assert indices == [3, 2, 0, 1]
+
+
+@pytest.mark.parametrize(
+    ("x", "values", "column_index", "result"),
+    [
+        ([[1, 1], [2, 2], [3, 3]], [0] * 3, 1, [[1, 0], [2, 0], [3, 0]]),
+        (
+            [[1, "1"], [2, "2"], [3, "3"]],
+            ["a", "b", "c"] * 3,
+            1,
+            [[1, "a"], [2, "b"], [3, "c"]],
+        ),
+        (
+            pl.DataFrame({"a": [1, 2, 3], "b": [1, 2, 3]}),
+            [0] * 3,
+            1,
+            pl.DataFrame({"a": [1, 2, 3], "b": [0, 0, 0]}),
+        ),
+        (
+    
+            pl.DataFrame({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]}),
+            [0.1, 0.2, 0.3],
+            1,
+            pl.DataFrame({"a": [1, 2, 3], "b": [0.1, 0.2, 0.3]}),
+        ),
+        (
+            pl.DataFrame({"a": [1, 2, 3], "b": ["1", "2", "3"]}),
+            ["a", "b", "c"],
+            1,
+            pl.DataFrame({"a": [1, 2, 3], "b": ["a", "b", "c"]}),
+        ),
+        (
+            pl.DataFrame(
+                {"a": [1, 2, 3], "b": pl.Series(["1", "2", "3"], dtype=pl.Categorical)}
+            ),
+            ["a", "b", "c"],
+            1,
+            pl.DataFrame(
+                {"a": [1, 2, 3], "b": pl.Series(["a", "b", "c"], dtype=pl.Categorical)}
+            ),
+        ),
+        (
+            pd_DataFrame({"a": [1, 2, 3], "b": [1, 2, 3]}),
+            [0] * 3,
+            1,
+            pd_DataFrame({"a": [1, 2, 3], "b": [0, 0, 0]}),
+        ),
+        (
+    
+            pd_DataFrame({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]}),
+            [0.1, 0.2, 0.3],
+            1,
+            pd_DataFrame({"a": [1, 2, 3], "b": [0.1, 0.2, 0.3]}),
+        ),
+        (
+            pd_DataFrame({"a": [1, 2, 3], "b": ["1", "2", "3"]}),
+            ["a", "b", "c"],
+            1,
+            pd_DataFrame({"a": [1, 2, 3], "b": ["a", "b", "c"]}),
+        ),
+        (
+            pd_DataFrame(
+                {"a": [1, 2, 3], "b": pd_Series(["a", "b", "c"], dtype="category")}
+            ),
+            pd_Series(["c", "b", "a"], dtype="category"),
+            1,
+            pd_DataFrame(
+                {"a": [1, 2, 3], "b": pd_Series(["c", "b", "a"], dtype="category")}
+            ),
+        ),
+        (
+            pa_table({"a": [1, 2, 3], "b": [1, 2, 3]}),
+            [0] * 3,
+            1,
+            pa_table({"a": [1, 2, 3], "b": [0, 0, 0]}),
+        ),
+        (
+    
+            pa_table({"a": [1, 2, 3], "b": [1.1, 2.2, 3.3]}),
+            [0.1, 0.2, 0.3],
+            1,
+            pa_table({"a": [1, 2, 3], "b": [0.1, 0.2, 0.3]}),
+        ),
+        (
+            pa_table({"a": [1, 2, 3], "b": ["1", "2", "3"]}),
+            ["a", "b", "c"],
+            1,
+            pa_table({"a": [1, 2, 3], "b": ["a", "b", "c"]}),
+        ),
+    ],
+)
+@pytest.mark.parametrize("values_as_pl", [False, True])
+def test_safe_assign_column(x, values, column_index, result, values_as_pl):
+    """Test that safe_assign_column does its job."""
+    if isinstance(x, SkipContainer):
+        pytest.skip("Module for data container not imported.")
+
+    if values_as_pl:
+        if is_pandas_df(x) and "category" in [i.name for i in x.dtypes]:
+            values = pl.Series(values.to_numpy(), dtype=pl.Categorical)
+        else:
+            values = pl.Series(values)
+
+    x = safe_assign_column(x, values, column_index)
+    if isinstance(result, (list, np.ndarray)):
+        assert_array_equal(x, result)
+    elif is_pandas_df(x):
+        import pandas as pd
+
+        pd.testing.assert_frame_equal(x, result)
+    elif is_pyarrow_table(x):
+        assert x.equals(result)
+    else:
+        assert_frame_equal(x, result, check_exact=True)
 
 
 def test_safe_index_rows_raises():

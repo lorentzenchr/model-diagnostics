@@ -258,21 +258,29 @@ def safe_assign_column(x, values, column_index):
             #   Setting an item of incompatible dtype is deprecated and will raise in a
             #   future error of pandas.
             # Also, assigning with a different index makes troubles.
+            # Also, we avoid to have pyarrow installed, which newer version of polars
+            # need to series.to_pandas().
             pd = sys.modules["pandas"]
             dtype = x.dtypes.iloc[column_index]
-            if isinstance(values, pl.Series) and isinstance(
-                values.dtype, pl.Categorical
-            ):
-                # FIXME: pyarrow not installed
-                pd_values = pd.Series(
-                    data=values.cast(pl.Utf8).to_numpy(),
+            if isinstance(values, pl.Series):
+                if isinstance(values.dtype, (pl.Categorical, pl.String)):
+                    pd_values = pd.Series(
+                        data=values.cast(pl.String).to_numpy(),
+                        dtype=dtype,
+                    )
+                elif values.dtype.is_integer() or values.dtype.is_float():
+                    pd_values = pd.Series(
+                        data=values.to_numpy(),
+                        dtype=dtype,
+                    )
+                else:
+                    pd_values = pd.Series(
+                        data=values.to_pandas(),
                     dtype=dtype,
                 )
             else:
                 pd_values = pd.Series(
-                    data=values.to_pandas()
-                    if isinstance(values, pl.Series)
-                    else values,
+                    data=values,
                     dtype=dtype,
                 )
             x.iloc[:, column_index] = pd_values
