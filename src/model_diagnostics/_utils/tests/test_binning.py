@@ -1,3 +1,4 @@
+from datetime import date
 from importlib.metadata import version
 
 import numpy as np
@@ -6,7 +7,7 @@ import pytest
 from packaging.version import Version, parse
 from polars.testing import assert_series_equal
 
-from model_diagnostics._utils.binning import bin_feature
+from model_diagnostics._utils.binning import bin_feature, compute_grid
 
 
 def test_bin_feature_raises():
@@ -182,3 +183,66 @@ def test_binning_strings_with_rest():
     )
 
     assert_series_equal(f_binned["bin"], f_binned_expected)
+
+
+@pytest.mark.parametrize(
+    ("x", "n", "result"),
+    [
+        (pl.Series([11] * 30), 10, pl.Series([11])),
+        (pl.Series(range(10)), 10, pl.Series(range(10))),
+        (pl.Series(range(10)), 20, pl.Series(range(10))),
+        (pl.Series(range(10)), 4, pl.Series([0, 3, 6, 9])),
+        (pl.Series([11.1] * 30), 10, pl.Series([11.1])),
+        (pl.Series(np.linspace(0, 1, 11)), 11, pl.Series(np.linspace(0, 1, 11))),
+        (pl.Series(np.linspace(0, 1, 11)), 10, pl.Series(np.linspace(0, 1, 10))),
+        (pl.Series(np.linspace(0, 1, 11)), 9, pl.Series(np.linspace(0, 1, 9))),
+        (
+            pl.Series(np.linspace(0, 1, 11), dtype=pl.Float32),
+            2,
+            pl.Series([0.0, 1.0], dtype=pl.Float32),
+        ),
+        (pl.Series(["a", "b"]), 10, pl.Series(["a", "b"])),
+        (pl.Series(["a", "b", "b"]), 1, pl.Series(["b"])),
+        (
+            pl.Series(
+                [
+                    date(2000, 1, 1),
+                    date(2000, 1, 2),
+                    date(2000, 1, 10),
+                    date(2000, 1, 21),
+                ]
+            ),
+            3,
+            pl.Series([date(2000, 1, 1), date(2000, 1, 11), date(2000, 1, 21)]),
+        ),
+        (
+            pl.Series(
+                [
+                    date(2000, 1, 1),
+                    date(2000, 1, 2),
+                    date(2000, 1, 10),
+                    date(2000, 1, 21),
+                ]
+            ),
+            2,
+            pl.Series([date(2000, 1, 1), date(2000, 1, 21)]),
+        ),
+        (
+            pl.Series(
+                [
+                    date(2000, 1, 1),
+                    date(2000, 1, 2),
+                    date(2000, 1, 10),
+                    date(2000, 1, 20),
+                ]
+            ),
+            3,
+            pl.Series([date(2000, 1, 1), date(2000, 1, 10), date(2000, 1, 19)]),
+        ),
+    ],
+)
+def test_compute_grid(x, n, result):
+    """Test compute_grid returns as expected."""
+    pl.enable_string_cache()
+    grid = compute_grid(x, n=n)
+    assert_series_equal(grid, result, check_names=False)
