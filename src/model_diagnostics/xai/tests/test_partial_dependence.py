@@ -15,14 +15,18 @@ from model_diagnostics._utils.array import (
     is_pyarrow_table,
     safe_index_rows,
 )
+from model_diagnostics._utils.binning import compute_grid
 from model_diagnostics.xai import compute_partial_dependence
 
 
+@pytest.mark.parametrize("grid_auto", [False, True])
 @pytest.mark.parametrize("n_max", [None, 50])
 @pytest.mark.parametrize("weights", [None, True])
 @pytest.mark.parametrize("feature_type", ["numeric", "cat", "enum", "string"])
 @pytest.mark.parametrize("data_container", ["list", "pandas", "polars", "pyarrow"])
-def test_compute_partial_dependence(n_max, weights, feature_type, data_container):
+def test_compute_partial_dependence(
+    grid_auto, n_max, weights, feature_type, data_container
+):
     """Test compute_partial_dependence vs scikit-learn version."""
     try:
         pandas = sys.modules["pandas"]
@@ -91,25 +95,28 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
         # scikit-learn does not like integers in partial dependence
         X_skl["a"] = 1.0 * X_skl["a"]
 
-    grid = X.get_column("a").unique().sort()
-    # Make sure grid is the same data container as X.
-    if data_container == "list":
-        X = [list(row.values()) for row in X.to_dicts()]
-        grid = grid.to_list()
-    elif data_container == "pandas":
-        X = X_skl
-        if pyarrow is None:
-            grid = X_skl["a"].unique()
-            # Distunguish numpy array and ExtensionArray.
-            if isinstance(grid, np.ndarray):
-                grid.sort()
+    if grid_auto:
+        grid = X.get_column("a").unique().sort()
+        # Make sure grid is the same data container as X.
+        if data_container == "list":
+            X = [list(row.values()) for row in X.to_dicts()]
+            grid = grid.to_list()
+        elif data_container == "pandas":
+            X = X_skl
+            if pyarrow is None:
+                grid = X_skl["a"].unique()
+                # Distunguish numpy array and ExtensionArray.
+                if isinstance(grid, np.ndarray):
+                    grid.sort()
+                else:
+                    grid = grid.sort_values()
             else:
-                grid = grid.sort_values()
-        else:
-            grid = grid.to_pandas()
-    elif data_container == "pyarrow":
-        X = X.to_arrow()
-        grid = grid.to_arrow()
+                grid = grid.to_pandas()
+        elif data_container == "pyarrow":
+            X = X.to_arrow()
+            grid = grid.to_arrow()
+    else:
+        grid = n_bins
 
     if weights is not None:
         weights = np.ones(n_obs)
@@ -136,6 +143,9 @@ def test_compute_partial_dependence(n_max, weights, feature_type, data_container
         n_max=n_max,
         rng=rng,
     )
+
+    if not grid_auto:
+        grid = compute_grid(get_second_dimension(X, 0), n=n_bins)
 
     class ModelWrapPredict(RegressorMixin, BaseEstimator):
         def fit(self, X):

@@ -1,4 +1,5 @@
 import copy
+import operator
 from typing import Callable
 
 import numpy as np
@@ -6,19 +7,23 @@ import numpy.typing as npt
 import polars as pl
 
 from model_diagnostics._utils.array import (
+    get_column_names,
+    get_second_dimension,
     is_pandas_df,
     is_pyarrow_table,
     length_of_first_dimension,
     safe_assign_column,
     safe_index_rows,
+    to_pl_series,
 )
+from model_diagnostics._utils.binning import compute_grid
 
 
 def compute_partial_dependence(
     pred_fun: Callable,
     X: npt.ArrayLike,
     features: int | str,
-    grid: npt.ArrayLike,
+    grid: npt.ArrayLike | int = 10,
     weights: npt.ArrayLike | None = None,
     n_max: int = 1000,
     rng: np.random.Generator | int | None = None,
@@ -36,9 +41,11 @@ def compute_partial_dependence(
         The dataframe or array of features to be passed to the model predict function.
     features : int or str
         Column index or column name of the feature in `X`.
-    grid : pl.Series
+    grid : pl.Series or int
         Values of the feature specified by `features`, for wich to compute partial
         dependence.
+        If an integer is specified, a grid of `grid` points of the given feature is
+        constructed automatically using binning.
     weights : array-like of shape (n_obs) or None
         Case weights. If given, the bias is calculated as weighted average of the
         identification function with these weights.
@@ -54,7 +61,21 @@ def compute_partial_dependence(
         Partial dependence values for the grid.
     """
     n = length_of_first_dimension(X)
-    n_grid = length_of_first_dimension(grid)
+    try:
+        feature_idx = operator.index(features)  # type: ignore
+    except TypeError as err:
+        if isinstance(features, str):
+            feature_idx = get_column_names(X).index(features)
+        else:
+            msg = f"The argument 'features' must be an int or str; got {features}"
+        raise ValueError(msg) from err
+
+    try:
+        n_grid = operator.index(grid)  # type: ignore
+        feature_column = to_pl_series(get_second_dimension(X, feature_idx))
+        grid = compute_grid(feature_column, n=n_grid)
+    except TypeError:
+        n_grid = length_of_first_dimension(grid)
 
     # Usually, the data is too large and we need subsampling.
     if n_max is not None and n > n_max:
