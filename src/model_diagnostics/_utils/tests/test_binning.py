@@ -246,3 +246,4 @@ def test_compute_grid(x, n, result):
     pl.enable_string_cache()
     grid = compute_grid(x, n=n)
     assert_series_equal(grid, result, check_names=False)
+    pl.disable_string_cache()
