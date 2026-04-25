@@ -258,21 +258,29 @@ def safe_assign_column(x, values, column_index):
             #   Setting an item of incompatible dtype is deprecated and will raise in a
             #   future error of pandas.
             # Also, assigning with a different index makes troubles.
+            # Also, we avoid to have pyarrow installed, which newer versions of polars
+            # need to series.to_pandas().
             pd = sys.modules["pandas"]
             dtype = x.dtypes.iloc[column_index]
-            if isinstance(values, pl.Series) and isinstance(
-                values.dtype, pl.Categorical
-            ):
-                # FIXME: pyarrow not installed
-                pd_values = pd.Series(
-                    data=values.cast(pl.Utf8).to_numpy(),
-                    dtype=dtype,
-                )
+            if isinstance(values, pl.Series):
+                if isinstance(values.dtype, (pl.Categorical, pl.String)):
+                    pd_values = pd.Series(
+                        data=values.cast(pl.String).to_numpy(),
+                        dtype=dtype,
+                    )
+                elif values.dtype.is_integer() or values.dtype.is_float():
+                    pd_values = pd.Series(
+                        data=values.to_numpy(),
+                        dtype=dtype,
+                    )
+                else:
+                    pd_values = pd.Series(
+                        data=values.to_pandas(),
+                        dtype=dtype,
+                    )
             else:
                 pd_values = pd.Series(
-                    data=values.to_pandas()
-                    if isinstance(values, pl.Series)
-                    else values,
+                    data=values,
                     dtype=dtype,
                 )
             x.iloc[:, column_index] = pd_values
@@ -386,3 +394,33 @@ def get_column_names(x) -> list:
         # e.g. numpy
         colnames = [str(i) for i in range(x.shape[1])]
     return colnames
+
+
+def to_pl_series(x, name=None) -> pl.Series:
+    """Convert x to a polars Series."""
+    try:
+        feature_out = pl.Series(name=name, values=x)
+    except ImportError:
+        # FIXME: pyarrow not installed
+        # For non numpy-backed columns, pyarrow is needed. Here we handle the case
+        # where pyarrow is not installed and such a pandas extention array is
+        # passed, e.g. with CategoricalDtype.
+        if is_pandas_series(x):
+            pandas = sys.modules["pandas"]
+            is_pandas_categorical = isinstance(
+                x.dtype,  # type: ignore
+                pandas.CategoricalDtype,
+            )
+            feature_out = pl.from_dataframe(
+                x.to_frame(name=name)  # type: ignore
+            )[:, 0]
+            if name is None:
+                feature_out = feature_out.alias("")
+            if is_pandas_categorical and isinstance(feature_out.dtype, pl.Enum):
+                # Pandas categoricals usually get mapped to polars categoricals.
+                # But this code path gives pl.Enum.
+                feature_out = feature_out.cast(pl.Categorical)
+        else:
+            raise  # re-raises the ImportError
+
+    return feature_out

@@ -1,4 +1,4 @@
-import sys
+from math import ceil
 from typing import Optional, Union
 
 import numpy as np
@@ -7,8 +7,8 @@ import polars as pl
 
 from model_diagnostics._utils.array import (
     array_name,
-    is_pandas_series,
     length_of_first_dimension,
+    to_pl_series,
 )
 
 
@@ -118,34 +118,15 @@ def bin_feature(
     feature_name = array_name(feature, default=default)
     # The following statement, i.e. possibly the creation of a pl.Categorical,
     # MUST be under the StringCache context manager!
-    try:
-        feature_out = pl.Series(name=feature_name, values=feature)
-    except ImportError:
-        # FIXME: pyarrow not installed
-        # For non numpy-backed columns, pyarrow is needed. Here we handle the case
-        # where pyarrow is not installed and such a pandas extention array is
-        # passed, e.g. with CategoricalDtype.
-        if is_pandas_series(feature):
-            pandas = sys.modules["pandas"]
-            is_pandas_categorical = isinstance(
-                feature.dtype,  # type: ignore
-                pandas.CategoricalDtype,
-            )
-            feature_out = pl.from_dataframe(
-                feature.to_frame(name=feature_name)  # type: ignore
-            )[:, 0]
-            if is_pandas_categorical and isinstance(feature_out.dtype, pl.Enum):
-                # Pandas categoricals usually get mapped to polars categoricals.
-                # But this code path gives pl.Enum.
-                feature_out = feature_out.cast(pl.Categorical)
-        else:
-            raise  # re-raises the ImportError
+    feature_out = to_pl_series(feature, name=feature_name)
+
     if length_of_first_dimension(feature_out) != n_obs:
         msg = (
             f"The feature array {feature_name} does not have length {n_obs} of its"
             " first dimension."
         )
         raise ValueError(msg)
+
     if feature_out.dtype == pl.Categorical:
         is_categorical = True
     elif feature_out.dtype == pl.Enum:
@@ -299,3 +280,34 @@ def bin_feature(
             .collect()
         )
     return feature_out, n_bins_ef + feature_out.has_nulls(), f_binned
+
+
+def compute_grid(x: pl.Series, n: int) -> pl.Series:
+    """Compute a grid with n equal distributed points.
+
+    Best call this function inside a `with pl.StringCache()` context manager.
+    """
+    if x.dtype.is_numeric() or x.dtype.is_temporal():
+        f_min, f_max = x.min(), x.max()
+        if f_min == f_max:
+            return pl.Series([f_min], dtype=x.dtype)
+        elif x.dtype.is_float():
+            # pl.linear_space was added in version 1.21.0, we have minimum 1.1.0.
+            grid = pl.Series(np.linspace(f_min, f_max, n), dtype=x.dtype)
+        elif x.dtype.is_integer():
+            step = max(1, ceil((f_max - f_min + 1) / n))
+            grid = pl.int_range(f_min, f_max + 1, step, dtype=x.dtype, eager=True)
+        elif isinstance(x.dtype, (pl.Date, pl.Datetime, pl.Time)):
+            d_range = {
+                pl.Date: pl.date_range,
+                pl.Datetime: pl.datetime_range,
+                pl.Time: pl.time_range,
+            }
+            n_res = int((f_max - f_min) / f_min.resolution) // max(1, (n - 1))
+            grid = d_range[x.dtype](f_min, f_max, n_res * f_min.resolution, eager=True)
+            # TODO: pl.Duration
+    else:
+        # String, Categorical, Enum or complex types such as List, Union
+        grid = x.value_counts(sort=True).head(n)[:, 0]
+
+    return grid

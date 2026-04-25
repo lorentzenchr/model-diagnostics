@@ -1,27 +1,32 @@
 import copy
-from typing import Callable, Optional, Union
+import operator
+from typing import Callable
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
 
 from model_diagnostics._utils.array import (
+    get_column_names,
+    get_second_dimension,
     is_pandas_df,
     is_pyarrow_table,
     length_of_first_dimension,
     safe_assign_column,
     safe_index_rows,
+    to_pl_series,
 )
+from model_diagnostics._utils.binning import compute_grid
 
 
 def compute_partial_dependence(
     pred_fun: Callable,
     X: npt.ArrayLike,
-    feature_index: int,
-    grid: npt.ArrayLike,
-    weights: Optional[npt.ArrayLike] = None,
+    features: int | str,
+    grid: npt.ArrayLike | int = 10,
+    weights: npt.ArrayLike | None = None,
     n_max: int = 1000,
-    rng: Optional[Union[np.random.Generator, int]] = None,
+    rng: np.random.Generator | int | None = None,
 ):
     """Compute partial dependence.
 
@@ -32,13 +37,15 @@ def compute_partial_dependence(
     ----------
     pred_fun : callable
         Prediction function, such that `pred_fun(X)` gives predicted values.
-     X : array-like of shape (n_obs, n_features)
+    X : array-like of shape (n_obs, n_features)
         The dataframe or array of features to be passed to the model predict function.
-    feature_index : int
-        Index / Position of the feature in `X`.
-    grid : pl.Series
-        Values of the feature, specified by feature_index, for wich to compute partial
+    features : int or str
+        Column index or column name of the feature in `X`.
+    grid : pl.Series or int
+        Values of the feature specified by `features`, for wich to compute partial
         dependence.
+        If an integer is specified, a grid of `grid` points of the given feature is
+        constructed automatically using binning.
     weights : array-like of shape (n_obs) or None
         Case weights. If given, the bias is calculated as weighted average of the
         identification function with these weights.
@@ -54,7 +61,21 @@ def compute_partial_dependence(
         Partial dependence values for the grid.
     """
     n = length_of_first_dimension(X)
-    n_grid = length_of_first_dimension(grid)
+    try:
+        feature_idx = operator.index(features)  # type: ignore
+    except TypeError as err:
+        if isinstance(features, str):
+            feature_idx = get_column_names(X).index(features)
+        else:
+            msg = f"The argument 'features' must be an int or str; got {features}"
+        raise ValueError(msg) from err
+
+    try:
+        n_grid = operator.index(grid)  # type: ignore
+        feature_column = to_pl_series(get_second_dimension(X, feature_idx))
+        grid = compute_grid(feature_column, n=n_grid)
+    except TypeError:
+        n_grid = length_of_first_dimension(grid)
 
     # Usually, the data is too large and we need subsampling.
     if n_max is not None and n > n_max:
@@ -81,7 +102,7 @@ def compute_partial_dependence(
         # pandas<2 does not allow "values" to have repeated indices
         X_stacked = X_stacked.reset_index(drop=True)
     X_stacked = safe_assign_column(
-        X_stacked, values=grid_stacked, column_index=feature_index
+        X_stacked, values=grid_stacked, column_index=features
     )
 
     y_pred = pred_fun(X_stacked)

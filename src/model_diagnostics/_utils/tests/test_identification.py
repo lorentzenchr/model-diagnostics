@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from scipy.stats import expectile
 
-from model_diagnostics.calibration import identification_function
+from model_diagnostics._utils.identification import identification_function
 
 
 @pytest.mark.parametrize(
