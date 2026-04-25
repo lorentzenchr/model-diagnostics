@@ -298,4 +298,5 @@ doctest_optionflags = [
 filterwarnings = [
   # fail on any warnings that are not explicitly matched below
   "error",
+  "ignore:Support for the dataframe interchange protocol:DeprecationWarning",
 ]
