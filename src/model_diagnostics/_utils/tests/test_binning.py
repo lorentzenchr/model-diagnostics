@@ -241,9 +241,8 @@ def test_binning_strings_with_rest():
         ),
     ],
 )
+@pl.StringCache()
 def test_compute_grid(x, n, result):
     """Test compute_grid returns as expected."""
-    pl.enable_string_cache()
     grid = compute_grid(x, n=n)
     assert_series_equal(grid, result, check_names=False)
-    pl.disable_string_cache()
