@@ -47,24 +47,23 @@ nav:
     - Regression on Workers' Compensation: examples/regression_on_workers_compensation.ipynb
     - Quantile Regression: examples/quantile_regression.ipynb
     - Classification: examples/classification.ipynb
-  - API Reference: reference/  # defer to gen-files + literate-nav
+  - API Reference:
+    - api-reference/index.md
+    - api-reference/model_diagnostics.md
+    - api-reference/calibration.md
+    - api-reference/scoring.md
+    - api-reference/xai.md
   - Development: development.md
   - Release Notes: https://github.com/lorentzenchr/model-diagnostics/releases
 
 watch:
   - src/model_diagnostics/
-  - docs/development.md
-  - docs/index.md
+  - docs/
 
 plugins:
   # Built-in
   - search:
   # Extra
-  - gen-files:
-      scripts:
-        - docs/gen_ref_pages.py
-  - literate-nav:
-      nav_file: SUMMARY.md
   - section-index
   - mkdocstrings:
       default_handler: python
@@ -88,7 +87,7 @@ plugins:
             show_signature_annotations: false  # type annotations
             # Other
             show_bases: false
-            show_source: true
+            show_source: false
   - mkdocs-jupyter:
       include_requirejs: true  # needed for plotly
 
