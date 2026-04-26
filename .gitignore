@@ -120,7 +120,7 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# properdocs documentation
+# zensical documentation
 /site
 
 # mypy
@@ -131,6 +131,9 @@ dmypy.json
 # own notebooks
 notebook.ipynb
 untitled.ipynb
+
+# html versions of example noteboooks
+docs/examples/*.html
 
 # Pyre type checker
 .pyre/

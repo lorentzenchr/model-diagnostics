@@ -15,22 +15,30 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 env:
   FORCE_COLOR: "1"
 
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d  # v6
       - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98  # v6
-
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: 3.x
-
       - name: Install Hatch
         uses: pypa/hatch@a3c83ab3d481fbc2dc91dd0088628817488dd1d5
-
-      - name: Publish on github.io
-        run: hatch run docs:ci-build
+      - name: Build docs
+        run: hatch run docs:build
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5
+        with:
+          path: site
+      - uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128  # v5
+        id: deployment
