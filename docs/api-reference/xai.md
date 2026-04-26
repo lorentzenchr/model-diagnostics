@@ -6,13 +6,6 @@ Tools to explain aspects of a model.
     handler: python
     options:
       members:
-        - decompose
-        - plot_murphy_diagram
-        - ElementaryScore
-        - GammaDeviance
-        - HomogeneousExpectileScore
-        - HomogeneousQuantileScore
-        - LogLoss
-        - PinballLoss
-        - PoissonDeviance
-        - SquaredError
+        - compute_partial_dependence
+        - compute_permutation_importance
+        - plot_permutation_importance
