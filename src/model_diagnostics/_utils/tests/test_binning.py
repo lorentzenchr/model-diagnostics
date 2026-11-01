@@ -8,6 +8,7 @@ from packaging.version import Version, parse
 from polars.testing import assert_series_equal
 
 from model_diagnostics._utils.binning import bin_feature, compute_grid
+from model_diagnostics._utils.fixes import StringCache
 
 
 def test_bin_feature_raises():
@@ -25,7 +26,7 @@ def test_bin_feature_raises():
 @pytest.mark.parametrize("with_null", [False, True])
 @pytest.mark.parametrize("feature_type", ["str", "cat", "enum"])
 @pytest.mark.parametrize("n_bins", [3, 5])
-@pl.StringCache()
+@StringCache()
 def test_binning_strings_categorical(with_null, feature_type, n_bins):
     """Test that binning works for strings, categoricals, enums."""
     feature = pl.Series(name="my_feature", values=["a", "b", "c"] * 3 + ["e"])
@@ -241,7 +242,7 @@ def test_binning_strings_with_rest():
         ),
     ],
 )
-@pl.StringCache()
+@StringCache()
 def test_compute_grid(x, n, result):
     """Test compute_grid returns as expected."""
     grid = compute_grid(x, n=n)

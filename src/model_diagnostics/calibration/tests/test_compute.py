@@ -6,6 +6,7 @@ from polars.testing import assert_frame_equal, assert_series_equal
 from scipy.special import stdtr
 from scipy.stats import ttest_1samp
 
+from model_diagnostics._utils.fixes import StringCache
 from model_diagnostics._utils.test_helper import (
     SkipContainer,
     pa_array,
@@ -61,7 +62,7 @@ def test_compute_bias(feature, f_grouped):
     """Test compute_bias on simple data."""
     if isinstance(feature, SkipContainer):
         pytest.skip("Module for data container not imported.")
-    with pl.StringCache():
+    with StringCache():
         # The string cache is needed to avoid the following error message:
         # exceptions.ComputeError: Cannot compare categoricals originating from
         # different sources. Consider setting a global string cache.
@@ -264,7 +265,7 @@ def test_compute_bias_n_bins_string_like_feature(feature_type):
     else:
         dtype = pl.Utf8
 
-    with pl.StringCache():
+    with StringCache():
         n_bins = 3
         n_obs = 6
         y_obs = np.arange(n_obs)
@@ -300,7 +301,7 @@ def test_compute_bias_n_bins_string_like_feature(feature_type):
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
 def test_compute_bias_multiple_predictions(feature_type):
     """Test compute_bias for multiple predictions."""
-    with pl.StringCache():
+    with StringCache():
         n_obs = 10
         y_obs = np.ones(n_obs)
         y_obs[: 10 // 2] = 2
@@ -566,7 +567,7 @@ def test_compute_marginal(feature, f_grouped, bin_edges):
     """Test compute_marginal on simple data."""
     if isinstance(feature, SkipContainer):
         pytest.skip("Module for data container not imported.")
-    with pl.StringCache():
+    with StringCache():
         # The string cache is needed to avoid the following error message:
         # exceptions.ComputeError: Cannot compare categoricals originating from
         # different sources. Consider setting a global string cache.
@@ -795,7 +796,7 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
     else:
         dtype = pl.Utf8
 
-    with pl.StringCache():
+    with StringCache():
         n_bins = 3
         n_obs = 6
         y_obs = np.array([1, 1, 0, 3, 1, 2])
@@ -839,7 +840,7 @@ def test_compute_marginal_n_bins_string_like_feature(feature_type):
 @pytest.mark.parametrize("feature_type", ["cat", "num", "string"])
 def test_compute_marginal_multiple_predictions(feature_type):
     """Test compute_marginal for multiple predictions."""
-    with pl.StringCache():
+    with StringCache():
         n_obs = 10
         y_obs = np.ones(n_obs)
         y_obs[: 10 // 2] = 2

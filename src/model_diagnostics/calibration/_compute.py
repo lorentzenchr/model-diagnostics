@@ -14,6 +14,7 @@ from model_diagnostics._utils.array import (
     validate_same_first_dimension,
 )
 from model_diagnostics._utils.binning import bin_feature
+from model_diagnostics._utils.fixes import StringCache
 from model_diagnostics._utils.identification import identification_function
 from model_diagnostics.xai._partial_dependence import compute_partial_dependence
 
@@ -206,7 +207,7 @@ def compute_bias(
 
     n_obs = length_of_first_dimension(y_pred)
     df_list = []
-    with pl.StringCache():
+    with StringCache():
         feature_name = None
         if feature is not None:
             feature_series, n_bins, f_binned = bin_feature(
@@ -584,7 +585,7 @@ def compute_marginal(
 
     n_obs = length_of_first_dimension(y_pred)
     df_list = []
-    with pl.StringCache():
+    with StringCache():
         if feature_input is not None:
             feature, n_bins, f_binned = bin_feature(
                 feature=feature_input,

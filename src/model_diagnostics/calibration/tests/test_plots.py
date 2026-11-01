@@ -15,6 +15,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder
 
 from model_diagnostics import config_context
+from model_diagnostics._utils.fixes import StringCache
 from model_diagnostics._utils.plot_helper import (
     get_legend_list,
     get_title,
@@ -335,7 +336,7 @@ def test_plot_bias(
     if isinstance(feature, SkipContainer):
         pytest.skip("Module for data container not imported.")
 
-    with pl.StringCache():
+    with StringCache():
         if with_null_values:
             if feature_type == "cat_pandas":
                 feature[0] = None
@@ -547,7 +548,7 @@ def test_plot_marginal(with_null_values, feature_type, bin_method, ax, plot_back
         pytest.skip("Module for data container not imported.")
 
     if with_null_values:
-        with pl.StringCache():
+        with StringCache():
             if feature_type == "cat_pandas":
                 feature[0] = None
             elif feature_type in ["cat", "cat_physical", "enum"]:
