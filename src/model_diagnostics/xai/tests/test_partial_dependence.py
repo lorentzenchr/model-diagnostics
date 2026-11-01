@@ -5,6 +5,7 @@ import numpy as np
 import polars as pl
 import pytest
 from numpy.testing import assert_allclose, assert_equal
+from packaging.version import Version
 from polars.testing import assert_frame_equal
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.inspection import partial_dependence
@@ -55,7 +56,10 @@ def test_compute_partial_dependence(
         cat_index = [0]
     elif feature_type == "enum":
         dtype = pl.Enum(categories=X.get_column("a").unique().cast(pl.Utf8))
-        X = X.with_columns(pl.col("a").cast(dtype))
+        if Version(pl.__version__) < Version("2.0"):
+            X = X.with_columns(pl.col("a").cast(dtype))
+        else:
+            X = X.with_columns(pl.col("a").cat.to(dtype))
         cat_index = [0]
     elif feature_type == "string":
         dtype = pl.Utf8
