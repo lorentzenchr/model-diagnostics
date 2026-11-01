@@ -32,7 +32,7 @@ jobs:
     - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98  # v6
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
       with:
         python-version: ${{ matrix.python-version }}
 
