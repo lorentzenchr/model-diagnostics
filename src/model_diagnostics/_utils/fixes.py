@@ -1,3 +1,5 @@
+import contextlib
+
 import polars as pl
 from packaging.version import Version
 
@@ -6,7 +8,7 @@ if Version(pl.__version__) < Version("1.41.0"):
     StringCache = pl.StringCache
 else:
 
-    class StringCache:  # type: ignore
+    class StringCache(contextlib.ContextDecorator):  # type: ignore
         # Could be used as context manager, therefore needs __enter__ and __exit__.
         def __enter__(self):
             return self

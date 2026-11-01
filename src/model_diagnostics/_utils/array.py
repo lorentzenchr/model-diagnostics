@@ -134,7 +134,7 @@ def get_array_min_max(a: npt.ArrayLike):
             # simply convert to numpy.
             a_min, a_max = a_min.to_numpy().min(), a_max.to_numpy().max()
     else:
-        a_min, a_max = np.min(a), np.max(a)
+        a_min, a_max = np.min(a), np.max(a)  # type: ignore[arg-type]
     return a_min, a_max
 
 
