@@ -38,7 +38,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install Hatch
-      uses: pypa/hatch@a3c83ab3d481fbc2dc91dd0088628817488dd1d5
+      uses: pypa/hatch@f647ed70d49adb885f53a27d1c7f5bdaeacf2c60
 
     - if: matrix.python-version == '3.11' && runner.os == 'Linux'
       name: Formatter & Linter
